@@ -136,21 +136,33 @@ export class Engine {
         if (!res.ok) {
             throw new Error("MS Basic sound font not found (" + res.status + ")");
         }
-        const total = Number(res.headers.get("content-length")) || 0;
-        if (!res.body || !total) {
+        if (!res.body) {
             return res.arrayBuffer();
         }
-        const buf = new Uint8Array(total);
+        // Content-Length is the size on the wire, which is smaller than the data
+        // when the server compresses it (GitHub Pages does), so it only drives
+        // the progress estimate; the chunks are collected as they come.
+        const SF_SIZE = 51278610; // MS Basic.sf3, for progress when compressed
+        const wire = Number(res.headers.get("content-length")) || 0;
+        const expected = res.headers.get("content-encoding") ? SF_SIZE : (wire || SF_SIZE);
+        const chunks: Uint8Array[] = [];
+        let received = 0;
         const reader = res.body.getReader();
-        let off = 0;
         for (;;) {
             const { done, value } = await reader.read();
             if (done) {
                 break;
             }
-            buf.set(value, off);
-            off += value.length;
-            this.emit("audioStatus", { text: `Loading MS Basic sound font… ${Math.round(off / total * 100)}%` });
+            chunks.push(value);
+            received += value.length;
+            const pct = Math.min(99, Math.round(received / expected * 100));
+            this.emit("audioStatus", { text: `Loading MS Basic sound font… ${pct}%` });
+        }
+        const buf = new Uint8Array(received);
+        let off = 0;
+        for (const c of chunks) {
+            buf.set(c, off);
+            off += c.length;
         }
         return buf.buffer;
     }

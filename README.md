@@ -10,6 +10,9 @@ runs MuseScore 4.7.5's own C++ code compiled to WebAssembly:
 - its playback model (repeats, tempo, dynamics, articulations)
 - its audio engine (FluidSynth with the **MS Basic** sound font, its mixer and reverb)
 
+**Try it: https://howieyhy.github.io/mobilemusescore/** (on iPad: Safari →
+Share → *Add to Home Screen*, then open it once online so it can work offline).
+
 > "MuseScore" is a trademark of MuseScore Ltd. This project is not affiliated
 > with or endorsed by MuseScore Ltd, and will ship under its own name.
 > "Score Player" and the app ID `io.github.howieyhy.scoreplayer` are placeholders.
@@ -69,8 +72,8 @@ exported audio file.
 | Page counts vs desktop 4.7.5 | desktop `--score-meta` | 5/5 identical |
 | Browser test on "I am move it": open, all 22 pages drawn, play, audio clock vs position (8.00 s vs 8.01 s), solo, seek, tap-to-seek | Chromium | pass |
 | Same test | WebKit (Safari engine) on Windows | display passes; **audio not testable** in this build |
-| Offline: cache, cut network, reload, open, play | Chromium | pass (5.0 engine; to be rerun on 4.7.5) |
-| Android: open, play, timing, mute, seek | Android 16 emulator | pass (5.0 engine; to be rerun on 4.7.5) |
+| Offline: cache, cut network, reload, open, play | Chromium, local build **and the live GitHub Pages site** | pass |
+| Android: open, play, audio clock vs position (8.05 s vs 8.12 s), mute, seek | Android 16 emulator | pass (on a cold-booted emulator playback lagged until the emulator settled; worth watching on slower phones) |
 | iPad (A16, iPadOS 26.6.2), Android phone | — | **not yet** |
 
 ### Not supported or not yet checked
@@ -178,7 +181,7 @@ To make the desktop references, run your desktop MuseScore 4.7.5 with
 
 - **iPad / iPhone: installable web app.** Safari → Share → *Add to Home Screen*.
   - It works offline after the first visit.
-  - Safari only allows the audio engine on HTTPS pages, so the app will be published with GitHub Pages from this repository.
+  - Safari only allows the audio engine on HTTPS pages. The app is published with GitHub Pages from the `gh-pages` branch; `bash scripts/deploy-pages.sh` (after `npm run build` in `app/`) publishes a new build.
   - This route also avoids the App Store's conflict with the GPL, and needs no Mac.
 - **Android:** install the APK, or open the same web app in Chrome.
 - **First download:** about 80 MB, of which MS Basic is 49 MB. Updates replace the cached copy.

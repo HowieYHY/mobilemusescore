@@ -1,0 +1,4 @@
+# Keep these byte-exact on every platform: patches must apply, scripts must run in bash
+*.patch -text
+*.sh text eol=lf
+app/android/gradlew text eol=lf

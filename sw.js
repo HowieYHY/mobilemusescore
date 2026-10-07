@@ -4,23 +4,63 @@
 
 // Replaced with the build's content hash by scripts/gen-precache.mjs, so every
 // build is a new service worker and a new cache (old ones are deleted).
-const VERSION = "a19b7f2aa51705fa";
+const VERSION = "def6164b89b497b9";
 const CACHE = "pocketscore-" + VERSION;
+
+async function sha1(res) {
+    const digest = await crypto.subtle.digest("SHA-1", await res.arrayBuffer());
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// The copy of `url` kept by an earlier version, if any
+async function previous(url) {
+    for (const key of await caches.keys()) {
+        if (key !== CACHE && key.startsWith("pocketscore-")) {
+            const hit = await (await caches.open(key)).match(url);
+            if (hit) {
+                return hit;
+            }
+        }
+    }
+    return null;
+}
+
+async function tellPages(msg) {
+    for (const c of await self.clients.matchAll({ includeUncontrolled: true })) {
+        c.postMessage(msg);
+    }
+}
 
 self.addEventListener("install", (event) => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE);
         const res = await fetch("precache.json", { cache: "no-store" });
         const { files } = await res.json();
-        // big files first is fine; addAll fails as a whole, so add one by one
+        const total = files.reduce((a, f) => a + f.size, 0);
+        let done = 0;
+        let lastTold = 0;
+        // one by one (addAll fails as a whole). An update keeps the files that
+        // haven't changed (same content hash) instead of downloading the whole
+        // app again, so it finishes quickly, before the app is closed.
         for (const f of files) {
+            const url = new URL(f.url, self.registration.scope).href;
             try {
-                const r = await fetch(f.url, { cache: "no-store" });
-                if (r.ok) {
-                    await cache.put(new URL(f.url, self.registration.scope).href, r);
+                const prev = f.h ? await previous(url) : null;
+                if (prev && await sha1(prev.clone()) === f.h) {
+                    await cache.put(url, prev);
+                } else {
+                    const r = await fetch(f.url, { cache: "no-store" });
+                    if (r.ok) {
+                        await cache.put(url, r);
+                    }
                 }
             } catch (err) {
                 // offline during install: the fetch handler fills gaps later
+            }
+            done += f.size;
+            if (done - lastTold > total / 50) {
+                lastTold = done;
+                await tellPages({ type: "sw-progress", done, total });
             }
         }
         await self.skipWaiting();

@@ -3,6 +3,18 @@
 
 add_subdirectory(${AUDIO_ROOT}/engine audio_engine)
 
+# WebAssembly SIMD (Chrome 91+, Safari 16.4+): MuseScore's reverb has an SSE2
+# path, which Emscripten translates to wasm SIMD; FluidSynth's loops get
+# auto-vectorised.
+option(MSS_AUDIO_SIMD "Build the audio engine with WebAssembly SIMD" ON)
+if (MSS_AUDIO_SIMD)
+    foreach(t muse_audio_engine fluidsynth)
+        if (TARGET ${t})
+            target_compile_options(${t} PRIVATE -msimd128 -msse2)
+        endif()
+    endforeach()
+endif()
+
 if (MSS_MUSESCORE STREQUAL "4.7")
     # upstream WebRpcChannel (in muse_audio_common), JS bridge through embind
     add_executable(msaudio msaudio.cpp)
@@ -29,7 +41,7 @@ target_link_options(msaudio PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_ES6=1"
     "SHELL:-s EXPORT_NAME=createMsAudio"
-    "SHELL:-s ENVIRONMENT=shell,node"
+    "SHELL:-s ENVIRONMENT=shell,node,worker"
     "SHELL:-s SINGLE_FILE=1"
     "SHELL:-s WASM_ASYNC_COMPILATION=0"
     "SHELL:-s INITIAL_MEMORY=128MB"

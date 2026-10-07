@@ -22,8 +22,11 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 
 ## Current status (7 Oct 2026)
 
-**Working prototype.** It runs in browsers (Chromium and WebKit) and in an
-Android emulator. It has **not yet run on a physical phone or tablet**.
+**Working prototype.** It runs in browsers (Chromium and WebKit), in an
+Android emulator and, as the web app, on an iPad (A16, iPadOS 26.6.2), where it
+passed every check. A first Android phone test played choppily; the audio
+redesign below (render ahead in a worker) is the fix and still needs checking
+on that phone.
 
 ### What works
 
@@ -33,9 +36,9 @@ Android emulator. It has **not yet run on a physical phone or tablet**.
 | Score display | MuseScore's layout. Page counts of all five test scores match desktop 4.7.5, and page 1 of "I am move it" matches its saved thumbnail. Pictures (PNG, JPEG, GIF, BMP) are drawn. |
 | Zoom and scroll | Opens fitted to the screen width. Zoom with − / + or pinch. |
 | View modes | Page (default); Continuous vertical and horizontal. |
-| Play, pause, back to start | MuseScore's audio engine in an AudioWorklet. |
+| Play, pause, back to start | MuseScore's audio engine in a Web Worker, rendering ahead into an AudioWorklet. |
 | Seek | Position slider, or **tap a note or rest** to play from there. Repeats are respected. |
-| Playback cursor | Follows playback across pages and pauses following while you scroll. |
+| Playback cursor | Moves smoothly with the sound you hear (driven by the audio clock, corrected for the audio queued ahead). Follows playback across pages and pauses following while you scroll. |
 | Mixer | Master volume, plus per-part volume, mute, solo and reverb send. Same solo/mute rules as desktop. Each part's saved sound, volume and mute/solo are read from the score. |
 | Metronome | Engine switch, matching desktop's transport metronome (no button in the app yet). |
 | Offline | After the first visit, the web app opens and plays scores with no network. The Android app is offline by design. |
@@ -55,7 +58,7 @@ compared, at 48 kHz with the metronome on, as on your desktop:
 | Make me wanna smoke | 0.0 dB | 0.998 | 0.999 | same length, no drift |
 | Valerie | −0.1 dB | 0.950 | 0.981 | same length, no drift |
 
-- **The same notes, sounds, dynamics and tempo.** The level stays within ±1 dB in every half second. The remaining differences are millisecond-scale note timing: desktop's export processes audio in blocks of about 21 ms, this player in blocks of under 3 ms.
+- **The same notes, sounds, dynamics and tempo.** The level stays within ±1 dB in every half second. The remaining differences are millisecond-scale note timing: desktop's export processes audio in blocks of about 21 ms; these figures were measured with the player using blocks of under 3 ms (the app now renders in 1024-frame blocks, the same size as desktop).
 - **Your command-line references match your GUI MP3 exports** (0.4 dB difference, spectrum 0.99), so they are a sound yardstick.
 - **The engine version matters.** MuseScore 5.0's development engine played everything 2.1 dB louder and shaped dynamics differently, which is why the app now builds from 4.7.5.
 
@@ -76,8 +79,10 @@ exported audio file.
 | Browser test on "I am move it": open, all 22 pages drawn, play, audio clock vs position (8.00 s vs 8.01 s), solo, seek, tap-to-seek | Chromium | pass |
 | Same test | WebKit (Safari engine) on Windows | display passes; **audio not testable** in this build |
 | Offline: cache, cut network, reload, open, play | Chromium, local build **and the live GitHub Pages site** | pass |
-| Android: open, play, audio clock vs position (8.05 s vs 8.12 s), mute, seek | Android 16 emulator | pass (on a cold-booted emulator playback lagged until the emulator settled; worth watching on slower phones) |
-| iPad (A16, iPadOS 26.6.2), Android phone | — | **not yet** |
+| Slow-phone simulation: play 20 s with the CPU slowed 1×, 4×, 6× (`stress-test.mjs`) | Chromium | 0 audio gaps at every rate; cursor 60 / 59 / 43 fps |
+| Android: open, play, audio clock vs position (7.99 s vs 7.91 s), audio gaps (0), mute, seek | Android 16 emulator (software graphics) | pass |
+| Your tests: open, draw, play, mixer, seek | iPad (A16, iPadOS 26.6.2), web app | pass |
+| Android phone | — | first test choppy; **fix not yet checked on the phone** |
 
 ### Not supported or not yet checked
 
@@ -119,14 +124,36 @@ exported audio file.
 ## How it works
 
 ```
- page / app WebView                                    AudioWorklet (audio thread)
+ page / app WebView                                    audio Worker
 ┌───────────────────────┐ Worker ┌────────────────┐ MessagePort ┌─────────────────────────────┐
 │ UI: pages on canvas,  │◄──────►│ mscore.wasm    │◄───────────►│ msaudio.wasm                │
 │ transport, mixer      │        │ MuseScore      │  MuseScore's │ MuseScore 4.7.5 audio:      │
 │ (app/src/main.ts)     │        │ engraving +    │  audio RPC   │ FluidSynth + MS Basic.sf3,  │
 │                       │        │ playback model │              │ mixer, reverb               │
-└───────────────────────┘        └────────────────┘              └─────────────────────────────┘
+└───────────────────────┘        └────────────────┘              └──────────────┬──────────────┘
+                                                              1024-frame blocks │ MessagePort
+                                                                 ┌──────────────▼──────────────┐
+                                                                 │ AudioWorklet (audio thread) │
+                                                                 │ plays from its queue        │
+                                                                 └─────────────────────────────┘
 ```
+
+**Why the audio engine is not in the AudioWorklet.** At first, `msaudio` ran
+inside the worklet and was called for every 128-frame slice. A slow phone could
+not always finish that within the slice's ~2.7 ms deadline, so the sound
+stuttered. Now `msaudio-worker.js` renders 1024-frame blocks about 170 ms ahead.
+On an underrun the queue grows by two blocks, up to about 0.5 s. The worklet
+(`msaudio-worklet.js`) only copies from its queue.
+- **Keeping the cursor in time.** The worklet reports how much audio is
+  queued, and the page passes that latency to the score engine
+  (`mss_set_output_latency`), which reports the position you *hear*.
+- **Seek, pause and stop** flush the queue, and pause rewinds to the heard
+  position.
+- **Moving the cursor.** It is animated each frame from the audio clock and a
+  timeline of note positions (`mss_timeline`), not from position messages.
+- **Speed.** `muse_audio_engine` and FluidSynth are built with WebAssembly SIMD.
+  This takes rendering of 1024-frame blocks from about 16× to about 20× real time
+  on a desktop CPU.
 
 This is the same split as upstream MuseScore's experimental web build
 (`src/web`), with a light HTML UI instead of Qt.
@@ -200,6 +227,7 @@ METRONOME=1 RATE=48000 node scripts/compare-audio.mjs "real test musescore files
 (cd app && npx vite --port 5180) & node scripts/browser-test.mjs <score> chromium|webkit
 (cd app && npm run build && npx vite preview --port 5181) & node scripts/offline-test.mjs <score>
 node scripts/android-test.mjs <score>    # emulator or USB device, adb on PATH
+node scripts/stress-test.mjs <score> 4   # dev server; CPU slowed 4x, reports audio gaps and fps
 ```
 
 To make the desktop references, run your desktop MuseScore 4.7.5 with

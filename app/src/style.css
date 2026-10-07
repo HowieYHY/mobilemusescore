@@ -123,6 +123,9 @@ body {
 .page canvas { display: block; width: 100%; height: 100%; }
 .cursor {
   position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
   background: rgba(47, 125, 225, 0.55);
   border-radius: 2px;
   pointer-events: none;

@@ -10,6 +10,7 @@ export type WorkerRequest =
     | Req<{ cmd: "page"; index: number }>
     | Req<{ cmd: "cursor"; secs: number }>
     | Req<{ cmd: "tracks" }>
+    | Req<{ cmd: "timeline" }>
     | Req<{ cmd: "play" | "pause" | "stop" }>
     | Req<{ cmd: "seek"; secs: number }>
     | Req<{ cmd: "seekAt"; page: number; x: number; y: number }>
@@ -17,7 +18,9 @@ export type WorkerRequest =
     | Req<{ cmd: "balance"; key: number; value: number }>
     | Req<{ cmd: "mute" | "solo"; key: number; on: boolean }>
     | Req<{ cmd: "reverb"; key: number; amount: number }>
-    | Req<{ cmd: "masterVolume"; db: number }>;
+    | Req<{ cmd: "masterVolume"; db: number }>
+    | Req<{ cmd: "latency"; secs: number }>
+    | Req<{ cmd: "metronome"; on: boolean }>;
 
 export type WorkerReply =
     | { type: "reply"; id: number; result?: unknown; error?: string }

@@ -68,11 +68,22 @@ public:
     // NotationConfiguration). The metronome track is muted while it is off.
     void setMetronome(bool on);
 
+    // How far the audio engine runs ahead of what is heard (audio queued for
+    // the speaker plus device latency). The cursor and the pause point are
+    // shifted back by this much.
+    void setOutputLatency(double secs) { m_outputLatency = std::max(0.0, secs); }
+
     std::string tracksJson() const;
     std::string scoreInfoJson() const;
 
     // Where the playback cursor sits at this position, as JSON.
     std::string cursorJson(double secs) const;
+
+    // The whole played timeline (repeats unrolled) as cursor key points, so the
+    // page can animate the cursor from the audio clock without asking:
+    // [[secs, page, x, y, h], ...] in page units; x is interpolated between
+    // consecutive points on the same system.
+    std::string timelineJson() const;
 
 private:
     struct Track {
@@ -127,5 +138,6 @@ private:
     bool m_playbackSetUp = false;
     double m_totalPlayTime = 0;
     bool m_metronome = false;
+    double m_outputLatency = 0.0;
 };
 }

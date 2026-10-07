@@ -94,7 +94,7 @@ MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
 
 - **No sound on iPhone or iPad:** check the volume buttons, and that Bluetooth isn't sending sound to another device.
 - **"Audio could not start":** close PocketScore completely, reopen it, and tap Play again.
-- **Choppy sound on Android:** known on some phones and being worked on. Closing other apps helps.
+- **Choppy sound or jumpy scrolling on Android:** update to the latest version (reinstall the APK, or reload the website). If it still happens, please report it with your phone model.
 - **A score won't open:** make sure it is a `.mscz` file saved by MuseScore.
 
 To report a problem, [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or send the

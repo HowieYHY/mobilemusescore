@@ -20,6 +20,9 @@ export class Engine {
     private node: AudioWorkletNode | null = null;
     private rpcForAudio: MessagePort;
     private audioStarting: Promise<void> | null = null;
+    private audioWorker: Worker | null = null;
+    private lastLatency = -1;
+    underruns = 0;
     readonly base: string;
 
     constructor(base = import.meta.env.BASE_URL) {
@@ -102,27 +105,40 @@ export class Engine {
                 ctx.audioWorklet.addModule(this.base + "worklet/msaudio-worklet.js"),
             ]);
 
+            // MuseScore's audio engine renders ahead in its own worker; the
+            // AudioWorklet only plays from the queue it is sent.
             const node = new AudioWorkletNode(ctx, "msaudio", { numberOfInputs: 0, outputChannelCount: [2] });
             this.node = node;
             node.connect(ctx.destination);
+            node.port.onmessage = (e) => {
+                if (e.data.type === "queued") {
+                    this.onQueued(e.data.frames, e.data.underruns);
+                }
+            };
 
+            const worker = new Worker(this.base + "worklet/msaudio-worker.js", { type: "module" });
+            this.audioWorker = worker;
             const ready = new Promise<void>((resolve, reject) => {
-                node.port.onmessage = (e) => {
+                worker.onmessage = (e) => {
                     const m = e.data;
                     if (m.type === "ready") {
                         resolve();
                     } else if (m.type === "error") {
                         reject(new Error(m.text));
-                    } else if (m.type === "log" && /ERROR|WARN/.test(m.text)) {
+                    } else if (m.type === "log" && /ERROR|WARN|underrun/.test(m.text)) {
                         console.warn("[audio engine]", m.text);
                     }
                 };
+                worker.onerror = (e) => reject(new Error(e.message || "audio worker failed"));
             });
 
-            // The worker must be listening before the engine announces itself
-            await this.request({ cmd: "startAudio", sampleRate: ctx.sampleRate, blockSize: 128, soundFontUri: "file://" + SOUND_FONT_PATH });
-            node.port.postMessage({ type: "init", rpcPort: this.rpcForAudio, soundFont: sf, soundFontPath: SOUND_FONT_PATH },
-                [this.rpcForAudio, sf]);
+            const audioPath = new MessageChannel(); // engine worker -> worklet
+            node.port.postMessage({ type: "init", inPort: audioPath.port2 }, [audioPath.port2]);
+
+            // The score engine must be listening before the audio engine announces itself
+            await this.request({ cmd: "startAudio", sampleRate: ctx.sampleRate, blockSize: 1024, soundFontUri: "file://" + SOUND_FONT_PATH });
+            worker.postMessage({ type: "init", rpcPort: this.rpcForAudio, outPort: audioPath.port1, soundFont: sf, soundFontPath: SOUND_FONT_PATH },
+                [this.rpcForAudio, audioPath.port1, sf]);
             await ready;
             this.emit("audioStatus", { text: "" });
         })();
@@ -167,6 +183,34 @@ export class Engine {
         return buf.buffer;
     }
 
+    // How far the engine is ahead of the speaker: the queued audio plus the
+    // device's own output latency. The score engine shifts the cursor and the
+    // pause point by this much so they match what is heard.
+    private onQueued(frames: number, underruns: number) {
+        if (!this.ctx) {
+            return;
+        }
+        this.underruns = underruns;
+        const out = (this.ctx as any).outputLatency || 0;
+        const latency = frames / this.ctx.sampleRate + (this.ctx.baseLatency || 0) + out;
+        if (Math.abs(latency - this.lastLatency) > 0.01) {
+            this.lastLatency = latency;
+            void this.request({ cmd: "latency", secs: latency });
+        }
+    }
+
+    // Drop audio queued ahead of the speaker, so a seek, pause or stop is heard at once
+    private flush() {
+        this.node?.port.postMessage({ type: "flush" });
+    }
+
+    // The audio clock, in seconds (0 before audio starts)
+    get audioTime(): number {
+        return this.ctx ? this.ctx.currentTime : 0;
+    }
+
+    timeline(): Promise<[number, number, number, number, number][]> { return this.request({ cmd: "timeline" }); }
+
     get audioRunning() {
         return this.ctx?.state === "running";
     }
@@ -180,10 +224,14 @@ export class Engine {
     cursor(secs: number): Promise<CursorInfo> { return this.request({ cmd: "cursor", secs }); }
     tracks(): Promise<TrackInfo[]> { return this.request({ cmd: "tracks" }); }
     play() { return this.request({ cmd: "play" }); }
-    pause() { return this.request({ cmd: "pause" }); }
-    stop() { return this.request({ cmd: "stop" }); }
-    seek(secs: number) { return this.request({ cmd: "seek", secs }); }
-    seekAt(page: number, x: number, y: number): Promise<CursorInfo | null> { return this.request({ cmd: "seekAt", page, x, y }); }
+    async pause() { await this.request({ cmd: "pause" }); this.flush(); }
+    async stop() { await this.request({ cmd: "stop" }); this.flush(); }
+    async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); }
+    async seekAt(page: number, x: number, y: number): Promise<CursorInfo | null> {
+        const c = await this.request<CursorInfo | null>({ cmd: "seekAt", page, x, y });
+        this.flush();
+        return c;
+    }
     setVolume(key: number, db: number) { return this.request({ cmd: "volume", key, db }); }
     setBalance(key: number, value: number) { return this.request({ cmd: "balance", key, value }); }
     setMute(key: number, on: boolean) { return this.request({ cmd: "mute", key, on }); }

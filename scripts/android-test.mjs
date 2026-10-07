@@ -66,10 +66,14 @@ try {
     console.log(`playing after ${Date.now() - t0} ms (includes loading MS Basic)`);
 
     await page.waitForTimeout(3000); // emulator start-up: position updates catch up first
-    const a = await page.evaluate(() => ({ pos: app.state.position, clock: app.engine.ctx.currentTime, rate: app.engine.ctx.sampleRate, base: app.engine.ctx.baseLatency }));
+    const a = await page.evaluate(() => ({ under: app.engine.underruns, pos: app.state.position, clock: app.engine.ctx.currentTime, rate: app.engine.ctx.sampleRate, base: app.engine.ctx.baseLatency }));
     await page.waitForTimeout(8000);
-    const b = await page.evaluate(() => ({ pos: app.state.position, clock: app.engine.ctx.currentTime }));
-    console.log(`audio clock +${(b.clock - a.clock).toFixed(2)} s, score position +${(b.pos - a.pos).toFixed(2)} s (sample rate ${a.rate})`);
+    const b = await page.evaluate(() => ({ under: app.engine.underruns, pos: app.state.position, clock: app.engine.ctx.currentTime }));
+    console.log(`audio clock +${(b.clock - a.clock).toFixed(2)} s, score position +${(b.pos - a.pos).toFixed(2)} s (sample rate ${a.rate}), `
+        + `${b.under - a.under} audio gap(s)`);
+    if (b.under > a.under) {
+        fail("audio had gaps (underruns) during steady playback");
+    }
     if (b.clock - a.clock < 6) {
         fail("audio clock is not running in real time (audio output stalled?)");
     }

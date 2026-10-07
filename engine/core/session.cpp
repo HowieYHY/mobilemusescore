@@ -354,7 +354,9 @@ void Session::onAudioReady()
     m_audioReady = true;
 
     m_audio->positionChanged().onReceive(this, [this](double pos) {
-        emit("position", cursorJson(pos));
+        // the engine renders ahead; show where the listener is
+        const double heard = m_audio->status() == PlaybackStatus::Running ? std::max(0.0, pos - m_outputLatency) : pos;
+        emit("position", cursorJson(heard));
         if (pos + 0.001 >= m_totalPlayTime && m_totalPlayTime > 0) {
             m_audio->stop(); // as in PlaybackController::setupPlayer
         }
@@ -881,7 +883,14 @@ void Session::play()
 void Session::pause()
 {
     if (m_audio && m_audio->status() == PlaybackStatus::Running) {
+        // stop where the listener is, not where the engine has rendered to: the
+        // audio queued ahead is dropped, and resuming continues from here
+        const double heard = std::max(0.0, m_audio->position() - m_outputLatency);
         m_audio->pause();
+        if (m_outputLatency > 0.0) {
+            m_audio->seek(heard, true);
+            emit("position", cursorJson(heard));
+        }
     }
 }
 
@@ -1037,6 +1046,63 @@ std::string Session::tracksJson() const
 
 // ---------------------------------------------------------------------------
 // Position: as in NotationPlayback::secToTick and PlaybackCursor::resolveCursorRectByTick
+
+std::string Session::timelineJson() const
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "[]";
+    }
+
+    const double spatium = score->style().spatium();
+    const std::vector<Page*>& pages = score->pages();
+    std::string out = "[";
+    bool first = true;
+
+    auto point = [&](int utick, const System* system, double canvasX) {
+        const Page* page = system->page();
+        if (!page) {
+            return;
+        }
+        // as in PlaybackCursor::resolveCursorRectByTick / calculateRect
+        double bottomY = 0.0;
+        for (size_t i = 0; i < score->nstaves(); ++i) {
+            const SysStaff* ss = system->staff(i);
+            if (!ss->show() || !score->staff(i)->show()) {
+                continue;
+            }
+            bottomY = ss->bbox().bottom();
+        }
+        const int pageIdx = int(std::find(pages.begin(), pages.end(), page) - pages.begin());
+        const double x = canvasX - spatium - page->pos().x();
+        const double y = system->staffCanvasYpage(0) - 3.0 * spatium;
+        const double h = bottomY + 6.0 * spatium;
+        if (!first) {
+            out += ",";
+        }
+        first = false;
+        out += "[" + num(std::round(uticksToSecs(score, utick) * 10000.0) / 10000.0) + "," + std::to_string(pageIdx) + ","
+               + num(std::round(x)) + "," + num(std::round(y)) + "," + num(std::round(h)) + "]";
+    };
+
+    for (const RepeatSegment* rs : playedRepeats(score)) {
+        const int offset = rs->utick - rs->tick;
+        for (const Measure* m : rs->measureList()) {
+            const System* system = m->system();
+            if (!system || system->staves().empty()) {
+                continue;
+            }
+            for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+                if (s->visible()) {
+                    point(s->tick().ticks() + offset, system, s->canvasPos().x());
+                }
+            }
+            const Segment* endBar = m->findSegment(SegmentType::EndBarLine, m->endTick());
+            point(m->endTick().ticks() + offset, system, endBar ? endBar->canvasPos().x() : m->canvasPos().x() + m->width());
+        }
+    }
+    return out + "]";
+}
 
 double Session::totalPlayTime() const
 {

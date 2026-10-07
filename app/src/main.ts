@@ -269,6 +269,7 @@ for (const ev of ["wheel", "touchmove"]) {
 
 let lastCursor: CursorInfo | null = null;
 let cursorEl: HTMLDivElement | null = null;
+let lastFollowCheck = 0;
 
 function showCursor(c: CursorInfo | null) {
     lastCursor = c;
@@ -285,12 +286,14 @@ function showCursor(c: CursorInfo | null) {
         pageEl.appendChild(cursorEl);
     }
     const w = Math.max(3, unitsToCss(c.w!));
-    cursorEl.style.left = unitsToCss(c.x!) + "px";
-    cursorEl.style.top = unitsToCss(c.y!) + "px";
+    cursorEl.style.transform = `translate(${unitsToCss(c.x!)}px, ${unitsToCss(c.y!)}px)`;
     cursorEl.style.width = w + "px";
     cursorEl.style.height = unitsToCss(c.h!) + "px";
 
-    if (state.playing && performance.now() > state.followUntil) {
+    // checking the view means reading layout, so a few times a second is enough
+    const now = performance.now();
+    if (state.playing && now > state.followUntil && now - lastFollowCheck > 200) {
+        lastFollowCheck = now;
         followCursor(pageEl);
     }
 }
@@ -312,19 +315,86 @@ function followCursor(pageEl: HTMLElement) {
     void pageEl;
 }
 
-engine.on("position", (c: CursorInfo) => {
-    state.position = c.secs;
-    state.duration = c.duration || state.duration;
-    if (!state.seeking) {
-        ui.seek.value = String(Math.round(c.secs / Math.max(1, state.duration) * 1000));
+// The audio engine renders ahead and reports its position in bursts, so while
+// playing the cursor is moved every frame from the audio clock, anchored to
+// those reports, using the score's timeline (see Session::timelineJson).
+type TimelinePoint = [number, number, number, number, number]; // secs, page, x, y, h
+let timeline: TimelinePoint[] = [];
+const anchor = { secs: 0, clock: 0 };
+
+async function loadTimeline() {
+    timeline = await engine.timeline();
+}
+
+function cursorFromTimeline(secs: number): CursorInfo | null {
+    if (!timeline.length) {
+        return null;
     }
-    ui.time.textContent = fmt(c.secs);
+    let lo = 0;
+    let hi = timeline.length - 1;
+    if (secs < timeline[0][0]) {
+        hi = 0;
+    }
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (timeline[mid][0] <= secs) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    const a = timeline[lo];
+    const b = timeline[lo + 1];
+    let x = a[2];
+    if (b && b[1] === a[1] && b[3] === a[3] && b[0] > a[0]) {
+        x = a[2] + (b[2] - a[2]) * Math.min(1, (secs - a[0]) / (b[0] - a[0]));
+    }
+    return { secs, duration: state.duration, page: a[1], x, y: a[3], w: 0.4 * (state.score?.spatium || 25), h: a[4] };
+}
+
+engine.on("position", (c: CursorInfo) => {
+    state.duration = c.duration || state.duration;
     ui.bar.textContent = c.measure ? `Bar ${c.measure}` : "";
-    showCursor(c);
+    const clock = engine.audioTime;
+    if (state.playing && clock > 0) {
+        // re-anchor only when the clock estimate has drifted (reports come in bursts)
+        const predicted = anchor.secs + (clock - anchor.clock);
+        if (Math.abs(predicted - c.secs) > 0.08) {
+            anchor.secs = c.secs;
+            anchor.clock = clock;
+        }
+        return;
+    }
+    anchor.secs = c.secs;
+    anchor.clock = clock;
+    showPosition(c.secs, c);
 });
 
+function showPosition(secs: number, fallback?: CursorInfo) {
+    state.position = secs;
+    if (!state.seeking) {
+        ui.seek.value = String(Math.round(secs / Math.max(1, state.duration) * 1000));
+    }
+    ui.time.textContent = fmt(secs);
+    showCursor(cursorFromTimeline(secs) || fallback || null);
+}
+
+function animate() {
+    if (state.playing) {
+        const secs = Math.min(state.duration, Math.max(0, anchor.secs + (engine.audioTime - anchor.clock)));
+        showPosition(secs);
+    }
+    requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
 engine.on("status", (s) => {
-    state.playing = s.status === "playing";
+    const nowPlaying = s.status === "playing";
+    if (nowPlaying && !state.playing) {
+        anchor.secs = state.position;
+        anchor.clock = engine.audioTime;
+    }
+    state.playing = nowPlaying;
     ui.play.innerHTML = state.playing ? ICON_PAUSE : ICON_PLAY;
     ui.play.setAttribute("aria-label", state.playing ? "Pause" : "Play");
 });
@@ -517,6 +587,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     state.zoom = fitWidthZoom();
     renderGeneration++;
     buildPages();
+    void loadTimeline();
     ui.viewer.scrollTop = 0;
     ui.viewer.scrollLeft = 0;
     setStatus(engine.audioRunning ? "Loading instrument sounds…" : "Tap Play to start playback.", "info", engine.audioRunning ? 0 : 4000);
@@ -525,6 +596,7 @@ async function openScore(name: string, data: ArrayBuffer) {
 ui.viewMode.onchange = async () => {
     setStatus("Laying out…");
     state.score = await engine.setViewMode(ui.viewMode.value as ViewMode);
+    await loadTimeline();
     rerenderAll(false);
     setStatus("");
 };

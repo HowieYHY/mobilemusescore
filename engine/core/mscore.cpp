@@ -80,6 +80,11 @@ EMSCRIPTEN_KEEPALIVE const char* mss_tracks()
     return ret(Session::instance()->tracksJson());
 }
 
+EMSCRIPTEN_KEEPALIVE const char* mss_timeline()
+{
+    return ret(Session::instance()->timelineJson());
+}
+
 EMSCRIPTEN_KEEPALIVE const char* mss_cursor(double secs)
 {
     return ret(Session::instance()->cursorJson(secs));
@@ -103,4 +108,5 @@ EMSCRIPTEN_KEEPALIVE void mss_set_track_solo(int key, int solo) { Session::insta
 EMSCRIPTEN_KEEPALIVE void mss_set_track_reverb(int key, double amount) { Session::instance()->setReverbSend(key, amount); }
 EMSCRIPTEN_KEEPALIVE void mss_set_master_volume(double db) { Session::instance()->setMasterVolume(db); }
 EMSCRIPTEN_KEEPALIVE void mss_set_metronome(int on) { Session::instance()->setMetronome(on != 0); }
+EMSCRIPTEN_KEEPALIVE void mss_set_output_latency(double secs) { Session::instance()->setOutputLatency(secs); }
 }

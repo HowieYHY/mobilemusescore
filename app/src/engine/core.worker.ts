@@ -129,6 +129,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "cursor":
             result = JSON.parse(callStr("mss_cursor", req.secs));
             break;
+        case "timeline":
+            result = JSON.parse(callStr("mss_timeline"));
+            break;
         case "tracks":
             result = JSON.parse(callStr("mss_tracks"));
             break;
@@ -146,6 +149,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "solo": callVoid("mss_set_track_solo", req.key, req.on ? 1 : 0); break;
         case "reverb": callVoid("mss_set_track_reverb", req.key, req.amount); break;
         case "masterVolume": callVoid("mss_set_master_volume", req.db); break;
+        case "latency": callVoid("mss_set_output_latency", req.secs); break;
+        case "metronome": callVoid("mss_set_metronome", req.on ? 1 : 0); break;
         }
         post({ type: "reply", id: req.id, result });
     } catch (err: any) {

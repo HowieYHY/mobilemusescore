@@ -1,5 +1,5 @@
 {
-  "name": "mobile-score-player",
+  "name": "pocketscore",
   "private": true,
   "version": "0.1.0",
   "description": "Plays and displays .mscz scores with MuseScore's own engine compiled to WebAssembly",

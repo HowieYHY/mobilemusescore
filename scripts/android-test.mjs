@@ -17,7 +17,7 @@ const { _android: android } = require("playwright");
 
 const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
 const outDir = path.resolve(process.argv[3] || path.join(root, "build/android"));
-const PKG = "io.github.howieyhy.scoreplayer";
+const PKG = "io.github.howieyhy.pocketscore";
 fs.mkdirSync(outDir, { recursive: true });
 
 let failures = 0;

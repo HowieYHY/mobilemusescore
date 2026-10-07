@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "io.github.howieyhy.scoreplayer"
+    namespace = "io.github.howieyhy.pocketscore"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.github.howieyhy.scoreplayer"
+        applicationId "io.github.howieyhy.pocketscore"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

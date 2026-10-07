@@ -1,6 +1,6 @@
 {
-  "appId": "io.github.howieyhy.scoreplayer",
-  "appName": "Score Player",
+  "appId": "io.github.howieyhy.pocketscore",
+  "appName": "PocketScore",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false

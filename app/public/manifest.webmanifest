@@ -1,6 +1,6 @@
 {
-  "name": "Score Player",
-  "short_name": "Score Player",
+  "name": "PocketScore",
+  "short_name": "PocketScore",
   "description": "View and play MuseScore (.mscz) scores offline.",
   "start_url": "./",
   "scope": "./",

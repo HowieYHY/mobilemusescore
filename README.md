@@ -1,4 +1,4 @@
-# Mobile score player (working name)
+# PocketScore
 
 A score **viewer and player** for `.mscz` files on Android phones, iPhones and
 iPads. It is not a notation editor.
@@ -13,9 +13,9 @@ runs MuseScore 4.7.5's own C++ code compiled to WebAssembly:
 **Try it: https://howieyhy.github.io/mobilemusescore/** (on iPad: Safari →
 Share → *Add to Home Screen*, then open it once online so it can work offline).
 
-> "MuseScore" is a trademark of MuseScore Ltd. This project is not affiliated
-> with or endorsed by MuseScore Ltd, and will ship under its own name.
-> "Score Player" and the app ID `io.github.howieyhy.scoreplayer` are placeholders.
+> PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
+> MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
+> Android app ID: `io.github.howieyhy.pocketscore`.
 
 ## Current status (7 Oct 2026)
 

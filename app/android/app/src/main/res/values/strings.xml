@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Score Player</string>
-    <string name="title_activity_main">Score Player</string>
-    <string name="package_name">io.github.howieyhy.scoreplayer</string>
-    <string name="custom_url_scheme">io.github.howieyhy.scoreplayer</string>
+    <string name="app_name">PocketScore</string>
+    <string name="title_activity_main">PocketScore</string>
+    <string name="package_name">io.github.howieyhy.pocketscore</string>
+    <string name="custom_url_scheme">io.github.howieyhy.pocketscore</string>
 </resources>

@@ -1,4 +1,4 @@
-package io.github.howieyhy.scoreplayer;
+package io.github.howieyhy.pocketscore;
 
 import com.getcapacitor.BridgeActivity;
 

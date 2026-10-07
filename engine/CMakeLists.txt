@@ -64,8 +64,8 @@ set(PLATFORM_DETECTED 1)
 include(GetPlatformInfo)
 
 include(${MU_ROOT}/version.cmake)
-set(MUSE_APP_NAME_HUMAN_READABLE "Mobile Score Player")
-set(MUSE_APP_NAME_MACHINE_READABLE "MobileScorePlayer")
+set(MUSE_APP_NAME_HUMAN_READABLE "PocketScore")
+set(MUSE_APP_NAME_MACHINE_READABLE "PocketScore")
 
 # --- Configuration (mirrors upstream's APP-WEB configuration) -------------
 set(MUSE_QT_SUPPORT OFF)

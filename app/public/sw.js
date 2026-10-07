@@ -5,7 +5,7 @@
 // Replaced with the build's content hash by scripts/gen-precache.mjs, so every
 // build is a new service worker and a new cache (old ones are deleted).
 const VERSION = "__BUILD_VERSION__";
-const CACHE = "score-player-" + VERSION;
+const CACHE = "pocketscore-" + VERSION;
 
 self.addEventListener("install", (event) => {
     event.waitUntil((async () => {

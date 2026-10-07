@@ -530,6 +530,20 @@ std::string Session::load(const std::string& path)
             t.title = "Part " + std::to_string(t.key);
         }
 
+        // Mixer values are known from the score itself, so the mixer works
+        // before the sounds have loaded; changes made meanwhile are kept
+        t.out = m_hasAudioSettings ? m_audioSettings.trackOutputParams(t.id) : OutputParams();
+        if (t.isMetronome) {
+            // as in PlaybackController::trackOutputParams: muted unless the metronome is on
+            t.out.muted = !m_metronome;
+        }
+        if (!t.isMetronome && t.out.auxSends.empty()) {
+            // PlaybackConfiguration::defaultAuxSendValue for Fluid sources: 30%
+            for (aux_channel_idx_t idx = 0; idx < AUX_CHANNEL_NUM; ++idx) {
+                t.out.auxSends.emplace_back(AuxSendParams { 0.30f, true });
+            }
+        }
+
         if (m_audioSettings.hasTrackSoloMuteState(id)) {
             t.soloMute = m_audioSettings.trackSoloMuteState(id);
         }
@@ -561,6 +575,9 @@ std::string Session::load(const std::string& path)
         }
         return a.isChordSymbols < b.isChordSymbols;
     });
+
+    m_master = m_hasAudioSettings ? m_audioSettings.masterOutputParams() : OutputParams();
+    updateSoloMuteStates(); // nothing is sent yet: no track is added
 
     m_playbackSetUp = false;
     if (m_audioReady) {
@@ -683,8 +700,7 @@ void Session::setupPlayback()
     }
     m_playbackSetUp = true;
 
-    m_master = m_hasAudioSettings ? m_audioSettings.masterOutputParams() : OutputParams();
-    m_audio->setMasterOutput(m_master);
+    m_audio->setMasterOutput(m_master); // as read from the score (see load), or as changed since
 
     m_pendingTracks = int(m_tracks.size()) + int(AUX_CHANNEL_NUM);
     emit("loading", "{\"done\":0,\"total\":" + std::to_string(m_pendingTracks) + "}");
@@ -744,19 +760,7 @@ void Session::addTrack(Track& t)
     }
 
     t.source = resolveSource(t, playbackData);
-    t.out = m_hasAudioSettings ? m_audioSettings.trackOutputParams(t.id) : OutputParams();
-
-    if (t.isMetronome) {
-        // as in PlaybackController::trackOutputParams: muted unless the metronome is on
-        t.out.muted = !m_metronome;
-    }
-
-    if (!t.isMetronome && t.out.auxSends.empty()) {
-        // PlaybackConfiguration::defaultAuxSendValue for Fluid sources: 30%
-        for (aux_channel_idx_t idx = 0; idx < AUX_CHANNEL_NUM; ++idx) {
-            t.out.auxSends.emplace_back(AuxSendParams { 0.30f, true });
-        }
-    }
+    // t.out was set when the score loaded (and may have been changed since)
 
     const uint64_t loadKey = m_loadKey;
     const int key = t.key;
@@ -1040,7 +1044,7 @@ void Session::setTrackSolo(int trackKey, bool solo)
 void Session::setReverbSend(int trackKey, double amount)
 {
     Track* t = findTrack(trackKey);
-    if (!t || !t->added || t->out.auxSends.empty()) {
+    if (!t || t->out.auxSends.empty()) {
         return;
     }
     t->out.auxSends[REVERB_CHANNEL_IDX].signalAmount = static_cast<float>(std::clamp(amount, 0.0, 1.0));

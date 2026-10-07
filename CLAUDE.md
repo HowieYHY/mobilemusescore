@@ -16,10 +16,17 @@ build, tests, status) before working here.
   rules); read its source in `third_party/musescore-4.7` rather than guessing.
 - Mixer volume is shown as loudness in % against the score's own setting (100% = as saved); the user
   asked for this over dB.
-- Notes: black is the default colour; double-tap adds a text box, one tap outside finishes it;
-  *Draw with finger* is a visible switch for people without a stylus. Notes save by themselves and
-  say so; mixer changes are unsaved until **Save**, with Discard, a reminder when leaving the score,
-  and a draft offered back after the app was closed.
+- Notes: black is the default colour; double-tap adds a text box, one tap outside finishes it and
+  the text stays exactly where it was; the box being edited is outlined, never filled (no yellow);
+  *Draw with finger* is a visible switch for people without a stylus; each tool has a size choice.
+- **One Save for the whole score** (notes + mixer), in the top bar, kept in PocketScore on the device
+  (the user chose this over writing a copy of the .mscz). Ask only when opening another score with
+  unsaved changes (Save / Don't save / Cancel); no bars or prompts after each change. Keep a silent
+  draft so closing the app loses nothing.
+- The README must say plainly that notes stay on the device and are not in the file, so people the
+  score is shared with won't see them.
+- The mixer works as soon as a score is open (sounds load on open, not on Play).
+- No on-screen playback diagnostics (removed once Android was smooth); use `app.engine.stats`.
 - On phones the score's name sits on its own row above the top buttons.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
@@ -50,6 +57,13 @@ build, tests, status) before working here.
   (some devices give no output timestamp) and position reports wobble, so the cursor stuttered while
   the sound was fine. Rule: run the cursor on the system clock and pull it gently toward the audio
   clock; test with `scripts/cursor-test.mjs`, which imitates those clocks.
+- **Buttons that appear on selection must not move the content.** The text box's move and delete
+  buttons sat in the same row as the text, so the text jumped sideways when the box was finished.
+  Rule: position such handles outside the content (absolutely), and test that the content's position
+  is unchanged before and after selecting.
+- **Ask what "save" covers before building it.** A mixer-only Save with a bar after every change was
+  not what the user wanted: one Save for everything, asked only when leaving the score. Rule: follow
+  the familiar document model (one Save, question on leaving, quiet recovery) unless told otherwise.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.

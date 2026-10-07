@@ -28,7 +28,7 @@ You don't need an app store.
 ### Computer
 Open the link in Chrome, Edge or Safari. Chrome and Edge also offer **Install PocketScore**.
 
-**The first time you press Play**, PocketScore downloads its instrument sounds (about 50 MB),
+**The first time you open a score**, PocketScore downloads its instrument sounds (about 50 MB),
 so use Wi-Fi. After that it works offline.
 
 ### Updates
@@ -70,12 +70,15 @@ Tap the **pencil** button at the top:
 - **Erase**: tap or rub over a mark or text box.
 - **Colours**: black (the default), white, red, blue, green and yellow. Tap **+** for more colours,
   or pick any colour. While you're typing in a text box, a new colour changes that box.
+- **Size** (the dots next to the colours): how thick the pen, highlighter or eraser is, or how big
+  new text is. While you're typing in a text box, a new size changes that box.
 - **Undo** and **Clear** (everything on this score).
 
-**Notes save by themselves** as you write: the bar says *Saved on this device*. There is no Save
-button to remember. Tap **Done** to go back to playing. Your notes come back when you open the same
-score again, even if you rename the file. They stay on the device: they are not added to the `.mscz`
-file and are not shared. Notes made in page view and in the continuous views are kept separately.
+Tap **Done** to go back to playing. To keep your notes, tap **Save** (see below).
+
+> **Your notes stay on this device.** They are kept inside PocketScore, not in the `.mscz` file.
+> If you send the score to someone else, or open it on another phone, tablet or computer, the
+> notes are **not** there. Notes made in page view and in the continuous views are kept separately.
 
 ### Mixer: practise your part
 Tap **Mixer**:
@@ -89,19 +92,22 @@ Tap **Mixer**:
 - **Reverb**: tap **Reverb** at the top to show how much room echo each part has.
 - **Master**: the overall volume.
 
+The mixer works as soon as the score is open; you don't need to press Play first.
 PocketScore starts with the volume, mute and solo settings saved in your score, as MuseScore does.
 If a score opens with no sound, check whether its parts were saved muted.
 
-**Saving mixer changes.** Mixer changes are for practising now, until you keep them:
-- After a change, the mixer says *Changes not saved*, with **Save** and **Discard**, and the
-  **Mixer** button gets a yellow dot.
-- **Save** keeps them for this score on this device, for next time you open it.
-  **Discard** puts the mixer back as it was.
-- If you open another score first, PocketScore asks whether to save them. If you close the app
-  without saving, they come back next time you open the score, and you can save or discard them then.
-- Once saved, the mixer says *Using your saved settings*. **Use score's settings** goes back to the
-  score's own mixer.
-- Your score file is never changed.
+### Save
+**Save** at the top keeps everything you changed on this score, your notes and your mixer
+settings, for the next time you open it.
+- Save turns blue when there is something to save.
+- If you open another score with changes that aren't saved, PocketScore asks: **Save**,
+  **Don't save** (forget the changes) or **Cancel** (stay on this score).
+- If the app closes before you save, nothing is lost: next time you open the score your changes are
+  back, still unsaved, so you can save them then.
+- Your score file is never changed, and what you save stays on this device (see above). The score
+  is recognised by its contents, so a renamed copy of the same file shows your notes too; a version
+  you edited and re-saved in MuseScore counts as a different score.
+- On a keyboard, **Ctrl+S** (or **⌘S**) saves.
 
 ---
 
@@ -127,6 +133,11 @@ No. PocketScore is for reading and playing. Make changes in MuseScore.
 **Are my scores uploaded anywhere?**
 No. Everything happens on your device. Your scores are never sent anywhere.
 
+**If I share a score, will others see my notes?**
+No. Notes and saved mixer settings stay in PocketScore on the device where you made them. The
+`.mscz` file is unchanged, so anyone you send it to (or you, on another device) sees the score
+without them.
+
 **Which files does it open?**
 MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
 
@@ -137,7 +148,7 @@ MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
 - **No sound on iPhone or iPad:** check the volume buttons, and that Bluetooth isn't sending sound to another device.
 - **"Audio could not start":** close PocketScore completely, reopen it, and tap Play again.
 - **Drawing scrolls the page instead (or the page won't scroll):** check **Draw with finger** in the notes bar.
-- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen, and at the bottom of the mixer). If it still happens, play the score for a minute, open the **Mixer**, and send a screenshot of the *Playback check* line at the bottom, with your phone model. It says how busy the sound engine is (well under 100% is fine), whether the moving line jumped, and whether the sound had gaps.
+- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen). If it still happens, send a screen recording and your phone model.
 - **A score won't open:** make sure it is a `.mscz` file saved by MuseScore.
 
 To report a problem, [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or send the

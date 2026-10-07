@@ -85,21 +85,26 @@ body {
   white-space: nowrap;
   font-weight: 600;
 }
+#save { gap: 6px; }
+#open-label .short { display: none; }
 @media (max-width: 600px) {
   .topbar {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "title title title title"
-      "open . notes view";
+      "title title title title title"
+      "open save . notes view";
     row-gap: 4px;
     column-gap: 8px;
     padding-top: calc(6px + var(--safe-t));
   }
   .topbar .title { grid-area: title; font-size: 16px; line-height: 1.3; padding: 0 2px; }
   .topbar #open-label { grid-area: open; }
+  .topbar #save { grid-area: save; }
   .topbar #notes-toggle { grid-area: notes; }
-  .topbar #view-mode { grid-area: view; }
+  .topbar #view-mode { grid-area: view; max-width: 38vw; }
+  #open-label .long { display: none; }
+  #open-label .short { display: inline; }
 }
 .topbar select {
   -webkit-appearance: none;
@@ -228,30 +233,6 @@ body {
   flex: none;
 }
 .mixer-head strong { flex: 1; font-size: 15px; }
-.mixer-save {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 14px;
-  background: #fff8e1;
-  border-bottom: 1px solid #ecdca8;
-  font-size: 13px;
-  color: #5b4600;
-  flex: none;
-}
-.mixer-save-text { flex: 1; min-width: 0; }
-#mixer-toggle { position: relative; }
-#mixer-toggle.unsaved::after {
-  content: "";
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #f5b82e;
-  box-shadow: 0 0 0 2px var(--chrome);
-}
 .chip {
   appearance: none;
   font: inherit;
@@ -422,15 +403,15 @@ body {
 @media (max-width: 480px) { #notes-toggle .label { display: none; } }
 
 /* Laid out as a grid so the groups always sit on full rows:
-   tablets: tools, colours | actions on top; finger switch, hint | saved below.
+   tablets: tools, colours | actions on top; sizes, finger switch, hint below.
    wide screens: everything but the hint on one row.
-   phones: tools | actions; colours | finger; hint | saved. */
+   phones: tools | actions; colours, sizes; finger switch, hint. */
 .notesbar {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     "tools swatches . actions"
-    "finger hint hint saved";
+    "sizes finger hint hint";
   align-items: center;
   gap: 6px 14px;
   padding: 6px 12px 7px;
@@ -444,28 +425,27 @@ body {
 .notesbar .finger { grid-area: finger; justify-self: start; }
 .notesbar .actions { grid-area: actions; }
 .notesbar .hint { grid-area: hint; }
-.notesbar .saved { grid-area: saved; }
-.notesbar .finger[hidden] + .actions + .hint { grid-column: 1 / 4; }
+.notesbar .sizes { grid-area: sizes; }
+.notesbar .finger[hidden] + .actions + .hint { grid-column: 2 / 5; }
 @media (min-width: 1100px) {
   .notesbar {
-    grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto auto auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "tools swatches finger . actions"
-      "hint hint hint hint saved";
+      "tools swatches sizes finger . actions"
+      "hint hint hint hint hint hint";
   }
-  .notesbar .finger[hidden] + .actions + .hint { grid-column: auto; }
+  .notesbar .finger[hidden] + .actions + .hint { grid-column: 1 / -1; }
 }
 @media (max-width: 699px) {
   .notesbar {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "tools . actions"
-      "swatches swatches finger"
-      "hint hint saved";
+      "swatches . sizes"
+      "finger hint hint";
     column-gap: 8px;
   }
-  .notesbar .finger { justify-self: end; }
-  .notesbar .finger[hidden] + .actions + .hint { grid-column: auto; }
+  .notesbar .finger[hidden] + .actions + .hint { grid-column: 1 / -1; }
   .notesbar .actions .lbl { display: none; }
   .notesbar .actions .btn:not(.primary) { width: 38px; padding: 0; }
   .notesbar .finger .long { display: none; }
@@ -475,7 +455,27 @@ body {
   .notesbar .tool { min-width: 42px; padding: 4px 2px; }
   .notesbar .swatches { gap: 4px; }
   .notesbar .swatch { width: 26px; height: 26px; }
+  .notesbar .size { width: 24px; }
 }
+.notesbar .sizes { display: flex; gap: 2px; align-items: center; }
+.notesbar .size {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-on-chrome);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.notesbar .size i { display: block; border-radius: 50%; background: currentColor; }
+.notesbar .sizes.text .size i { background: none; border-radius: 0; font-style: normal; font-weight: 600; line-height: 1; }
+.notesbar .size.on { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.35); }
 .notesbar .tools { display: flex; gap: 2px; }
 .notesbar .tool {
   appearance: none;
@@ -558,10 +558,6 @@ body {
 .finger[aria-pressed="true"] .switch::after { transform: translateX(12px); }
 .notesbar .actions { display: flex; gap: 6px; justify-self: end; }
 .notesbar .hint { font-size: 12px; opacity: 0.85; min-width: 0; }
-.notesbar .saved { font-size: 12px; opacity: 0.85; justify-self: end; white-space: nowrap; }
-.notesbar .saved:not(:empty)::before { content: "✓ "; }
-.notesbar .saved.failed { opacity: 1; color: #ffb4a8; }
-.notesbar .saved.failed::before { content: ""; }
 
 .palette {
   position: fixed;
@@ -595,8 +591,6 @@ body {
 .page .texts { position: absolute; inset: 0; pointer-events: none; }
 .tnote {
   position: absolute;
-  display: flex;
-  align-items: flex-start;
   max-width: 60%;
   line-height: 1.25;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -607,8 +601,11 @@ body {
 .annotating[data-tool="text"] .texts .tnote, .annotating[data-tool="eraser"] .texts .tnote { pointer-events: auto; }
 .annotating[data-tool="text"] .tnote .tbody { border-color: rgba(0, 0, 0, 0.18); border-style: dashed; }
 /* the box being edited */
-.annotating .tnote.sel .tbody { background: rgba(255, 255, 210, 0.9); border: 1px solid var(--accent); min-height: 1.25em; min-width: 3ch; }
+.annotating .tnote.sel .tbody { border: 1px solid var(--accent); min-height: 1.25em; min-width: 3ch; }
 .annotating .tnote.sel .tgrip, .annotating .tnote.sel .tdel {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -622,8 +619,8 @@ body {
   touch-action: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
-.annotating .tnote.sel .tgrip { cursor: move; margin-right: 3px; }
-.annotating .tnote.sel .tdel { margin-left: 3px; padding: 0; appearance: none; cursor: pointer; }
+.annotating .tnote.sel .tgrip { right: 100%; margin-right: 4px; cursor: move; }
+.annotating .tnote.sel .tdel { left: 100%; margin-left: 4px; padding: 0; appearance: none; cursor: pointer; }
 .pages.annotating[data-tool="text"] .page { cursor: text; }
 .pages.annotating[data-tool="pen"] .page, .pages.annotating[data-tool="highlighter"] .page { cursor: crosshair; }
 /* a finger that draws must not scroll (two fingers scroll, handled in script) */
@@ -645,7 +642,5 @@ body {
 .ask p { margin: 0 0 18px; font-size: 15px; line-height: 1.45; color: var(--ink-2); }
 .ask-buttons { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
-/* ---------------------------------------------------------------- playback check */
 
-.diag { padding: 6px 12px 8px; font-size: 11px; color: var(--ink-2); border-top: 1px solid var(--panel-line); flex: none; }
-.mixer.picking .diag { display: none; }
+

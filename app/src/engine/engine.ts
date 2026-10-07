@@ -87,8 +87,9 @@ export class Engine {
         });
     }
 
-    // Must be called from a user gesture on iOS (tap), since browsers only
-    // allow audio to start after one.
+    // Can be called when a score opens, so the sounds load early: the audio
+    // context then starts suspended (browsers only let sound out after a tap),
+    // and calling this again from a tap resumes it.
     startAudio(): Promise<void> {
         if (this.audioStarting) {
             if (this.ctx && this.ctx.state !== "running") {
@@ -278,6 +279,11 @@ export class Engine {
 
     get audioRunning() {
         return this.ctx?.state === "running";
+    }
+
+    /** Resolves once sound can be heard (after startAudio was called from a tap). */
+    whenRunning(): Promise<void> {
+        return this.ctx && this.ctx.state !== "running" ? this.ctx.resume() : Promise.resolve();
     }
 
     async load(name: string, data: ArrayBuffer): Promise<{ ok: boolean; error?: string; score?: ScoreInfo }> {

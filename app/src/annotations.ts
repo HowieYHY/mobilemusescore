@@ -19,7 +19,8 @@ type Undo =
 interface PageView { el: HTMLElement; svg: SVGSVGElement; texts: HTMLElement; w: number; h: number }
 
 const SVG = "http://www.w3.org/2000/svg";
-const STORAGE_PREFIX = "pocketscore.notes.";
+const STORAGE_PREFIX = "pocketscore.notes.";      // saved notes, by score
+const DRAFT_PREFIX = "pocketscore.notesDraft.";   // notes changed since the last Save
 const PREFS_KEY = "pocketscore.notesPrefs";
 const DOUBLE_TAP_MS = 400;
 
@@ -36,6 +37,31 @@ export const MORE_COLORS = [
 
 const ICON_CLOSE = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 const ICON_MOVE = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2l3.5 3.5h-2.5v5h5V8l3.5 3.5-3.5 3.5v-2.5h-5v5h2.5L12 21l-3.5-3.5H11v-5H6V15l-3.5-3.5L6 8v2.5h5v-5H8.5z" fill="currentColor"/></svg>`;
+
+/** Sizes on screen (CSS px): stroke width, text size, eraser reach. */
+export const SIZES: Record<Tool, number[]> = {
+    pen: [1.2, 2.4, 4, 7],
+    highlighter: [8, 14, 22, 32],
+    text: [12, 16, 22, 30],
+    eraser: [6, 10, 18, 30],
+};
+
+/** Notes as stored: empty pages and views dropped, so equal notes give equal text. */
+function normalised(d: Stored): string {
+    const modes: Record<string, ModeNotes> = {};
+    for (const [m, pages] of Object.entries(d.modes)) {
+        const kept: ModeNotes = {};
+        for (const [i, p] of Object.entries(pages)) {
+            if (p.strokes.length || p.texts.length) {
+                kept[i] = p;
+            }
+        }
+        if (Object.keys(kept).length) {
+            modes[m] = kept;
+        }
+    }
+    return JSON.stringify({ v: 1, modes });
+}
 
 const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -72,7 +98,12 @@ export class Annotations {
     private undoStack: Undo[] = [];
     private saveTimer = 0;
     /** Notes save by themselves: "" (nothing written yet), "saving", "saved" or "failed". */
-    saveState: "" | "saving" | "saved" | "failed" = "";
+    /** The saved notes (normalised JSON), to tell whether there are unsaved changes. */
+    private savedJson = "";
+    /** Opening the score brought back changes that were never saved. */
+    restoredDraft = false;
+    /** Thickness / size choice per tool: an index into SIZES. */
+    private sizes: Record<Tool, number> = { pen: 1, highlighter: 1, text: 1, eraser: 1 };
     private drawing: { pointerId: number; page: number; stroke: Stroke; path: SVGPathElement; lastX: number; lastY: number } | null = null;
     private erasing: { pointerId: number; page: number } | null = null;
     private touches = new Map<number, { x: number; y: number }>();
@@ -154,6 +185,12 @@ export class Annotations {
                 if (typeof p.finger === "boolean") {
                     this.fingerChoice = p.finger;
                 }
+                for (const t of ["pen", "highlighter", "text", "eraser"] as const) {
+                    const s = p.sizes?.[t];
+                    if (Number.isInteger(s) && s >= 0 && s < SIZES[t].length) {
+                        this.sizes[t] = s;
+                    }
+                }
             }
         } catch (err) {
             // storage unavailable: defaults
@@ -162,7 +199,7 @@ export class Annotations {
 
     private savePrefs() {
         try {
-            localStorage.setItem(PREFS_KEY, JSON.stringify({ colors: this.colors, finger: this.fingerChoice }));
+            localStorage.setItem(PREFS_KEY, JSON.stringify({ colors: this.colors, finger: this.fingerChoice, sizes: this.sizes }));
         } catch (err) {
             // storage unavailable: the choice lasts until the app closes
         }
@@ -176,23 +213,60 @@ export class Annotations {
 
     /** Load the notes for a score (`key` identifies the file). */
     open(key: string, mode: string) {
+        clearTimeout(this.saveTimer);
         this.key = key;
-        this.saveState = "";
         this.mode = mode;
         this.undoStack = [];
-        this.data = { v: 1, modes: {} };
-        try {
-            const raw = localStorage.getItem(STORAGE_PREFIX + key);
-            if (raw) {
-                const d = JSON.parse(raw);
-                if (d && d.v === 1 && d.modes) {
-                    this.data = d;
-                }
+        const read = (k: string): Stored | null => {
+            try {
+                const d = JSON.parse(localStorage.getItem(k) || "null");
+                return d && d.v === 1 && d.modes ? d : null;
+            } catch (err) {
+                return null; // storage unavailable
             }
-        } catch (err) {
-            // storage unavailable: notes last until the app closes
-        }
+        };
+        const saved = read(STORAGE_PREFIX + key) || { v: 1, modes: {} };
+        this.savedJson = normalised(saved);
+        // notes written but not saved (the app was closed) come back, still unsaved
+        const draft = read(DRAFT_PREFIX + key);
+        this.restoredDraft = !!draft && normalised(draft) !== this.savedJson;
+        this.data = this.restoredDraft ? draft! : saved;
         this.onChange();
+    }
+
+    /** Changes since the last Save. */
+    get dirty(): boolean {
+        return !!this.key && normalised(this.data) !== this.savedJson;
+    }
+
+    /** Save: keep the notes for this score. Returns false if storage is full or blocked. */
+    commit(): boolean {
+        clearTimeout(this.saveTimer);
+        const json = normalised(this.data);
+        try {
+            if (json === normalised({ v: 1, modes: {} })) {
+                localStorage.removeItem(STORAGE_PREFIX + this.key);
+            } else {
+                localStorage.setItem(STORAGE_PREFIX + this.key, json);
+            }
+            localStorage.removeItem(DRAFT_PREFIX + this.key);
+        } catch (err) {
+            return false;
+        }
+        this.savedJson = json;
+        this.restoredDraft = false;
+        this.onChange();
+        return true;
+    }
+
+    /** Don't save: forget the unsaved changes (call before opening another score). */
+    discard() {
+        clearTimeout(this.saveTimer);
+        try {
+            localStorage.removeItem(DRAFT_PREFIX + this.key);
+        } catch (err) {
+            // nothing kept
+        }
     }
 
     setMode(mode: string) {
@@ -217,36 +291,23 @@ export class Annotations {
         return n;
     }
 
+    // After every change: the notes stay unsaved until Save, but a draft is
+    // kept so closing the app doesn't lose them.
     private save() {
         clearTimeout(this.saveTimer);
-        this.saveState = "saving";
         this.saveTimer = window.setTimeout(() => {
             if (!this.key) {
                 return;
             }
-            // drop empty pages and modes
-            for (const [m, pages] of Object.entries(this.data.modes)) {
-                for (const [i, p] of Object.entries(pages)) {
-                    if (!p.strokes.length && !p.texts.length) {
-                        delete pages[i];
-                    }
-                }
-                if (!Object.keys(pages).length) {
-                    delete this.data.modes[m];
-                }
-            }
             try {
-                if (Object.keys(this.data.modes).length) {
-                    localStorage.setItem(STORAGE_PREFIX + this.key, JSON.stringify(this.data));
+                if (this.dirty) {
+                    localStorage.setItem(DRAFT_PREFIX + this.key, normalised(this.data));
                 } else {
-                    localStorage.removeItem(STORAGE_PREFIX + this.key);
+                    localStorage.removeItem(DRAFT_PREFIX + this.key);
                 }
-                this.saveState = "saved";
             } catch (err) {
-                this.saveState = "failed";
-                this.onError("Your notes could not be saved on this device (storage is full or blocked).");
+                this.onError("Your notes could not be kept on this device (storage is full or blocked). Tap Save to try again.");
             }
-            this.onChange();
         }, 300);
         this.onChange();
     }
@@ -290,6 +351,31 @@ export class Annotations {
 
     get color() {
         return this.colors[this.tool];
+    }
+
+    /** The size choice for the current tool (index into SIZES[tool]). */
+    get size() {
+        return this.sizes[this.tool];
+    }
+
+    setSize(i: number) {
+        this.sizes[this.tool] = i;
+        this.savePrefs();
+        // resize the text box being edited
+        const body = this.tool === "text" ? this.editingText : null;
+        const box = body?.closest<HTMLElement>(".tnote");
+        const pageEl = box?.closest<HTMLElement>(".page");
+        if (box && pageEl) {
+            const page = Number(pageEl.dataset.index);
+            const v = this.views.get(page);
+            const t = this.pageNotes(page).texts.find((n) => n.id === box.dataset.id);
+            if (t && v) {
+                t.size = Math.round(SIZES.text[i] / this.pxPerUnit(v));
+                box.style.fontSize = (t.size * parseFloat(v.el.style.width) / v.w) + "px";
+                this.save();
+            }
+        }
+        this.onChange();
     }
 
     setColor(c: string) {
@@ -580,7 +666,7 @@ export class Annotations {
             id: newId(),
             tool: this.tool,
             color: this.color,
-            width: Math.round((this.tool === "highlighter" ? 14 : 2.4) / ppu),
+            width: Math.max(1, Math.round(SIZES[this.tool][this.sizes[this.tool]] / ppu)),
             pts: [x, y],
         };
         const path = this.strokeEl(stroke);
@@ -669,7 +755,7 @@ export class Annotations {
 
     private eraseAt(page: number, v: PageView, x: number, y: number) {
         const p = this.pageNotes(page);
-        const r = 10 / this.pxPerUnit(v);
+        const r = SIZES.eraser[this.sizes.eraser] / this.pxPerUnit(v);
         const hit = p.strokes.filter((s) => {
             const pts = s.pts;
             const reach = r + s.width / 2;
@@ -720,7 +806,7 @@ export class Annotations {
         }
         const { x, y } = this.toUnits(hit.v, e);
         const ppu = this.pxPerUnit(hit.v);
-        const size = Math.round(16 / ppu);
+        const size = Math.round(SIZES.text[this.sizes.text] / ppu);
         // put the text's first line where the tap was
         const t: TextNote = { id: newId(), x, y: Math.round(y - size * 0.7), size, color: this.colors.text, text: "" };
         this.pageNotes(hit.index).texts.push(t);

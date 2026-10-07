@@ -28,18 +28,13 @@ const ui = {
     mixerBody: $("mixer-body"),
     mixerClose: $<HTMLButtonElement>("mixer-close"),
     mixerReverb: $<HTMLButtonElement>("mixer-reverb"),
-    mixerSave: $("mixer-save"),
-    mixerSaveText: $("mixer-save-text"),
-    mixerSaveBtn: $<HTMLButtonElement>("mixer-savebtn"),
-    mixerDiscard: $<HTMLButtonElement>("mixer-discard"),
-    mixerReset: $<HTMLButtonElement>("mixer-reset"),
+    save: $<HTMLButtonElement>("save"),
     ask: $<HTMLDialogElement>("ask"),
-    notesSaved: $("notes-saved"),
+    sizes: $("sizes"),
     sounds: $("sounds"),
     soundsTitle: $("sounds-title"),
     soundsBody: $("sounds-body"),
     soundsBack: $<HTMLButtonElement>("sounds-back"),
-    diag: $("diag"),
     notesToggle: $<HTMLButtonElement>("notes-toggle"),
     notesbar: $("notesbar"),
     swatches: $("swatches"),
@@ -414,7 +409,6 @@ engine.on("position", (c: CursorInfo) => {
         if (Math.abs(err) > 0.3) {
             anchor.secs = c.secs;
             anchor.clock = clock;
-            lastFrame = null; // a seek, not a jump
         } else {
             anchor.secs += err * 0.05;
         }
@@ -434,24 +428,10 @@ function showPosition(secs: number, fallback?: CursorInfo) {
     showCursor(cursorFromTimeline(secs) || fallback || null);
 }
 
-// For the playback check: frames where the cursor moved more (or less) than
-// the time that passed, by over 40 ms of music
-const cursorJumps: number[] = [];
-let lastFrame: { now: number; secs: number } | null = null;
-
-function animate(now: number) {
+function animate() {
     if (state.playing) {
         const secs = Math.min(state.duration, Math.max(0, anchor.secs + (engine.audioTime - anchor.clock)));
-        if (lastFrame) {
-            const music = secs - lastFrame.secs;
-            if (music < -0.001 || Math.abs(music - (now - lastFrame.now) / 1000) > 0.04) {
-                cursorJumps.push(now);
-            }
-        }
-        lastFrame = { now, secs };
         showPosition(secs);
-    } else {
-        lastFrame = null;
     }
     requestAnimationFrame(animate);
 }
@@ -471,11 +451,18 @@ engine.on("status", (s) => {
 // ---------------------------------------------------------------- transport
 
 async function startAudioFromTap() {
-    setStatus("Starting audio…");
     try {
-        await engine.startAudio();
+        await engine.startAudio(); // also lets sound out (browsers need a tap for that)
+        await engine.whenRunning();
     } catch (err: any) {
         setStatus("Audio could not start: " + (err && err.message || err), "error");
+        return;
+    }
+    // sounds were already loaded: hear the tapped note now
+    if (state.playbackReady && pendingPreview) {
+        const t = pendingPreview;
+        pendingPreview = null;
+        void engine.seekAt(t.page, t.x, t.y, t.radius, true);
     }
 }
 
@@ -589,8 +576,9 @@ function buildMixer() {
             const sound = document.createElement("button");
             sound.className = "sound";
             sound.innerHTML = `<span></span>${ICON_CHEVRON}`;
-            sound.querySelector("span")!.textContent = t.sound || "MS Basic";
-            sound.setAttribute("aria-label", `Sound for ${t.title}: ${t.sound || "MS Basic"}. Change`);
+            const soundName = t.ready ? t.sound || "MS Basic" : "Loading sounds…";
+            sound.querySelector("span")!.textContent = soundName;
+            sound.setAttribute("aria-label", `Sound for ${t.title}: ${soundName}. Change`);
             sound.disabled = !t.ready;
             sound.onclick = () => void openSounds(t);
             row.querySelector(".who")!.appendChild(sound);
@@ -784,21 +772,36 @@ ui.mixerReverb.onclick = () => {
     ui.mixerReverb.setAttribute("aria-pressed", String(on));
 };
 
-// ---------------------------------------------------------------- saving the mixer
+// ---------------------------------------------------------------- saving
 
-// Mixer changes are for this sitting until the reader taps Save; saved
-// settings come back when the score is opened again on this device. Unsaved
-// changes are kept as a draft too, so closing the app doesn't lose them: they
-// are offered back next time. (Notes, by contrast, save as you write.)
+// One Save for the whole score, in the top bar: notes and mixer changes stay
+// unsaved until the reader taps it, and are then kept in PocketScore on this
+// device for this score (the .mscz itself is never changed). Meanwhile unsaved
+// work is kept as a draft, so closing the app loses nothing: it comes back
+// next time, still unsaved. The reader is asked only when opening another
+// score with unsaved changes.
 const mix = {
     store: null as MixStore | null,
     score: null as Mix | null, // as the score was saved
     saved: null as Mix | null, // the reader's saved settings for it
     dirty: false,
+    // sounds chosen (or saved) before the sounds were loaded, applied when they are
+    pendingSounds: {} as Record<string, string>,
 };
 let draftTimer = 0;
+let restoredNotice = false;
 
-const currentMix = () => mixOf(state.tracks, state.masterDb);
+// A part's sound is recorded only when it isn't the score's own ("" = the score's)
+function currentMix(): Mix {
+    const m = mixOf(state.tracks, state.masterDb);
+    for (const t of state.tracks) {
+        const p = m.parts[slot(t)];
+        p.soundId = t.ready
+            ? (t.soundId && t.soundId !== t.scoreSoundId ? t.soundId : "")
+            : (mix.pendingSounds[slot(t)] || "");
+    }
+    return m;
+}
 
 async function applyMix(m: Mix) {
     for (const t of state.tracks) {
@@ -806,8 +809,17 @@ async function applyMix(m: Mix) {
         if (!p) {
             continue;
         }
-        if (p.soundId && p.soundId !== t.soundId) {
-            await engine.setSound(t.key, p.soundId);
+        if (!t.ready) {
+            if (p.soundId) {
+                mix.pendingSounds[slot(t)] = p.soundId;
+            } else {
+                delete mix.pendingSounds[slot(t)];
+            }
+        } else {
+            const target = p.soundId || t.scoreSoundId;
+            if (target && target !== t.soundId) {
+                await engine.setSound(t.key, target);
+            }
         }
         if (Math.abs(p.volume - t.volume) > 0.01) {
             await engine.setVolume(t.key, p.volume);
@@ -829,8 +841,11 @@ async function applyMix(m: Mix) {
     state.tracks = await engine.tracks();
 }
 
-async function loadMix() {
+// When a score opens: the score's mixer, then the reader's saved settings,
+// then any unsaved changes from last time. Returns whether those came back.
+async function loadMix(): Promise<boolean> {
     state.masterDb = await engine.masterVolume();
+    mix.pendingSounds = {};
     const store = new MixStore(state.scoreKey);
     mix.store = store;
     mix.score = currentMix();
@@ -839,91 +854,80 @@ async function loadMix() {
         await applyMix(mix.saved);
     }
     const draft = store.draft();
-    if (draft && !sameMix(draft, mix.saved || mix.score)) {
-        await applyMix(draft);
-        mix.dirty = true;
-        setStatus("Your unsaved mixer changes from last time are back. Open the Mixer to save or discard them.", "info", 8000);
+    mix.dirty = !!draft && !sameMix(draft, mix.saved || mix.score);
+    if (mix.dirty) {
+        await applyMix(draft!);
     } else {
         store.setDraft(null);
-        mix.dirty = false;
     }
-    updateMixState();
+    return mix.dirty;
 }
 
 function mixChanged() {
     if (!mix.store || !mix.score) {
         return;
     }
-    const now = currentMix();
-    mix.dirty = !sameMix(now, mix.saved || mix.score);
+    mix.dirty = !sameMix(currentMix(), mix.saved || mix.score);
     clearTimeout(draftTimer);
     draftTimer = window.setTimeout(() => mix.store?.setDraft(mix.dirty ? currentMix() : null), 400);
-    updateMixState();
+    updateSaveState();
 }
 
-function saveMix() {
+function saveMix(): boolean {
     if (!mix.store) {
-        return;
+        return true;
     }
-    const now = currentMix();
-    // settings that are the score's own need no saving
-    const toSave = mix.score && sameMix(now, mix.score) ? null : now;
     clearTimeout(draftTimer);
+    const now = currentMix();
+    // the score's own settings need no saving
+    const toSave = mix.score && sameMix(now, mix.score) ? null : now;
     if (!mix.store.save(toSave)) {
-        setStatus("The mixer settings could not be saved on this device (storage is full or blocked).", "error", 6000);
-        return;
+        return false;
     }
     mix.saved = toSave;
     mix.dirty = false;
-    updateMixState();
+    return true;
 }
 
-function updateMixState() {
-    ui.mixerToggle.classList.toggle("unsaved", mix.dirty);
-    ui.mixerToggle.setAttribute("aria-label", mix.dirty ? "Mixer (changes not saved)" : "Mixer");
-    ui.mixerSave.hidden = !mix.dirty && !mix.saved;
-    ui.mixerSaveText.textContent = mix.dirty ? "Changes not saved" : "Using your saved settings";
-    ui.mixerSaveBtn.hidden = !mix.dirty;
-    ui.mixerDiscard.hidden = !mix.dirty;
-    ui.mixerReset.hidden = mix.dirty || !mix.saved;
+const hasUnsaved = () => !!state.score && (notes.dirty || mix.dirty);
+
+function updateSaveState() {
+    const unsaved = hasUnsaved();
+    ui.save.disabled = !unsaved;
+    ui.save.classList.toggle("primary", unsaved);
+    ui.save.title = unsaved ? "Save your notes and mixer changes for this score" : "Everything is saved";
 }
 
-ui.mixerSaveBtn.onclick = () => {
-    saveMix();
-    setStatus("Mixer settings saved for this score on this device.", "info", 3000);
-};
-ui.mixerDiscard.onclick = async () => {
-    const back = mix.saved || mix.score;
-    if (!back) {
-        return;
+function saveAll(): boolean {
+    const ok = notes.commit() && saveMix();
+    updateSaveState();
+    if (!ok) {
+        setStatus("Your changes could not be saved on this device (storage is full or blocked).", "error", 8000);
+        return false;
     }
-    await applyMix(back);
+    setStatus("Saved.", "info", 2000);
+    return true;
+}
+
+function discardAll() {
+    clearTimeout(draftTimer);
+    notes.discard();
     mix.store?.setDraft(null);
     mix.dirty = false;
-    buildMixer();
-    updateMixState();
-};
-ui.mixerReset.onclick = async () => {
-    const choice = await ask("Use the score's settings?",
-        "The mixer goes back to how it is saved in the score, and your saved settings for this score are removed.",
-        [["cancel", "Cancel"], ["reset", "Use score's settings"]]);
-    if (choice !== "reset" || !mix.score) {
-        return;
-    }
-    await applyMix(mix.score);
-    mix.store?.save(null);
-    mix.saved = null;
-    mix.dirty = false;
-    buildMixer();
-    updateMixState();
-};
+}
 
-// Leaving with unsaved changes: browsers that can, ask (the draft is kept either way)
-window.addEventListener("beforeunload", (e) => {
-    if (mix.dirty) {
-        mix.store?.setDraft(currentMix());
+ui.save.onclick = () => {
+    if (hasUnsaved()) {
+        saveAll();
+    }
+};
+// Ctrl+S / Cmd+S (keyboards on computers and iPads)
+document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        e.returnValue = "";
+        if (hasUnsaved()) {
+            saveAll();
+        }
     }
 });
 
@@ -954,9 +958,32 @@ function ask(title: string, text: string, buttons: [string, string][]): Promise<
 engine.on("playbackReady", async (tracks: TrackInfo[]) => {
     state.playbackReady = true;
     state.tracks = tracks;
-    setStatus(""); // before loadMix, which may leave a message
-    await loadMix();
-    ui.mixerToggle.disabled = false;
+    setStatus("");
+    // sounds chosen before the sounds had loaded
+    for (const t of tracks) {
+        const id = mix.pendingSounds[slot(t)];
+        if (id && id !== t.soundId) {
+            await engine.setSound(t.key, id);
+        }
+    }
+    mix.pendingSounds = {};
+    // settings saved by 0.2.1 name the score's own sound too: that means "the score's"
+    for (const m of [mix.saved, mix.score]) {
+        for (const t of tracks) {
+            const p = m?.parts[slot(t)];
+            if (p && p.soundId === t.scoreSoundId) {
+                p.soundId = "";
+            }
+        }
+    }
+    state.tracks = await engine.tracks();
+    if (mix.store) {
+        mixChanged();
+    }
+    if (restoredNotice) {
+        restoredNotice = false;
+        setStatus("Your unsaved changes from last time are back. Tap Save to keep them.", "info", 8000);
+    }
     if (!ui.mixer.hidden) {
         buildMixer();
     }
@@ -964,7 +991,7 @@ engine.on("playbackReady", async (tracks: TrackInfo[]) => {
         pendingPlay = false;
         pendingPreview = null;
         void engine.play();
-    } else if (pendingPreview) {
+    } else if (pendingPreview && engine.audioRunning) {
         const t = pendingPreview;
         pendingPreview = null;
         void engine.seekAt(t.page, t.x, t.y, t.radius, true);
@@ -976,20 +1003,21 @@ engine.on("playbackReady", async (tracks: TrackInfo[]) => {
 ui.fileInput.onchange = async () => {
     const file = ui.fileInput.files?.[0];
     ui.fileInput.value = "";
-    if (file && mix.dirty) {
-        const choice = await ask("Save your mixer changes?",
-            `You changed the mixer for “${ui.title.textContent}”. Save the changes for next time you open it?`,
-            [["discard", "Don't save"], ["save", "Save"]]);
-        if (choice === "save") {
-            saveMix();
-        } else {
-            mix.store?.setDraft(null);
+    if (!file) {
+        return;
+    }
+    if (hasUnsaved()) {
+        const choice = await ask("Save your changes?",
+            `Your notes or mixer changes for “${ui.title.textContent}” are not saved. Save them before opening another score?`,
+            [["cancel", "Cancel"], ["discard", "Don't save"], ["save", "Save"]]);
+        if (choice === "cancel" || (choice === "save" && !saveAll())) {
+            return;
         }
-        mix.dirty = false;
+        if (choice === "discard") {
+            discardAll();
+        }
     }
-    if (file) {
-        await openScore(file.name, await file.arrayBuffer());
-    }
+    await openScore(file.name, await file.arrayBuffer());
 };
 
 async function openScore(name: string, data: ArrayBuffer) {
@@ -1002,8 +1030,8 @@ async function openScore(name: string, data: ArrayBuffer) {
         closeLayer(closeSounds); // it lists the previous score's parts
     }
     state.playbackReady = false;
-    Object.assign(mix, { store: null, score: null, saved: null, dirty: false });
-    updateMixState();
+    clearTimeout(draftTimer);
+    Object.assign(mix, { store: null, score: null, saved: null, dirty: false, pendingSounds: {} });
     state.pageOps.clear();
     ui.mixerToggle.disabled = true;
     const key = await scoreKey(name, data); // before the data goes to the engine
@@ -1019,6 +1047,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     state.tracks = res.score.tracks;
     lastCursor = null;
     ui.title.textContent = res.score.title || name.replace(/\.(mscz|mscx)$/i, "");
+    $("open-label").classList.remove("primary"); // only the start screen's main action
     ui.empty.hidden = true;
     ui.viewMode.disabled = false;
     ui.viewMode.value = "page";
@@ -1037,7 +1066,18 @@ async function openScore(name: string, data: ArrayBuffer) {
     void loadTimeline();
     ui.viewer.scrollTop = 0;
     ui.viewer.scrollLeft = 0;
-    setStatus(engine.audioRunning ? "Loading instrument sounds…" : "Tap Play to start playback.", "info", engine.audioRunning ? 0 : 4000);
+
+    // the mixer works from the start: its values come from the score, and the
+    // sounds load now rather than on the first Play
+    const mixRestored = await loadMix();
+    restoredNotice = notes.restoredDraft || mixRestored;
+    ui.mixerToggle.disabled = false;
+    if (!ui.mixer.hidden) {
+        buildMixer();
+    }
+    updateSaveState();
+    setStatus("Loading instrument sounds…");
+    void engine.startAudio().catch(() => {}); // errors are shown by the engine
 }
 
 ui.viewMode.onchange = async () => {
@@ -1224,14 +1264,28 @@ function updateNotesBar() {
     };
     ui.notesHint.textContent = hints[notes.tool];
 
-    // notes save by themselves; say so, so nobody looks for a Save button
-    const saved: Record<string, string> = {
-        saving: "Saving…",
-        saved: "Saved on this device",
-        failed: "Not saved: storage full",
-    };
-    ui.notesSaved.textContent = saved[notes.saveState] || (notes.count ? "Saved on this device" : "");
-    ui.notesSaved.classList.toggle("failed", notes.saveState === "failed");
+    ui.sizes.querySelectorAll<HTMLButtonElement>(".size").forEach((b, i) => {
+        const on = i === notes.size;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-checked", String(on));
+        // a dot (text: a letter) that grows step by step, easy to tell apart
+        const dot = b.querySelector<HTMLElement>("i")!;
+        dot.style.width = dot.style.height = notes.tool === "text" ? "" : [4, 7, 11, 16][i] + "px";
+        dot.textContent = notes.tool === "text" ? "A" : "";
+        dot.style.fontSize = notes.tool === "text" ? [10, 13, 17, 22][i] + "px" : "";
+        b.setAttribute("aria-label", (notes.tool === "text" ? ["Small", "Medium", "Large", "Extra large"] : ["Thin", "Medium", "Thick", "Extra thick"])[i]);
+    });
+    ui.sizes.classList.toggle("text", notes.tool === "text");
+    updateSaveState();
+}
+
+for (let i = 0; i < 4; i++) {
+    const b = document.createElement("button");
+    b.className = "size";
+    b.setAttribute("role", "radio");
+    b.innerHTML = "<i></i>";
+    b.onclick = () => notes.setSize(i);
+    ui.sizes.appendChild(b);
 }
 
 function setNotesActive(on: boolean) {
@@ -1261,34 +1315,6 @@ ui.notesClear.onclick = () => {
         notes.clear();
     }
 };
-
-// ---------------------------------------------------------------- playback check
-
-// Shown under the mixer; helps diagnose choppy sound on a particular device
-setInterval(() => {
-    if (ui.mixer.hidden) {
-        return;
-    }
-    const s = engine.stats;
-    const rate = engine.sampleRate || 48000;
-    if (s.load === null && s.loadUnder === null) {
-        ui.diag.textContent = `Playback check: measured while music plays. Version ${__APP_VERSION__}.`;
-        return;
-    }
-    // how much of the time the sound engine is busy: well under 100% keeps the sound smooth
-    const pct = (v: number) => (v < 0.01 ? "under 1" : v < 0.1 ? (v * 100).toFixed(1) : String(Math.round(v * 100)));
-    const load = s.load !== null ? `${pct(s.load)}%` : `under ${Math.max(1, Math.ceil(s.loadUnder! * 100))}%`;
-    const now = performance.now();
-    while (cursorJumps.length && cursorJumps[0] < now - 10000) {
-        cursorJumps.shift();
-    }
-    const jumps = cursorJumps.length;
-    ui.diag.textContent = `Playback check: sound engine busy ${load} of the time `
-        + `(busiest block ${s.slowestMs.toFixed(1)} of ${(1024 / rate * 1000).toFixed(0)} ms) · `
-        + `cursor ${jumps ? `jumped ${jumps} time${jumps === 1 ? "" : "s"} in 10 s` : "smooth"} · `
-        + `${s.queuedSecs.toFixed(2)} s queued (aim ${s.targetSecs.toFixed(2)} s) · `
-        + `${engine.underruns} gap${engine.underruns === 1 ? "" : "s"} · ${rate} Hz · version ${__APP_VERSION__}`;
-}, 1000);
 
 // Let tests and the console drive the app
 (window as any).app = { engine, state, openScore, notes };

@@ -68,6 +68,9 @@ await open(async () => {
     check(await page.evaluate(() => window.__prompted === true), "the Install button opens Chrome's install dialog");
 });
 await shot("01-opened");
+check(await page.isEnabled("#mixer-toggle"), "the mixer can be opened as soon as the score is open, before Play");
+const soundsLoaded = await page.waitForFunction(() => app.state.playbackReady && !app.state.playing, null, { timeout: 180000 }).then(() => true, () => false);
+check(soundsLoaded, "the sounds load when the score opens, without pressing Play");
 
 // ---- notes with a finger
 await page.tap("#notes-toggle");
@@ -183,15 +186,13 @@ await page.goBack();
 await page.waitForTimeout(200);
 check(!(await page.isVisible("#mixer")), "Back closes the mixer");
 
-// ---- saving mixer changes
-check(await page.locator("#mixer-toggle.unsaved").count() === 1, "the Mixer button shows there are unsaved changes");
+// ---- saving (one Save in the top bar, for notes and mixer together)
+check(await page.isEnabled("#save"), "a mixer change lights up Save");
 const soundOf = () => page.evaluate(async (k) => (await app.engine.tracks()).find((t) => t.key === k), firstKey);
 async function reopen() {
     await open();
-    await page.tap("#play");
     await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
     await page.waitForTimeout(800);
-    await page.tap("#play"); // pause
 }
 async function openMixer() {
     if (await page.isHidden("#mixer")) {
@@ -200,63 +201,41 @@ async function openMixer() {
     await page.waitForSelector(".strip:not(.master)");
     await page.waitForTimeout(200);
 }
-page.on("dialog", (d) => d.accept()); // "Leave site?" when closing with unsaved changes
 
-// closed without saving: the changes come back, with a reminder
+// closed without saving: the changes come back, still unsaved, with a message
 await reopen();
 check((await soundOf()).soundId === after.soundId, "unsaved changes come back after closing the app");
-check(/unsaved mixer changes/i.test(await page.textContent("#status")), "a message says unsaved changes are back");
-check(await page.locator("#mixer-toggle.unsaved").count() === 1, "and the Mixer button still marks them unsaved");
+check(/unsaved changes from last time/i.test(await page.textContent("#status")), "a message says unsaved changes are back");
+check(await page.isEnabled("#save"), "and Save still offers to keep them");
 
-// Discard goes back to the score's settings
-await openMixer();
-check(await page.isVisible("#mixer-discard") && await page.isVisible("#mixer-savebtn"), "the mixer offers Save and Discard");
-await page.tap("#mixer-discard");
-await page.waitForTimeout(400);
-check((await soundOf()).soundId === before.soundId, "Discard puts the score's sound back");
-check(await page.locator("#mixer-toggle.unsaved").count() === 0 && !(await page.isVisible("#mixer-save")), "after Discard nothing is unsaved");
-
-// Save keeps the change for next time
-await page.locator(".strip:not(.master):not(.metronome)").first().locator(".sound").tap();
-await page.waitForSelector("#sounds:not([hidden])");
-const cat2 = page.locator("#sounds-body > details").filter({ hasText: "Strings" }).first();
-await cat2.locator("> summary").tap();
-await cat2.locator(".pick").first().tap();
-await page.waitForSelector("#sounds", { state: "hidden" });
-await page.waitForTimeout(300);
-await page.tap("#mixer-savebtn");
-check(await page.locator("#mixer-toggle.unsaved").count() === 0, "Save clears the unsaved mark");
-await page.tap("#mixer-close");
+// Save keeps them
+await page.tap("#save");
+check(!(await page.isEnabled("#save")), "after Save there is nothing to save");
 await reopen();
 check((await soundOf()).soundId === after.soundId, `a saved sound comes back after reopening (${(await soundOf()).sound})`);
-check(await page.locator("#mixer-toggle.unsaved").count() === 0, "saved settings are not marked unsaved");
-await openMixer();
-check((await page.textContent("#mixer-save-text")).includes("saved settings"), "the mixer says it is using your saved settings");
+check(!(await page.isEnabled("#save")), "saved settings are not marked unsaved");
 
-// opening another score with unsaved changes asks first
+// opening another score with unsaved changes asks; Cancel stays, Don't save drops them
+await openMixer();
 await page.locator(".strip:not(.master):not(.metronome)").first().locator(".toggle.m").tap();
 await page.waitForTimeout(300);
 await page.setInputFiles("#file-input", scorePath);
 await page.waitForSelector("#ask[open]");
-check(true, "opening another score with unsaved changes asks whether to save them");
+await shot("09-ask");
+check(await page.locator("#ask button").count() === 3, "opening another score asks: Cancel, Don't save or Save");
+await page.click('#ask button:has-text("Cancel")');
+await page.waitForTimeout(300);
+check((await soundOf()).mute === true && await page.isEnabled("#save"), "Cancel keeps the score and its unsaved change");
+await page.setInputFiles("#file-input", scorePath);
+await page.waitForSelector("#ask[open]");
 await page.click('#ask button:has-text("Don\'t save")');
-await page.waitForSelector(".page canvas", { timeout: 180000 });
-
-// "Use score's settings" removes the saved settings
-await page.tap("#play");
 await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
 await page.waitForTimeout(800);
-await page.tap("#play");
-check((await soundOf()).mute === false, "Don't save dropped the unsaved mute");
-await openMixer();
-await page.tap("#mixer-reset");
-await page.waitForSelector("#ask[open]");
-await page.click('#ask button:has-text("Use score")');
-await page.waitForTimeout(500);
-check((await soundOf()).soundId === before.soundId, "Use score's settings puts the score's sound back");
-await reopen();
-check((await soundOf()).soundId === before.soundId, "and it stays that way after reopening");
+const dropped = await soundOf();
+check(dropped.mute === false && dropped.soundId === after.soundId, "Don't save drops the change and keeps what was saved");
 
+// tidy up for the next run
+await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("pocketscore.")).forEach((k) => localStorage.removeItem(k)));
 await browser.close();
 console.log(failures ? `${failures} failure(s)` : "all phone checks passed");
 process.exit(failures ? 1 : 0);

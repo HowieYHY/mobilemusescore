@@ -12,7 +12,9 @@
 //   {type:"playing", on}     while stopped only a little audio is queued, so
 //                            a tapped note sounds at once
 // To the page: {type:"underrun", count} for each gap while playing, and
-// {type:"stats", speed, slowestMs, target} about once a second.
+// {type:"stats", load, loadUnder, slowestMs, target} every few seconds while
+// music plays: load = share of the time spent rendering (0.05 = 5%), or null
+// with loadUnder set when this device's timer is too coarse to measure it.
 // On outPort (from/to the worklet):
 //   -> {type:"audio", data: Float32Array (interleaved stereo), gen}
 //   <- {type:"consumed", frames} | {type:"underrun"} | {type:"flush", gen}
@@ -38,10 +40,27 @@ let gen = 0; // flush generation: audio rendered before a flush is dropped
 let pumping = false;
 
 // render speed, reported to the page for the playback check
+// Measured only while music plays (rendering silence while stopped is nearly
+// free and would read as thousands of times faster), over a few seconds.
 let renderMs = 0;
 let renderedFrames = 0;
 let slowestMs = 0;
 let lastStats = 0;
+const STATS_MS = 3000;
+// Browsers coarsen performance.now() (Safari in workers: whole milliseconds),
+// so a block that renders in well under 1 ms can read as 0 ms
+const timerStep = (() => {
+    let step = Infinity;
+    for (let i = 0; i < 5; i++) {
+        const a = performance.now();
+        let b = a;
+        while (b === a) {
+            b = performance.now();
+        }
+        step = Math.min(step, b - a);
+    }
+    return step;
+})();
 
 function connectRpc(rpc) {
     // 5.0 builds: _mss_rpc_receive / rpcSend; 4.7 builds: upstream's embind pair
@@ -72,9 +91,11 @@ function renderBlock() {
     const t0 = performance.now();
     mod._msaudio_process(bufPtr, BLOCK);
     const ms = performance.now() - t0;
-    renderMs += ms;
-    renderedFrames += BLOCK;
-    slowestMs = Math.max(slowestMs, ms);
+    if (playing) {
+        renderMs += ms;
+        renderedFrames += BLOCK;
+        slowestMs = Math.max(slowestMs, ms);
+    }
     // copy out of wasm memory; the copy is transferred to the worklet
     const data = new Float32Array(mod.HEAPF32.buffer, bufPtr, BLOCK * 2).slice();
     out.postMessage({ type: "audio", data, gen }, [data.buffer]);
@@ -83,12 +104,23 @@ function renderBlock() {
 
 function reportStats() {
     const now = performance.now();
-    if (now - lastStats < 1000 || !renderedFrames) {
+    if (now - lastStats < STATS_MS || !renderedFrames) {
         return;
     }
     lastStats = now;
     const audioMs = renderedFrames / sampleRate * 1000;
-    self.postMessage({ type: "stats", speed: audioMs / Math.max(0.001, renderMs), slowestMs, target: playTarget });
+    // Too few timer steps to trust: give an upper bound instead (each block's
+    // reading can be short by up to one timer step)
+    const measurable = renderMs >= 20 * timerStep;
+    const blocks = renderedFrames / BLOCK;
+    self.postMessage({
+        type: "stats",
+        load: measurable ? renderMs / audioMs : null,
+        loadUnder: measurable ? null : (renderMs + blocks * timerStep) / audioMs,
+        slowestMs,
+        timerStep,
+        target: playTarget,
+    });
     renderMs = 0;
     renderedFrames = 0;
     slowestMs = 0;

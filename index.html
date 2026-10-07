@@ -10,8 +10,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-DHIRCoKM.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BWS7_V0m.css">
+  <script type="module" crossorigin src="./assets/index-DQfHErxw.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CNWlG2CN.css">
 </head>
 <body>
   <header class="topbar">
@@ -38,13 +38,14 @@
     <div class="swatches" id="swatches" role="group" aria-label="Colour">
       <button class="swatch more" id="more-colors" aria-label="More colours" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
     </div>
-    <button class="finger" id="notes-finger" aria-pressed="true" title="When on, one finger draws and two fingers scroll. A stylus always draws."><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 11.2V4.8a1.8 1.8 0 0 1 3.6 0v5.4l4.7.9c1.3.25 2.2 1.45 2.05 2.77l-.6 5.1A2.5 2.5 0 0 1 16.3 21h-5.1a2.5 2.5 0 0 1-2-1l-3.9-5.3a1.6 1.6 0 0 1 2.3-2.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Draw with finger</span><i class="switch" aria-hidden="true"></i></button>
+    <button class="finger" id="notes-finger" aria-pressed="true" title="When on, one finger draws and two fingers scroll. A stylus always draws."><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 11.2V4.8a1.8 1.8 0 0 1 3.6 0v5.4l4.7.9c1.3.25 2.2 1.45 2.05 2.77l-.6 5.1A2.5 2.5 0 0 1 16.3 21h-5.1a2.5 2.5 0 0 1-2-1l-3.9-5.3a1.6 1.6 0 0 1 2.3-2.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span class="long">Draw with finger</span><span class="short" aria-hidden="true">Finger</span><i class="switch" aria-hidden="true"></i></button>
     <div class="actions">
-      <button class="btn small" id="notes-undo" disabled>Undo</button>
-      <button class="btn small" id="notes-clear">Clear</button>
+      <button class="btn small" id="notes-undo" disabled aria-label="Undo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Undo</span></button>
+      <button class="btn small" id="notes-clear" aria-label="Clear all notes"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Clear</span></button>
       <button class="btn small primary" id="notes-done">Done</button>
     </div>
     <div class="hint" id="notes-hint"></div>
+    <div class="saved" id="notes-saved" aria-live="polite"></div>
   </div>
 
   <div class="palette" id="palette" role="dialog" aria-label="More colours" hidden>
@@ -79,6 +80,12 @@
       <button class="chip" id="mixer-reverb" aria-pressed="false">Reverb</button>
       <button class="btn small" id="mixer-close">Done</button>
     </div>
+    <div class="mixer-save" id="mixer-save" hidden>
+      <span class="mixer-save-text" id="mixer-save-text"></span>
+      <button class="btn small plain" id="mixer-reset">Use score's settings</button>
+      <button class="btn small plain" id="mixer-discard">Discard</button>
+      <button class="btn small primary" id="mixer-savebtn">Save</button>
+    </div>
     <div class="mixer-body" id="mixer-body"></div>
     <div class="sounds" id="sounds" hidden>
       <div class="sounds-head">
@@ -89,6 +96,12 @@
     </div>
     <div class="diag" id="diag"></div>
   </section>
+
+  <dialog class="ask" id="ask">
+    <h2></h2>
+    <p></p>
+    <div class="ask-buttons"></div>
+  </dialog>
 
   <footer class="transport">
     <button class="btn round" id="rewind" aria-label="Back to start" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor"/></svg></button>

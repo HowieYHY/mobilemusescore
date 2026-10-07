@@ -471,6 +471,10 @@ std::string Session::load(const std::string& path)
     // Playback model, with NotationConfiguration defaults:
     // play repeats on, chord symbols on, metronome off.
     LOGI() << "load step 7";
+    // Every score opens with the metronome off (muted in the mixer), whatever
+    // the previous score did, as desktop's metronome button is off by default
+    m_metronome = false;
+
     m_playbackModel = std::make_unique<PlaybackModel>(m_ctx);
     m_playbackModel->setPlayRepeats(true);
     m_playbackModel->setPlayChordSymbols(true);
@@ -1200,10 +1204,16 @@ std::string Session::timelineJson() const
 
     const double spatium = score->style().spatium();
     const std::vector<Page*>& pages = score->pages();
-    std::string out = "[";
-    bool first = true;
 
-    auto point = [&](int utick, const System* system, double canvasX) {
+    struct Point {
+        double secs;
+        int page;
+        double x, y, h;
+        bool barEnd;
+    };
+    std::vector<Point> points;
+
+    auto point = [&](int utick, const System* system, double canvasX, bool barEnd = false) {
         const Page* page = system->page();
         if (!page) {
             return;
@@ -1221,12 +1231,8 @@ std::string Session::timelineJson() const
         const double x = canvasX - spatium - page->pos().x();
         const double y = system->staffCanvasYpage(0) - 3.0 * spatium;
         const double h = bottomY + 6.0 * spatium;
-        if (!first) {
-            out += ",";
-        }
-        first = false;
-        out += "[" + num(std::round(uticksToSecs(score, utick) * 10000.0) / 10000.0) + "," + std::to_string(pageIdx) + ","
-               + num(std::round(x)) + "," + num(std::round(y)) + "," + num(std::round(h)) + "]";
+        points.push_back({ std::round(uticksToSecs(score, utick) * 10000.0) / 10000.0, pageIdx,
+                           std::round(x), std::round(y), std::round(h), barEnd });
     };
 
     for (const RepeatSegment* rs : playedRepeats(score)) {
@@ -1242,8 +1248,31 @@ std::string Session::timelineJson() const
                 }
             }
             const Segment* endBar = m->findSegment(SegmentType::EndBarLine, m->endTick());
-            point(m->endTick().ticks() + offset, system, endBar ? endBar->canvasPos().x() : m->canvasPos().x() + m->width());
+            point(m->endTick().ticks() + offset, system, endBar ? endBar->canvasPos().x() : m->canvasPos().x() + m->width(), true);
         }
+    }
+
+    // A bar's end point sits on its barline, at the same moment as the next
+    // bar's first note, which is further right: the cursor would reach the
+    // barline and then jump. When the next bar follows on the same line, the
+    // end point is left out, so the cursor glides from the last note of a bar
+    // to the first note of the next. (At the end of a line it still goes to
+    // the barline, then on to the next line.)
+    std::string out = "[";
+    bool first = true;
+    for (size_t i = 0; i < points.size(); ++i) {
+        const Point& p = points[i];
+        if (p.barEnd && i + 1 < points.size()) {
+            const Point& next = points[i + 1];
+            if (next.page == p.page && next.y == p.y && next.x > p.x) {
+                continue;
+            }
+        }
+        if (!first) {
+            out += ",";
+        }
+        first = false;
+        out += "[" + num(p.secs) + "," + std::to_string(p.page) + "," + num(p.x) + "," + num(p.y) + "," + num(p.h) + "]";
     }
     return out + "]";
 }

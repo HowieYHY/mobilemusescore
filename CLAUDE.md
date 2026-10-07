@@ -28,6 +28,8 @@ build, tests, status) before working here.
 - The mixer works as soon as a score is open (sounds load on open, not on Play). The metronome
   starts muted and unmuting it turns the clicks on. Opening a score stops playback.
 - Text is sized by dragging the text box corner (no text size buttons).
+- The music pauses when the app is left (another app, home screen, screen locked), and the README
+  says so; nothing plays on unseen.
 - No on-screen playback diagnostics (removed once Android was smooth); use `app.engine.stats`.
 - On phones the score's name sits on its own row above the top buttons.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
@@ -66,6 +68,15 @@ build, tests, status) before working here.
 - **Ask what "save" covers before building it.** A mixer-only Save with a bar after every change was
   not what the user wanted: one Save for everything, asked only when leaving the score. Rule: follow
   the familiar document model (one Save, question on leaving, quiet recovery) unless told otherwise.
+- **Two async steps that both touch the same state must be ordered.** Restoring saved settings and
+  the engine's "sounds ready" ran side by side; when "ready" came in the middle of the restore, saved
+  sound choices were dropped (6 of 9 GODS voices back on MS Basic, "randomly"). Rule: make the later
+  step wait for the earlier (`mixLoading`), and reproduce races by slowing one side down in a test
+  (`SLOW=1 scripts/reopen-test.mjs`), checking the test fails without the fix.
+- **Per-score defaults must be reset per score.** The metronome was "muted by default" only for the
+  first score: the engine's `m_metronome` was session-wide, so after unmuting it once every later
+  score opened with clicks, and saved settings from older versions replayed it too. Rule: anything
+  the user wants "by default" is set in `Session::load` and not restored from saved settings.
 - **The device decides, not a web search.** From web reports I told the user iPadOS's photo and
   camera options could not be removed; on their iPad (0.3.2: `accept` with `.mscz` plus generic
   types, and the file input over the Open button instead of `hidden`) Open score already went straight

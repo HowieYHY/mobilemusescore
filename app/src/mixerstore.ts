@@ -17,7 +17,8 @@ export const slot = (t: TrackInfo) => `${t.key}:${t.title}`;
 export function mixOf(tracks: TrackInfo[], masterDb: number): Mix {
     const parts: Record<string, PartMix> = {};
     for (const t of tracks) {
-        parts[slot(t)] = { volume: t.volume, mute: t.mute, solo: t.solo, reverb: t.reverb, soundId: t.soundId };
+        // the metronome always opens muted (off), so its on/off isn't kept
+        parts[slot(t)] = { volume: t.volume, mute: t.metronome ? true : t.mute, solo: t.solo, reverb: t.reverb, soundId: t.soundId };
     }
     return { master: masterDb, parts };
 }

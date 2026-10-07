@@ -60,6 +60,9 @@ Files straight away. If music is playing, it stops when you open another score.
 A blue line shows where you are in the music, and the page follows it as it plays.
 If you scroll away, it waits a moment before following again.
 
+**The music pauses when you leave PocketScore** (switch to another app, go to the home screen or
+lock the screen), so it never keeps playing where you can't see it. Tap Play when you come back.
+
 ### Write on the score
 Tap the **pencil** button at the top:
 - **Pen** and **Highlight**: write or mark with a stylus (Apple Pencil, S Pen) or your finger.
@@ -86,7 +89,8 @@ Tap **Mixer**:
 - **Slider**: how loud that part is, compared with the score. **100%** (the small mark in the
   middle) is as the score was saved; **50%** sounds about half as loud, **200%** about twice as loud.
 - **M** (mute): silences that part. It shows **Muted**.
-- **Metronome** (at the bottom of the list): starts muted. Unmute it to hear a click on every beat.
+- **Metronome** (at the bottom of the list): muted every time a score opens. Unmute it to hear a
+  click on every beat.
 - **S** (solo): plays only that part; you can solo several. The other parts are dimmed.
 - **The sound under a part's name** (for example *Grand Piano*): tap it to play that part with a
   different instrument sound. The sounds are grouped as in MuseScore's mixer; *In score* marks the

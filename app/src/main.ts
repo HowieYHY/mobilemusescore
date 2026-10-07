@@ -391,7 +391,8 @@ function cursorFromTimeline(secs: number): CursorInfo | null {
     const a = timeline[lo];
     const b = timeline[lo + 1];
     let x = a[2];
-    if (b && b[1] === a[1] && b[3] === a[3] && b[0] > a[0]) {
+    // glide to the next point only along the same line and forwards (a repeat jumps back)
+    if (b && b[1] === a[1] && b[3] === a[3] && b[0] > a[0] && b[2] >= a[2]) {
         x = a[2] + (b[2] - a[2]) * Math.min(1, (secs - a[0]) / (b[0] - a[0]));
     }
     return { secs, duration: state.duration, page: a[1], x, y: a[3], w: 0.4 * (state.score?.spatium || 25), h: a[4] };
@@ -456,6 +457,21 @@ function followReports(secs: number, clock: number) {
 }
 
 engine.on("seeked", () => (resyncCursor = true));
+
+// Leaving PocketScore (another app, the home screen, locking the screen) pauses
+// the music, so it doesn't play on unseen; coming back says so.
+let pausedOnLeaving = false;
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        if (state.playing) {
+            pausedOnLeaving = true;
+            void engine.pause();
+        }
+    } else if (pausedOnLeaving) {
+        pausedOnLeaving = false;
+        setStatus("The music paused when you left PocketScore. Tap Play to go on.", "info", 6000);
+    }
+});
 
 // The device can stop the sound by itself (a call, Siri, a system dialog, another
 // app taking the audio). Pause then, so the cursor stops with the sound.
@@ -843,6 +859,8 @@ const mix = {
     pendingSounds: {} as Record<string, string>,
 };
 let draftTimer = 0;
+// restoring the opened score's saved settings (see the playbackReady handler)
+let mixLoading: Promise<boolean> = Promise.resolve(false);
 let restoredNotice = false;
 
 // A part's sound is recorded only when it isn't the score's own ("" = the score's)
@@ -881,7 +899,7 @@ async function applyMix(m: Mix) {
         if (Math.abs(p.reverb - t.reverb) > 0.001) {
             await engine.setReverb(t.key, p.reverb);
         }
-        if (p.mute !== t.mute) {
+        if (p.mute !== t.mute && !t.metronome) { // the metronome stays as it is (off when a score opens)
             await engine.setMute(t.key, p.mute);
         }
         if (p.solo !== t.solo) {
@@ -1009,11 +1027,16 @@ function ask(title: string, text: string, buttons: [string, string][]): Promise<
     });
 }
 
-engine.on("playbackReady", async (tracks: TrackInfo[]) => {
+engine.on("playbackReady", async () => {
+    // The saved settings must be restored first: when the audio is already
+    // running the sounds can be ready before that has finished, and the saved
+    // sound choices were then lost (parts back on the score's sound).
+    await mixLoading;
     state.playbackReady = true;
+    const tracks = await engine.tracks();
     state.tracks = tracks;
     setStatus("");
-    // sounds chosen before the sounds had loaded
+    // sounds chosen (or saved) before the sounds had loaded
     for (const t of tracks) {
         const id = mix.pendingSounds[slot(t)];
         if (id && id !== t.soundId) {
@@ -1095,12 +1118,16 @@ async function openScore(name: string, data: ArrayBuffer) {
     state.playbackReady = false;
     clearTimeout(draftTimer);
     Object.assign(mix, { store: null, score: null, saved: null, dirty: false, pendingSounds: {} });
+    // the sounds may report ready at any point from here on: they wait for the restore below
+    let mixRestoreDone: (restored: boolean) => void = () => {};
+    mixLoading = new Promise((resolve) => (mixRestoreDone = resolve));
     state.pageOps.clear();
     ui.mixerToggle.disabled = true;
     const key = await scoreKey(name, data); // before the data goes to the engine
     state.scoreKey = key;
     const res = await engine.load(name, data);
     if (!res.ok || !res.score) {
+        mixRestoreDone(false);
         setStatus(res.error || "Could not open this score.", "error");
         return;
     }
@@ -1133,6 +1160,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     // the mixer works from the start: its values come from the score, and the
     // sounds load now rather than on the first Play
     const mixRestored = await loadMix();
+    mixRestoreDone(mixRestored);
     restoredNotice = notes.restoredDraft || mixRestored;
     ui.mixerToggle.disabled = false;
     if (!ui.mixer.hidden) {
@@ -1383,4 +1411,4 @@ ui.notesClear.onclick = async () => {
 };
 
 // Let tests and the console drive the app
-(window as any).app = { engine, state, openScore, notes };
+(window as any).app = { engine, state, openScore, notes, mix };

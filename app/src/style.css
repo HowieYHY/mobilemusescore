@@ -15,6 +15,7 @@
   --warn: #8a4b00;
   --page-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --bar-b: max(10px, var(--safe-b)); /* space under the bottom bar's buttons */
   --safe-t: env(safe-area-inset-top, 0px);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-text-size-adjust: 100%;
@@ -25,17 +26,23 @@
 
 html, body {
   margin: 0;
-  height: 100%;
-  background: var(--bg);
   overflow: hidden;
   overscroll-behavior: none;
 }
 
+/* Behind the app, the colour of its bars, so no light strip ever shows at an edge */
+html { height: 100%; background: var(--chrome); }
+
+/* The app is pinned to the edges of the screen rather than sized with a
+   height unit: 100vh/100dvh are wrong on phones at times (stale after the
+   installed app restarts for an update, which buried the bottom bar on
+   Android, and short of the screen on iPad, which left a gap at the bottom). */
 body {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  /* the visible height: in a browser tab on a phone, 100% runs under the address bar */
-  height: 100dvh;
+  background: var(--bg);
 }
 
 ::selection { background: rgba(30, 106, 208, 0.25); }
@@ -189,7 +196,7 @@ body {
 .zoom {
   position: fixed;
   right: 12px;
-  bottom: calc(96px + var(--safe-b));
+  bottom: calc(86px + var(--bar-b));
   display: flex;
   align-items: center;
   gap: 6px;
@@ -206,7 +213,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px calc(10px + var(--safe-b));
+  /* clear of the home indicator, without adding its space on top of the padding */
+  padding: 10px 12px var(--bar-b);
   background: var(--chrome);
   color: var(--text-on-chrome);
   flex: none;
@@ -224,7 +232,7 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(76px + var(--safe-b));
+  bottom: calc(66px + var(--bar-b));
   max-height: min(48vh, 420px);
   display: flex;
   flex-direction: column;

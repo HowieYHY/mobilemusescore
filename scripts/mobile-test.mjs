@@ -253,6 +253,20 @@ check(!(await page.evaluate(() => app.state.playing)) && Math.abs(p2 - p1) < 0.0
 await page.tap("#play");
 await page.waitForFunction(() => app.state.playing, null, { timeout: 30000 }).then(() => check(true, "Play goes on afterwards"), () => check(false, "Play goes on afterwards"));
 
+// ---- leaving the app pauses the music; coming back says so
+const setVisible = (v) => page.evaluate((vis) => {
+    Object.defineProperty(document, "visibilityState", { value: vis ? "visible" : "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+}, v);
+await page.waitForFunction(() => app.state.playing, null, { timeout: 30000 });
+await setVisible(false);
+await page.waitForTimeout(500);
+check(!(await page.evaluate(() => app.state.playing)), "leaving the app pauses the music");
+await setVisible(true);
+check(/paused when you left/i.test(await page.textContent("#status")), "coming back says the music paused");
+await page.tap("#play");
+await page.waitForFunction(() => app.state.playing, null, { timeout: 30000 });
+
 // ---- opening a score while it plays stops the music first
 await page.setInputFiles("#file-input", scorePath);
 await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });

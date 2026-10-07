@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (8 Oct 2026, version 0.3.2)
+## Current status (8 Oct 2026, version 0.3.3)
 
 **Working prototype.** It runs in browsers (Chromium and WebKit) and, as the
 installable web app, on an iPad (A16, iPadOS 26.6.2) and an Android phone
@@ -46,7 +46,11 @@ the Pixel 9a; the iPad still showed the same choppiness, which 0.3.2 addresses
 | Back button | Mixer, sound list, colour palette and notes mode each add a history entry, so Android's Back closes them instead of leaving the app. |
 | Save | One **Save** in the top bar for everything changed on a score: notes (`annotations.ts`) and mixer (`mixerstore.ts`), in `localStorage` per score (SHA-256 of the file). Nothing is saved until then; a draft is kept on every change, so closing the app loses nothing and the changes come back next time, still unsaved, with a message (iOS home-screen apps get no `beforeunload`). The only question: opening another score with unsaved changes (Save / Don't save / Cancel). Ctrl/Cmd+S. Notes saved by 0.2.x are read as saved; 0.2.1 saved mixers and 0.2.0 sound choices are carried over. A part's sound is stored only when it isn't the score's own. The score's saved master volume is read (`mss_master_volume`). |
 | Mixer before Play | The audio engine starts when a score opens (the `AudioContext` starts suspended until a tap; Play or tapping a note resumes it), so the sounds load straight away. The mixer works from the moment the score is open: the engine sets each part's volume, reverb and mute/solo from the score at load (no longer when the sounds are added), so changes made before the sounds arrive are kept. Sound choices made or restored before then are applied once the sounds are loaded. |
-| Metronome | Its mixer strip starts muted (desktop's metronome is off by default); unmuting it turns the clicks on in the playback model (`setMetronome`), muting turns them off. |
+| Metronome | Its mixer strip is muted whenever a score opens (`Session::load` resets it; desktop's metronome is off by default), and its on/off is not kept in saved settings; unmuting it turns the clicks on in the playback model (`setMetronome`), muting turns them off. |
+| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. |
+| Saved sounds on reopening | The `playbackReady` handler waits for the opened score's saved settings to be restored (`mixLoading`). Before, when the audio was already running, the sounds could become ready while saved settings were being put back part by part, and the sound choices queued after that were never applied (parts back on the score's sound, e.g. 6 of 9 voices of GODS on MS Basic). `reopen-test.mjs` (SLOW=1 makes the restore slow, as on a phone) lost them in 4 of 6 reopenings before, 0 after. |
+| Screen fit | The app is pinned to the screen's edges (`body { position: fixed; inset: 0 }`) instead of `100dvh`, which was stale after an installed app restarted for an update (Android: bottom bar buried) and short of the screen (iPad: gap at the bottom). The bottom bar keeps the larger of its padding and the home-indicator space, not both. |
+| Cursor at barlines | A bar's end point (on the barline, at the same moment as the next bar's first note) is left out of the timeline when the next bar is on the same line, so the cursor glides from the last note of a bar to the first of the next instead of stopping at the barline and jumping. |
 | Interruptions | When the device stops the sound (a call, Siri, a system dialog; the `AudioContext` leaves "running"), playback pauses so the cursor stops too. The app never uses `confirm()`/`alert()` (on iPad they stop the sound); questions use its own dialog. Opening a score stops playback first. |
 | Fonts | Chrome rejects MuseScore's `BravuraText.otf` (its format 4 `cmap` lacks the 0xFFFF terminator), and a page using it (Paper Hearts' page 1) was not drawn. `scripts/fix-fonts.py` (fontTools, run by `build-resources.mjs`) rewrites just that table; the mapping and every other table are unchanged, and page counts are the same. A font that still fails no longer stops a page from being drawn. |
 | Offline | After the first visit, the web app opens and plays scores with no network. |
@@ -260,6 +264,7 @@ node scripts/android-test.mjs <score>    # Chrome on a USB-debugging phone, adb 
 node scripts/mobile-test.mjs [score]     # dev server; phone-sized touch screen in Chromium
 node scripts/cursor-test.mjs [score]     # dev server; cursor smoothness with Android-like audio clocks
 node scripts/layout-shots.mjs [score]    # dev server; screenshots at phone and iPad sizes in build/layout
+SLOW=1 node scripts/reopen-test.mjs [score] [times]   # dev server; saved sounds survive reopening (slow-device race)
 node scripts/stress-test.mjs <score> 4   # dev server; CPU slowed 4x, reports audio gaps and fps
 node scripts/note-preview-test.mjs <score>
 node scripts/update-test.mjs build/ghpages   # installed web app updates to app/dist

@@ -1,0 +1,13 @@
+diff --git a/src/engraving/internal/engravingfontsprovider.cpp b/src/engraving/internal/engravingfontsprovider.cpp
+index e6b3398fb6..5f9d494ce8 100644
+--- a/src/engraving/internal/engravingfontsprovider.cpp
++++ b/src/engraving/internal/engravingfontsprovider.cpp
+@@ -38,7 +38,7 @@ void EngravingFontsProvider::deinit()
+ 
+ void EngravingFontsProvider::addInternalFont(const std::string& name, const std::string& family, const muse::io::path_t& filePath)
+ {
+-    muse::io::path_t basePath = muse::io::dirpath(filePath.toQString());
++    muse::io::path_t basePath = muse::io::dirpath(filePath);
+     muse::io::path_t metadataPath = basePath + "/metadata.json";
+     std::shared_ptr<EngravingFont> f = std::make_shared<EngravingFont>(name, family, filePath, metadataPath);
+     m_symbolFonts.push_back(f);

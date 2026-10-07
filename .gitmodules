@@ -1,0 +1,12 @@
+[submodule "third_party/musescore"]
+	path = third_party/musescore
+	url = https://github.com/HowieYHY/MuseScore-Plus.git
+[submodule "third_party/muse"]
+	path = third_party/muse
+	url = https://github.com/musescore/muse_framework.git
+[submodule "third_party/muse_deps"]
+	path = third_party/muse_deps
+	url = https://github.com/musescore/muse_deps.git
+[submodule "third_party/musescore-4.7"]
+	path = third_party/musescore-4.7
+	url = https://github.com/musescore/MuseScore.git

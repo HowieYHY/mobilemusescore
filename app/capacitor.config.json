@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.howieyhy.scoreplayer",
+  "appName": "Score Player",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}

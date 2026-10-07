@@ -1,0 +1,27 @@
+{
+  "name": "mobile-score-player",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plays and displays .mscz scores with MuseScore's own engine compiled to WebAssembly",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "prepare-assets": "node ../scripts/build-resources.mjs && node ../scripts/copy-engine.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node ../scripts/gen-precache.mjs",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "playwright": "^1.63.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.7"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  }
+}

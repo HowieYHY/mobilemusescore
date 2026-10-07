@@ -1,0 +1,215 @@
+diff --git a/src/engraving/internal/engravingfontsprovider.cpp b/src/engraving/internal/engravingfontsprovider.cpp
+index 90a9561e..c8384258 100644
+--- a/src/engraving/internal/engravingfontsprovider.cpp
++++ b/src/engraving/internal/engravingfontsprovider.cpp
+@@ -36,7 +36,7 @@ EngravingFontsProvider::EngravingFontsProvider(const muse::modularity::ContextPt
+ 
+ void EngravingFontsProvider::addInternalFont(const std::string& name, const std::string& family, const muse::io::path_t& filePath)
+ {
+-    muse::io::path_t basePath = muse::io::dirpath(filePath.toQString());
++    muse::io::path_t basePath = muse::io::dirpath(filePath);
+     muse::io::path_t metadataPath = basePath + "/metadata.json";
+     std::shared_ptr<EngravingFont> f = std::make_shared<EngravingFont>(name, family, filePath, metadataPath, iocContext());
+     m_symbolFonts.push_back(f);
+diff --git a/src/framework/audio/common/audiotypes.h b/src/framework/audio/common/audiotypes.h
+index 1ba7d772..d286a27a 100644
+--- a/src/framework/audio/common/audiotypes.h
++++ b/src/framework/audio/common/audiotypes.h
+@@ -182,12 +182,12 @@ enum class AudioResourceType {
+     AudioUnit,
+ };
+ 
+-static const std::map<AudioResourceType, QString> RESOURCE_TYPE_MAP = {
+-    { AudioResourceType::Undefined, "undefined" },
+-    { AudioResourceType::MuseSamplerSoundPack, "muse_sampler_sound_pack" },
+-    { AudioResourceType::FluidSoundfont, "fluid_soundfont" },
+-    { AudioResourceType::VstPlugin, "vst_plugin" },
+-    { AudioResourceType::MusePlugin, "muse_plugin" },
++static const std::map<AudioResourceType, String> RESOURCE_TYPE_MAP = {
++    { AudioResourceType::Undefined, u"undefined" },
++    { AudioResourceType::MuseSamplerSoundPack, u"muse_sampler_sound_pack" },
++    { AudioResourceType::FluidSoundfont, u"fluid_soundfont" },
++    { AudioResourceType::VstPlugin, u"vst_plugin" },
++    { AudioResourceType::MusePlugin, u"muse_plugin" },
+ };
+ 
+ struct AudioResourceMeta {
+diff --git a/src/framework/audio/common/workmode.cpp b/src/framework/audio/common/workmode.cpp
+index 12af9a80..1e069b77 100644
+--- a/src/framework/audio/common/workmode.cpp
++++ b/src/framework/audio/common/workmode.cpp
+@@ -22,7 +22,10 @@
+ 
+ #include "workmode.h"
+ 
++#include "muse_framework_config.h"
++#ifndef MUSE_CONFIGURATION_IS_WEB
+ #include "global/settings.h"
++#endif
+ 
+ #include "muse_framework_config.h"
+ 
+@@ -32,11 +35,17 @@ using namespace muse::audio;
+ workmode::Mode workmode::m_mode = workmode::Mode::Undefined;
+ workmode::Mode workmode::m_desiredMode = workmode::Mode::Undefined;
+ 
++#ifndef MUSE_CONFIGURATION_IS_WEB
+ static const Settings::Key WORKMODE_KEY("audio", "dev/workmode");
++#endif
+ 
+ void workmode::load()
+ {
++#ifdef MUSE_CONFIGURATION_IS_WEB
++    int val = 0;
++#else
+     int val = settings()->value(WORKMODE_KEY).toInt();
++#endif
+     if (val > 0 && val <= 3) {
+         m_mode = static_cast<Mode>(val);
+     } else {
+@@ -59,7 +68,9 @@ workmode::Mode workmode::mode()
+ void workmode::setMode(Mode m)
+ {
+     //! NOTE Need restart
++#ifndef MUSE_CONFIGURATION_IS_WEB
+     settings()->setLocalValue(WORKMODE_KEY, Val(static_cast<int>(m)));
++#endif
+     m_desiredMode = m;
+ }
+ 
+diff --git a/src/framework/audio/engine/internal/audioengineconfiguration.cpp b/src/framework/audio/engine/internal/audioengineconfiguration.cpp
+index feecc321..540c3a4d 100644
+--- a/src/framework/audio/engine/internal/audioengineconfiguration.cpp
++++ b/src/framework/audio/engine/internal/audioengineconfiguration.cpp
+@@ -33,16 +33,20 @@ using namespace muse::audio::engine;
+ using namespace muse::audio::rpc;
+ 
+ static const AudioResourceId DEFAULT_SOUND_FONT_NAME = "MS Basic";
+-static const AudioResourceAttributes DEFAULT_AUDIO_RESOURCE_ATTRIBUTES = {
+-    { PLAYBACK_SETUP_DATA_ATTRIBUTE, muse::mpe::GENERIC_SETUP_DATA_STRING },
+-    { synth::SOUNDFONT_NAME_ATTRIBUTE, String::fromStdString(DEFAULT_SOUND_FONT_NAME) } };
+-
+-static const AudioResourceMeta DEFAULT_AUDIO_RESOURCE_META = {
+-    DEFAULT_SOUND_FONT_NAME,
+-    "Fluid",
+-    DEFAULT_AUDIO_RESOURCE_ATTRIBUTES,
+-    AudioResourceType::FluidSoundfont,
+-    false /*hasNativeEditor*/ };
++// Built on first use: the attribute keys are globals defined in other files,
++// and C++ does not order the initialisation of globals across files.
++static const AudioResourceMeta& defaultAudioResourceMeta()
++{
++    static const AudioResourceMeta meta = {
++        DEFAULT_SOUND_FONT_NAME,
++        "Fluid",
++        AudioResourceAttributes {
++            { PLAYBACK_SETUP_DATA_ATTRIBUTE, muse::mpe::GENERIC_SETUP_DATA_STRING },
++            { synth::SOUNDFONT_NAME_ATTRIBUTE, String::fromStdString(DEFAULT_SOUND_FONT_NAME) } },
++        AudioResourceType::FluidSoundfont,
++        false /*hasNativeEditor*/ };
++    return meta;
++}
+ 
+ void AudioEngineConfiguration::setConfig(const AudioEngineConfig& conf)
+ {
+@@ -104,7 +108,7 @@ async::Channel<bool> AudioEngineConfiguration::useSoundFontLowPassFilterChanged(
+ AudioInputParams AudioEngineConfiguration::defaultAudioInputParams() const
+ {
+     AudioInputParams result;
+-    result.resourceMeta = DEFAULT_AUDIO_RESOURCE_META;
++    result.resourceMeta = defaultAudioResourceMeta();
+ 
+     return result;
+ }
+diff --git a/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp b/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
+index 6a27131c..84ed5327 100644
+--- a/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
++++ b/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
+@@ -148,7 +148,7 @@ void SoundFontRepository::doAddSoundFont(const SoundFontUri& uri, const SoundFon
+     } else {
+ #ifdef Q_OS_WASM
+         auto promise = NetworkSFLoader::load(uri);
+-        promise.onResolve(this, [uri, parseAndAdd](const RetVal<ByteArray>& data) {
++        promise.onResolve(nullptr, [uri, parseAndAdd](const RetVal<ByteArray>& data) {
+             if (data.ret) {
+                 const io::path_t fileName = fileNameFromUri(uri);
+ 
+diff --git a/src/framework/global/settings.h b/src/framework/global/settings.h
+index cee128fc..6b5ce848 100644
+--- a/src/framework/global/settings.h
++++ b/src/framework/global/settings.h
+@@ -122,7 +122,9 @@ private:
+     Items readItems() const;
+     void writeValue(const Key& key, const Val& value);
+ 
++#ifndef NO_QT_SUPPORT
+     QString dataPath() const;
++#endif
+ 
+     QSettings* m_settings = nullptr;
+     mutable Items m_items;
+diff --git a/src/framework/mpe/internal/articulationstringutils.h b/src/framework/mpe/internal/articulationstringutils.h
+index 5be49f5e..e0838740 100644
+--- a/src/framework/mpe/internal/articulationstringutils.h
++++ b/src/framework/mpe/internal/articulationstringutils.h
+@@ -22,13 +22,23 @@
+ 
+ #pragma once
+ 
++#ifdef NO_QT_SUPPORT
++#include <string>
++#else
+ #include <QString>
++#endif
+ #include <unordered_map>
+ 
+ #include "mpe/mpetypes.h"
+ 
+ namespace muse::mpe {
+-static const std::unordered_map<ArticulationFamily, QString> ARTICULATION_FAMILY_NAMES {
++#ifdef NO_QT_SUPPORT
++using ArticulationStr = std::string;
++#else
++using ArticulationStr = QString;
++#endif
++
++static const std::unordered_map<ArticulationFamily, ArticulationStr> ARTICULATION_FAMILY_NAMES {
+     { ArticulationFamily::Undefined, "Undefined" },
+     { ArticulationFamily::Keyboards, "KeyboardsArticulation" },
+     { ArticulationFamily::Strings, "StringsArticulation" },
+@@ -37,7 +47,7 @@ static const std::unordered_map<ArticulationFamily, QString> ARTICULATION_FAMILY
+     { ArticulationFamily::Voices, "VoicesArticulation" },
+ };
+ 
+-static const std::unordered_map<ArticulationType, QString> ARTICULATION_TYPE_NAMES {
++static const std::unordered_map<ArticulationType, ArticulationStr> ARTICULATION_TYPE_NAMES {
+     { ArticulationType::Undefined, "Undefined" },
+     { ArticulationType::Standard, "Standard" },
+     { ArticulationType::Staccato, "Staccato" },
+@@ -165,22 +175,22 @@ static const std::unordered_map<ArticulationType, QString> ARTICULATION_TYPE_NAM
+     { ArticulationType::Echo, "Echo" },
+ };
+ 
+-inline ArticulationFamily articulationFamilyFromString(const QString& str)
++inline ArticulationFamily articulationFamilyFromString(const ArticulationStr& str)
+ {
+     return muse::key(ARTICULATION_FAMILY_NAMES, str, ArticulationFamily::Undefined);
+ }
+ 
+-inline const QString articulationFamilyToString(const ArticulationFamily family)
++inline const ArticulationStr articulationFamilyToString(const ArticulationFamily family)
+ {
+     return muse::value(ARTICULATION_FAMILY_NAMES, family);
+ }
+ 
+-inline ArticulationType articulationTypeFromString(const QString& str)
++inline ArticulationType articulationTypeFromString(const ArticulationStr& str)
+ {
+     return muse::key(ARTICULATION_TYPE_NAMES, str, ArticulationType::Undefined);
+ }
+ 
+-inline const QString articulationTypeToString(const ArticulationType type)
++inline const ArticulationStr articulationTypeToString(const ArticulationType type)
+ {
+     return muse::value(ARTICULATION_TYPE_NAMES, type);
+ }

@@ -1,0 +1,158 @@
+diff --git a/framework/audio/common/audiotypes.h b/framework/audio/common/audiotypes.h
+index 92f84e88..75234d40 100644
+--- a/framework/audio/common/audiotypes.h
++++ b/framework/audio/common/audiotypes.h
+@@ -311,12 +311,12 @@ inline bool hasNativeEditorSupport(const AudioResourceMeta& meta)
+     return boolAttribute(meta, HAS_NATIVE_EDITOR_SUPPORT_ATTRIBUTE);
+ }
+ 
+-static const std::map<AudioResourceType, QString> RESOURCE_TYPE_MAP = {
+-    { AudioResourceType::Undefined, "undefined" },
+-    { AudioResourceType::MuseSamplerSoundPack, "muse_sampler_sound_pack" },
+-    { AudioResourceType::FluidSoundfont, "fluid_soundfont" },
+-    { AudioResourceType::VstPlugin, "vst_plugin" },
+-    { AudioResourceType::NativeEffect, "muse_plugin" },
++static const std::map<AudioResourceType, String> RESOURCE_TYPE_MAP = {
++    { AudioResourceType::Undefined, u"undefined" },
++    { AudioResourceType::MuseSamplerSoundPack, u"muse_sampler_sound_pack" },
++    { AudioResourceType::FluidSoundfont, u"fluid_soundfont" },
++    { AudioResourceType::VstPlugin, u"vst_plugin" },
++    { AudioResourceType::NativeEffect, u"muse_plugin" },
+ };
+ 
+ static const AudioResourceId MUSE_REVERB_ID("Muse Reverb");
+diff --git a/framework/audio/common/workmode.cpp b/framework/audio/common/workmode.cpp
+index 558fb4f9..bd5cd39e 100644
+--- a/framework/audio/common/workmode.cpp
++++ b/framework/audio/common/workmode.cpp
+@@ -22,7 +22,10 @@
+ 
+ #include "workmode.h"
+ 
++#include "muse_framework_config.h"
++#ifndef MUSE_CONFIGURATION_IS_WEB
+ #include "global/settings.h"
++#endif
+ 
+ #include "muse_framework_config.h"
+ 
+@@ -34,11 +37,17 @@ using namespace muse::audio;
+ workmode::Mode workmode::m_mode = workmode::Mode::Undefined;
+ workmode::Mode workmode::m_desiredMode = workmode::Mode::Undefined;
+ 
++#ifndef MUSE_CONFIGURATION_IS_WEB
+ static const Settings::Key WORKMODE_KEY("audio", "dev/workmode");
++#endif
+ 
+ void workmode::load()
+ {
++#ifdef MUSE_CONFIGURATION_IS_WEB
++    int val = 0;
++#else
+     int val = settings()->value(WORKMODE_KEY).toInt();
++#endif
+     if (val > 0 && val <= 3) {
+         m_mode = static_cast<Mode>(val);
+     } else {
+@@ -66,7 +75,9 @@ workmode::Mode workmode::mode()
+ void workmode::setMode(Mode m)
+ {
+     //! NOTE Need restart
++#ifndef MUSE_CONFIGURATION_IS_WEB
+     settings()->setLocalValue(WORKMODE_KEY, Val(static_cast<int>(m)));
++#endif
+     m_desiredMode = m;
+ }
+ 
+diff --git a/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp b/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
+index e7352536..37e65df1 100644
+--- a/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
++++ b/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
+@@ -148,7 +148,7 @@ void SoundFontRepository::doAddSoundFont(const SoundFontUri& uri, const SoundFon
+     } else {
+ #ifdef Q_OS_WASM
+         auto promise = NetworkSFLoader::load(uri);
+-        promise.onResolve(this, [uri, parseAndAdd](const RetVal<ByteArray>& data) {
++        promise.onResolve(nullptr, [uri, parseAndAdd](const RetVal<ByteArray>& data) {
+             if (data.ret) {
+                 const io::path_t fileName = fileNameFromUri(uri);
+ 
+diff --git a/framework/global/settings.h b/framework/global/settings.h
+index ce6256c7..f30fccb8 100644
+--- a/framework/global/settings.h
++++ b/framework/global/settings.h
+@@ -122,7 +122,9 @@ private:
+     Items readItems() const;
+     void writeValue(const Key& key, const Val& value);
+ 
++#ifndef NO_QT_SUPPORT
+     QString dataPath() const;
++#endif
+ 
+     QSettings* m_settings = nullptr;
+     mutable Items m_items;
+diff --git a/framework/mpe/internal/articulationstringutils.h b/framework/mpe/internal/articulationstringutils.h
+index 29747bc3..70b1dcc6 100644
+--- a/framework/mpe/internal/articulationstringutils.h
++++ b/framework/mpe/internal/articulationstringutils.h
+@@ -22,13 +22,23 @@
+ 
+ #pragma once
+ 
++#ifdef NO_QT_SUPPORT
++#include <string>
++#else
+ #include <QString>
++#endif
+ #include <unordered_map>
+ 
+ #include "mpe/mpetypes.h"
+ 
+ namespace muse::mpe {
+-static const std::unordered_map<ArticulationFamily, QString> ARTICULATION_FAMILY_NAMES {
++#ifdef NO_QT_SUPPORT
++using ArticulationStr = std::string;
++#else
++using ArticulationStr = QString;
++#endif
++
++static const std::unordered_map<ArticulationFamily, ArticulationStr> ARTICULATION_FAMILY_NAMES {
+     { ArticulationFamily::Undefined, "Undefined" },
+     { ArticulationFamily::Keyboards, "KeyboardsArticulation" },
+     { ArticulationFamily::Strings, "StringsArticulation" },
+@@ -37,7 +47,7 @@ static const std::unordered_map<ArticulationFamily, QString> ARTICULATION_FAMILY
+     { ArticulationFamily::Voices, "VoicesArticulation" },
+ };
+ 
+-static const std::unordered_map<ArticulationType, QString> ARTICULATION_TYPE_NAMES {
++static const std::unordered_map<ArticulationType, ArticulationStr> ARTICULATION_TYPE_NAMES {
+     { ArticulationType::Undefined, "Undefined" },
+     { ArticulationType::Standard, "Standard" },
+     { ArticulationType::Staccato, "Staccato" },
+@@ -165,22 +175,22 @@ static const std::unordered_map<ArticulationType, QString> ARTICULATION_TYPE_NAM
+     { ArticulationType::Echo, "Echo" },
+ };
+ 
+-inline ArticulationFamily articulationFamilyFromString(const QString& str)
++inline ArticulationFamily articulationFamilyFromString(const ArticulationStr& str)
+ {
+     return muse::key(ARTICULATION_FAMILY_NAMES, str, ArticulationFamily::Undefined);
+ }
+ 
+-inline const QString articulationFamilyToString(const ArticulationFamily family)
++inline const ArticulationStr articulationFamilyToString(const ArticulationFamily family)
+ {
+     return muse::value(ARTICULATION_FAMILY_NAMES, family);
+ }
+ 
+-inline ArticulationType articulationTypeFromString(const QString& str)
++inline ArticulationType articulationTypeFromString(const ArticulationStr& str)
+ {
+     return muse::key(ARTICULATION_TYPE_NAMES, str, ArticulationType::Undefined);
+ }
+ 
+-inline const QString articulationTypeToString(const ArticulationType type)
++inline const ArticulationStr articulationTypeToString(const ArticulationType type)
+ {
+     return muse::value(ARTICULATION_TYPE_NAMES, type);
+ }

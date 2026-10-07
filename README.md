@@ -88,6 +88,31 @@ exported audio file.
 - **No loop, count-in, metronome button, speed control or parts view** yet. **The score library isn't remembered** between visits.
 - **The iPhone/iPad native app** needs a Mac to build. iOS is covered by the installable web app.
 
+## How to test
+
+**iPad / iPhone** (Safari)
+1. Open **https://howieyhy.github.io/mobilemusescore/** and tap Share → **Add to Home Screen**.
+2. Open PocketScore from the home screen. Wait for "Ready", then tap **Open score** and pick an `.mscz` from Files. AirDrop or save your scores to Files first.
+3. Tap **Play**. The first time, it downloads the MS Basic sound font (49 MB), so use Wi-Fi.
+4. Check:
+   - the sound plays even with the ring/silent switch on silent;
+   - the blue cursor follows the music;
+   - tapping a note jumps playback there;
+   - the slider seeks;
+   - pinch and − / + zoom;
+   - the view menu switches views;
+   - in the **Mixer**: volume, M, S and reverb for each part, plus master volume.
+5. Offline check: after one successful play, switch on Airplane mode, close the app fully, reopen it, open a score and play.
+
+**Android**
+- Install the APK from the [releases page](https://github.com/HowieYHY/mobilemusescore/releases/tag/v0.1.0-test), allowing "Install unknown apps" when asked.
+- Or use the website above in Chrome (menu → *Add to Home screen*).
+- Then run the same checks.
+
+**What to report:** the device and OS version, the score, what you did, and what happened, with a screenshot or screen recording if possible. Mention especially:
+- crackles, stutters, or sound that runs slow;
+- anything that looks different from desktop MuseScore.
+
 ## How it works
 
 ```

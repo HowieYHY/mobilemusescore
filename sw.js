@@ -4,7 +4,7 @@
 
 // Replaced with the build's content hash by scripts/gen-precache.mjs, so every
 // build is a new service worker and a new cache (old ones are deleted).
-const VERSION = "016e1f91367a5628";
+const VERSION = "a19b7f2aa51705fa";
 const CACHE = "pocketscore-" + VERSION;
 
 self.addEventListener("install", (event) => {

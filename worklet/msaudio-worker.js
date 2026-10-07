@@ -9,22 +9,39 @@
 //
 // Messages from the page:
 //   {type:"init", soundFont, soundFontPath, rpcPort, outPort, sampleRate}
+//   {type:"playing", on}     while stopped only a little audio is queued, so
+//                            a tapped note sounds at once
+// To the page: {type:"underrun", count} for each gap while playing, and
+// {type:"stats", speed, slowestMs, target} about once a second.
 // On outPort (from/to the worklet):
-//   -> {type:"audio", data: Float32Array (interleaved stereo)}
-//   <- {type:"consumed", frames} | {type:"underrun"} | {type:"flush"}
+//   -> {type:"audio", data: Float32Array (interleaved stereo), gen}
+//   <- {type:"consumed", frames} | {type:"underrun"} | {type:"flush", gen}
 
 import createMsAudio from "../engine/msaudio.mjs";
 
 const BLOCK = 1024;
-const MIN_TARGET = 4 * BLOCK; // ~85 ms at 48 kHz
-const MAX_TARGET = 24 * BLOCK; // ~0.5 s
+const MAX_TARGET = 48 * BLOCK; // ~1 s
 
 let mod = null;
 let out = null;
 let bufPtr = 0;
 let inFlight = 0; // frames sent to the worklet and not yet played
-let target = 8 * BLOCK; // ~170 ms
+// Audio queued ahead while playing. Deep enough to ride out a busy moment on
+// a phone (~340 ms); seek, pause and stop flush it, so it adds no delay there.
+let playTarget = 16 * BLOCK;
+// While stopped (~85 ms); grows if the device takes audio in bigger bursts
+let idleTarget = 4 * BLOCK;
+const MAX_IDLE_TARGET = 12 * BLOCK;
+let underruns = 0;
+let playing = false;
+let gen = 0; // flush generation: audio rendered before a flush is dropped
 let pumping = false;
+
+// render speed, reported to the page for the playback check
+let renderMs = 0;
+let renderedFrames = 0;
+let slowestMs = 0;
+let lastStats = 0;
 
 function connectRpc(rpc) {
     // 5.0 builds: _mss_rpc_receive / rpcSend; 4.7 builds: upstream's embind pair
@@ -52,33 +69,61 @@ function connectRpc(rpc) {
 }
 
 function renderBlock() {
+    const t0 = performance.now();
     mod._msaudio_process(bufPtr, BLOCK);
+    const ms = performance.now() - t0;
+    renderMs += ms;
+    renderedFrames += BLOCK;
+    slowestMs = Math.max(slowestMs, ms);
     // copy out of wasm memory; the copy is transferred to the worklet
     const data = new Float32Array(mod.HEAPF32.buffer, bufPtr, BLOCK * 2).slice();
-    out.postMessage({ type: "audio", data }, [data.buffer]);
+    out.postMessage({ type: "audio", data, gen }, [data.buffer]);
     inFlight += BLOCK;
 }
 
-// Keep `target` frames queued ahead of the speaker.
+function reportStats() {
+    const now = performance.now();
+    if (now - lastStats < 1000 || !renderedFrames) {
+        return;
+    }
+    lastStats = now;
+    const audioMs = renderedFrames / sampleRate * 1000;
+    self.postMessage({ type: "stats", speed: audioMs / Math.max(0.001, renderMs), slowestMs, target: playTarget });
+    renderMs = 0;
+    renderedFrames = 0;
+    slowestMs = 0;
+}
+
+// Keep the target amount of audio queued ahead of the speaker.
 function pump() {
     if (!mod || pumping) {
         return;
     }
     pumping = true;
     try {
+        const target = playing ? playTarget : idleTarget;
         while (inFlight < target) {
             renderBlock();
         }
     } finally {
         pumping = false;
     }
+    reportStats();
 }
+
+let sampleRate = 48000;
 
 self.onmessage = async (e) => {
     const msg = e.data;
+    if (msg.type === "playing") {
+        playing = msg.on;
+        pump();
+        return;
+    }
     if (msg.type !== "init") {
         return;
     }
+    sampleRate = msg.sampleRate || sampleRate;
     try {
         mod = await createMsAudio({
             print: (s) => self.postMessage({ type: "log", text: s }),
@@ -102,17 +147,23 @@ self.onmessage = async (e) => {
                 inFlight = Math.max(0, inFlight - m.frames);
             } else if (m.type === "underrun") {
                 // the device fell behind: keep more audio queued from now on
-                target = Math.min(MAX_TARGET, target + 2 * BLOCK);
-                self.postMessage({ type: "log", text: `audio underrun; queue now ${target} frames` });
+                if (playing) {
+                    underruns++;
+                    playTarget = Math.min(MAX_TARGET, playTarget + 4 * BLOCK);
+                    self.postMessage({ type: "underrun", count: underruns });
+                    self.postMessage({ type: "log", text: `audio underrun; queue now ${playTarget} frames` });
+                } else {
+                    idleTarget = Math.min(MAX_IDLE_TARGET, idleTarget + BLOCK);
+                }
             } else if (m.type === "flush") {
                 inFlight = 0; // the worklet dropped its queue
+                gen = m.gen;
             }
             pump();
         };
 
         bufPtr = mod._malloc(BLOCK * 2 * 4);
         mod._msaudio_init(); // announces EngineRunning to the score engine
-        target = Math.max(MIN_TARGET, target);
         pump();
         self.postMessage({ type: "ready", block: BLOCK });
     } catch (err) {

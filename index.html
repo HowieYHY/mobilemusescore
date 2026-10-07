@@ -10,13 +10,16 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-vYoW4_Lm.js"></script>
+  <script type="module" crossorigin src="./assets/index-BWAledxt.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-Bu_cyep2.css">
 </head>
 <body>
   <header class="topbar">
     <label class="btn primary" id="open-label">
-      <input type="file" id="file-input" hidden>
+      <!-- MuseScore files only: no photo library or camera. iOS doesn't know .mscz, and greys out
+           every file when the only types listed are unknown, so the generic types .mscz is seen
+           as are listed too (the app checks the extension when opening). -->
+      <input type="file" id="file-input" hidden accept=".mscz,.mscx,application/x-musescore,application/zip,application/octet-stream">
       <span class="long">Open score</span><span class="short" aria-hidden="true">Open</span>
     </label>
     <div class="title" id="score-title">PocketScore</div>

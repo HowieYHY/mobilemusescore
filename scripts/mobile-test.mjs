@@ -234,6 +234,31 @@ await page.waitForTimeout(800);
 const dropped = await soundOf();
 check(dropped.mute === false && dropped.soundId === after.soundId, "Don't save drops the change and keeps what was saved");
 
+// ---- the metronome starts muted
+await openMixer();
+const metRow = page.locator(".strip.metronome");
+check(await metRow.locator(".toggle.m.on").count() === 1 && (await metRow.locator(".db").textContent()) === "Muted", "the metronome is muted by default");
+await page.tap("#mixer-close");
+
+// ---- the device stops the sound (a call, Siri, a system dialog): playback pauses with it
+await page.tap("#play");
+await page.waitForFunction(() => app.state.playing, null, { timeout: 30000 });
+await page.waitForTimeout(1500);
+await page.evaluate(() => app.engine.ctx.suspend());
+await page.waitForTimeout(700);
+const p1 = await page.evaluate(() => app.state.position);
+await page.waitForTimeout(1000);
+const p2 = await page.evaluate(() => app.state.position);
+check(!(await page.evaluate(() => app.state.playing)) && Math.abs(p2 - p1) < 0.01, `when the device stops the sound, playback pauses and the line stops (${p1.toFixed(2)} then ${p2.toFixed(2)} s)`);
+await page.tap("#play");
+await page.waitForFunction(() => app.state.playing, null, { timeout: 30000 }).then(() => check(true, "Play goes on afterwards"), () => check(false, "Play goes on afterwards"));
+
+// ---- opening a score while it plays stops the music first
+await page.setInputFiles("#file-input", scorePath);
+await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
+await page.waitForTimeout(500);
+check(!(await page.evaluate(() => app.state.playing)), "opening a score while playing stops the music");
+
 // tidy up for the next run
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("pocketscore.")).forEach((k) => localStorage.removeItem(k)));
 await browser.close();

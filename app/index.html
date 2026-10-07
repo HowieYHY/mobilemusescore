@@ -15,10 +15,12 @@
 <body>
   <header class="topbar">
     <label class="btn primary" id="open-label">
-      <!-- MuseScore files only: no photo library or camera. iOS doesn't know .mscz, and greys out
-           every file when the only types listed are unknown, so the generic types .mscz is seen
-           as are listed too (the app checks the extension when opening). -->
-      <input type="file" id="file-input" hidden accept=".mscz,.mscx,application/x-musescore,application/zip,application/octet-stream">
+      <!-- Asks for MuseScore files. iOS doesn't know .mscz: with only that listed it greys out every
+           file, so the generic types it files .mscz under are listed too (the app checks the
+           extension when opening). Those also cover pictures, so iPadOS still offers Photo Library
+           and Take Photo; that can't be avoided. The input lies over the Open button (not hidden)
+           so iPadOS opens its menu at the button rather than mid-screen. -->
+      <input type="file" id="file-input" aria-label="Open score" accept=".mscz,.mscx,application/x-musescore,application/zip,application/octet-stream">
       <span class="long">Open score</span><span class="short" aria-hidden="true">Open</span>
     </label>
     <div class="title" id="score-title">PocketScore</div>

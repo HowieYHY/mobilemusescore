@@ -9,6 +9,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -58,6 +59,20 @@ for (const { alias, src } of entries) {
     const size = fs.statSync(dst).size;
     total += size;
     manifest.push({ path: alias, size });
+}
+
+// Chrome refuses fonts with a faulty cmap table (MuseScore's BravuraText.otf),
+// and a page using one was not drawn: repair them (scripts/fix-fonts.py, fontTools)
+const py = spawnSync(process.platform === "win32" ? "python" : "python3",
+    [path.join(root, "scripts/fix-fonts.py"), path.join(out, "fonts")], { encoding: "utf8" });
+if (py.status !== 0) {
+    console.error(py.stderr || py.error);
+    console.error("fonts not checked: install Python 3 and fontTools (python -m pip install --user fonttools)");
+    process.exit(1);
+}
+process.stdout.write(py.stdout);
+for (const m of manifest) {
+    m.size = fs.statSync(path.join(out, m.path)).size;
 }
 
 fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 1));

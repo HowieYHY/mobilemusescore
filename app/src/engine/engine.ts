@@ -111,6 +111,8 @@ export class Engine {
         const ctx = new AudioContext({ latencyHint: "playback" });
         this.ctx = ctx;
         void ctx.resume();
+        // "suspended" or (Safari) "interrupted" while playing means the device stopped the sound
+        ctx.onstatechange = () => this.emit("audioState", ctx.state);
 
         this.audioStarting = (async () => {
             this.emit("audioStatus", { text: "Loading MS Basic sound font…" });
@@ -241,7 +243,7 @@ export class Engine {
             return 0;
         }
         let raw = ctx.currentTime;
-        const ts = ctx.getOutputTimestamp?.();
+        const ts = ctx.state === "running" ? ctx.getOutputTimestamp?.() : null;
         if (ts && ts.performanceTime && ts.contextTime) {
             raw = ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
         }
@@ -273,6 +275,16 @@ export class Engine {
 
     timeline(): Promise<[number, number, number, number, number][]> { return this.request({ cmd: "timeline" }); }
 
+    /** How long after Play the music reaches the speaker: the audio queued ahead while playing plus the device's own delay. */
+    get playLatency(): number {
+        const ctx = this.ctx;
+        if (!ctx) {
+            return 0;
+        }
+        const queued = this.stats.targetSecs || (16 * 1024) / ctx.sampleRate; // the worker's playing queue
+        return queued + (ctx.baseLatency || 0) + ((ctx as any).outputLatency || 0);
+    }
+
     get sampleRate(): number {
         return this.ctx ? this.ctx.sampleRate : 0;
     }
@@ -297,7 +309,7 @@ export class Engine {
     play() { this.setPlaying(true); return this.request({ cmd: "play" }); }
     async pause() { await this.request({ cmd: "pause" }); this.setPlaying(false); this.flush(); }
     async stop() { await this.request({ cmd: "stop" }); this.setPlaying(false); this.flush(); }
-    async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); }
+    async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); this.emit("seeked", {}); }
     // Move to the note or beat at a point on a page (page units); `radius` is
     // how far from the point a note may be. While stopped, that note sounds.
     async seekAt(page: number, x: number, y: number, radius = 0, playNote = false): Promise<CursorInfo | null> {
@@ -305,6 +317,9 @@ export class Engine {
         const c = await this.request<CursorInfo | null>({ cmd: "seekAt", page, x, y, radius, playNote });
         if (playing) {
             this.flush(); // only playing audio is queued far ahead
+        }
+        if (c) {
+            this.emit("seeked", {});
         }
         return c;
     }

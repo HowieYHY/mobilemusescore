@@ -42,7 +42,9 @@ the yellow bar. This is the same on every device. The version number is on the s
 
 ### Open a score
 Tap **Open score** and choose a `.mscz` file. On iPad and iPhone, first save your scores to the
-**Files** app (AirDrop them, or save them from email or a cloud drive).
+**Files** app (AirDrop them, or save them from email or a cloud drive), then tap **Choose File**
+(iPad and iPhone also list *Photo Library* and *Take Photo*; PocketScore can't hide those, so just
+ignore them). If music is playing, it stops when you open another score.
 
 ### Play
 | To… | Do this |
@@ -66,12 +68,12 @@ Tap the **pencil** button at the top:
   with one finger and draw only with a stylus. It starts on, and turns off by itself the first time
   you use a stylus (you can turn it back on).
 - **Text**: **double-tap** the score to add a text box, then type. Tap once outside the box when
-  you're done. Tap a box to change it, drag the arrows to move it, tap **×** to delete it.
+  you're done. Tap a box to change it, drag the arrows on its left to move it, drag its bottom
+  corner to make it (and the text) bigger or smaller, and tap **×** to delete it.
 - **Erase**: tap or rub over a mark or text box.
 - **Colours**: black (the default), white, red, blue, green and yellow. Tap **+** for more colours,
   or pick any colour. While you're typing in a text box, a new colour changes that box.
-- **Size** (the dots next to the colours): how thick the pen, highlighter or eraser is, or how big
-  new text is. While you're typing in a text box, a new size changes that box.
+- **Size** (the dots): how thick the pen, highlighter or eraser is.
 - **Undo** and **Clear** (everything on this score).
 
 Tap **Done** to go back to playing. To keep your notes, tap **Save** (see below).
@@ -85,6 +87,7 @@ Tap **Mixer**:
 - **Slider**: how loud that part is, compared with the score. **100%** (the small mark in the
   middle) is as the score was saved; **50%** sounds about half as loud, **200%** about twice as loud.
 - **M** (mute): silences that part. It shows **Muted**.
+- **Metronome** (at the bottom of the list): starts muted. Unmute it to hear a click on every beat.
 - **S** (solo): plays only that part; you can solo several. The other parts are dimmed.
 - **The sound under a part's name** (for example *Grand Piano*): tap it to play that part with a
   different instrument sound. The sounds are grouped as in MuseScore's mixer; *In score* marks the

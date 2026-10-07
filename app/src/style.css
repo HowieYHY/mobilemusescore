@@ -86,6 +86,16 @@ body {
   font-weight: 600;
 }
 #save { gap: 6px; }
+#open-label { position: relative; overflow: hidden; }
+#file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 100px; /* the whole button is the input, in every browser */
+}
 #open-label .short { display: none; }
 @media (max-width: 600px) {
   .topbar {
@@ -427,6 +437,7 @@ body {
 .notesbar .hint { grid-area: hint; }
 .notesbar .sizes { grid-area: sizes; }
 .notesbar .finger[hidden] + .actions + .hint { grid-column: 2 / 5; }
+.notesbar .sizes[hidden] + .finger[hidden] + .actions + .hint { grid-column: 1 / -1; }
 @media (min-width: 1100px) {
   .notesbar {
     grid-template-columns: auto auto auto auto minmax(0, 1fr) auto;
@@ -596,16 +607,16 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 .tnote .tbody { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 1ch; outline: none; padding: 0 2px; border: 1px solid transparent; border-radius: 3px; }
-.tnote .tgrip, .tnote .tdel { display: none; }
+.tnote .tgrip, .tnote .tdel, .tnote .tsize { display: none; }
 /* text boxes can be picked up with the text tool or rubbed out with the eraser */
 .annotating[data-tool="text"] .texts .tnote, .annotating[data-tool="eraser"] .texts .tnote { pointer-events: auto; }
 .annotating[data-tool="text"] .tnote .tbody { border-color: rgba(0, 0, 0, 0.18); border-style: dashed; }
 /* the box being edited */
 .annotating .tnote.sel .tbody { border: 1px solid var(--accent); min-height: 1.25em; min-width: 3ch; }
-.annotating .tnote.sel .tgrip, .annotating .tnote.sel .tdel {
+/* handles sit outside the text, so it never moves: move on the left,
+   delete at the top corner, resize at the bottom corner */
+.annotating .tnote.sel .tgrip, .annotating .tnote.sel .tdel, .annotating .tnote.sel .tsize {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -619,8 +630,9 @@ body {
   touch-action: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
-.annotating .tnote.sel .tgrip { right: 100%; margin-right: 4px; cursor: move; }
-.annotating .tnote.sel .tdel { left: 100%; margin-left: 4px; padding: 0; appearance: none; cursor: pointer; }
+.annotating .tnote.sel .tgrip { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 4px; cursor: move; }
+.annotating .tnote.sel .tdel { left: calc(100% - 6px); bottom: calc(100% - 6px); padding: 0; appearance: none; cursor: pointer; }
+.annotating .tnote.sel .tsize { left: calc(100% - 6px); top: calc(100% - 6px); cursor: nwse-resize; }
 .pages.annotating[data-tool="text"] .page { cursor: text; }
 .pages.annotating[data-tool="pen"] .page, .pages.annotating[data-tool="highlighter"] .page { cursor: crosshair; }
 /* a finger that draws must not scroll (two fingers scroll, handled in script) */

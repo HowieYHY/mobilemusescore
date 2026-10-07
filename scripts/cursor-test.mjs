@@ -26,7 +26,9 @@ let failures = 0;
 
 // mode: "steady"; "android" (stepped, jittery output timestamps and noisy
 // position reports); "android-no-timestamp" (getOutputTimestamp gives zeros,
-// as on some devices, and currentTime moves only in ~100 ms batches)
+// as on some devices, and currentTime moves only in ~100 ms batches);
+// "ios-late-reports" (position reports held up and delivered in bursts, up to
+// 400 ms late, as when Safari delays messages from the workers)
 async function run(mode) {
     const page = await browser.newPage({ viewport: { width: 820, height: 1180 } });
     page.on("pageerror", (e) => console.log("[pageerror]", e.message));
@@ -37,6 +39,29 @@ async function run(mode) {
     await page.click("#play");
     await page.waitForFunction(() => app.state.playing, null, { timeout: 180000 });
 
+    if (mode === "ios-late-reports") {
+        await page.evaluate(() => {
+            const emit = app.engine.emit.bind(app.engine);
+            let held = [];
+            let releaseAt = 0;
+            app.engine.emit = (ev, data) => {
+                if (ev !== "position") {
+                    return emit(ev, data);
+                }
+                held.push(data);
+                const now = performance.now();
+                if (!releaseAt) {
+                    releaseAt = now + 100 + Math.random() * 300;
+                }
+                if (now >= releaseAt) {
+                    const batch = held;
+                    held = [];
+                    releaseAt = 0;
+                    batch.forEach((d) => emit(ev, d));
+                }
+            };
+        });
+    }
     if (mode === "android-no-timestamp") {
         await page.evaluate(() => {
             const ctx = app.engine.ctx;
@@ -98,7 +123,7 @@ async function run(mode) {
     return r;
 }
 
-for (const mode of ["steady", "android", "android-no-timestamp"]) {
+for (const mode of ["steady", "android", "android-no-timestamp", "ios-late-reports"]) {
     const r = await run(mode);
     const label = mode;
     console.log(`${label}: ${r.jumps} jumps, ${r.back} steps backwards in ${r.frames} frames`);

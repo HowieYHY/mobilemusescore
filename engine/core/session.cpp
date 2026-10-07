@@ -551,6 +551,11 @@ std::string Session::load(const std::string& path)
         if (t.hidden) {
             t.soloMute.mute = true;
         }
+        // the metronome is off (muted) until the reader unmutes it, as desktop's
+        // metronome button is off by default (NotationConfiguration)
+        if (t.isMetronome) {
+            t.soloMute.mute = !m_metronome;
+        }
 
         m_tracks.push_back(std::move(t));
     }
@@ -1025,8 +1030,8 @@ void Session::setTrackMute(int trackKey, bool mute)
     if (Track* t = findTrack(trackKey)) {
         t->soloMute.mute = mute;
         if (t->isMetronome) {
-            t->out.muted = mute;
-            sendControl(*t);
+            // unmuting the metronome turns its clicks on, as desktop's metronome button
+            setMetronome(!mute);
             return;
         }
         updateSoloMuteStates();

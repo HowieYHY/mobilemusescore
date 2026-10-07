@@ -38,13 +38,16 @@ export const MORE_COLORS = [
 const ICON_CLOSE = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 const ICON_MOVE = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2l3.5 3.5h-2.5v5h5V8l3.5 3.5-3.5 3.5v-2.5h-5v5h2.5L12 21l-3.5-3.5H11v-5H6V15l-3.5-3.5L6 8v2.5h5v-5H8.5z" fill="currentColor"/></svg>`;
 
-/** Sizes on screen (CSS px): stroke width, text size, eraser reach. */
-export const SIZES: Record<Tool, number[]> = {
+type SizedTool = "pen" | "highlighter" | "eraser";
+/** Sizes on screen (CSS px): stroke width, eraser reach. Text is sized by
+ * resizing its box instead. */
+export const SIZES: Record<SizedTool, number[]> = {
     pen: [1.2, 2.4, 4, 7],
     highlighter: [8, 14, 22, 32],
-    text: [12, 16, 22, 30],
     eraser: [6, 10, 18, 30],
 };
+const TEXT_PX = 16; // new text boxes
+const MIN_TEXT_PX = 8;
 
 /** Notes as stored: empty pages and views dropped, so equal notes give equal text. */
 function normalised(d: Stored): string {
@@ -62,6 +65,8 @@ function normalised(d: Stored): string {
     }
     return JSON.stringify({ v: 1, modes });
 }
+
+const ICON_RESIZE = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M20 4L4 20M20 4h-6M20 4v6M4 20h6M4 20v-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -103,7 +108,7 @@ export class Annotations {
     /** Opening the score brought back changes that were never saved. */
     restoredDraft = false;
     /** Thickness / size choice per tool: an index into SIZES. */
-    private sizes: Record<Tool, number> = { pen: 1, highlighter: 1, text: 1, eraser: 1 };
+    private sizes: Record<SizedTool, number> = { pen: 1, highlighter: 1, eraser: 1 };
     private drawing: { pointerId: number; page: number; stroke: Stroke; path: SVGPathElement; lastX: number; lastY: number } | null = null;
     private erasing: { pointerId: number; page: number } | null = null;
     private touches = new Map<number, { x: number; y: number }>();
@@ -185,7 +190,7 @@ export class Annotations {
                 if (typeof p.finger === "boolean") {
                     this.fingerChoice = p.finger;
                 }
-                for (const t of ["pen", "highlighter", "text", "eraser"] as const) {
+                for (const t of ["pen", "highlighter", "eraser"] as const) {
                     const s = p.sizes?.[t];
                     if (Number.isInteger(s) && s >= 0 && s < SIZES[t].length) {
                         this.sizes[t] = s;
@@ -353,29 +358,17 @@ export class Annotations {
         return this.colors[this.tool];
     }
 
-    /** The size choice for the current tool (index into SIZES[tool]). */
+    /** The size choice for the current tool (index into SIZES[tool]); -1 for text. */
     get size() {
-        return this.sizes[this.tool];
+        return this.tool === "text" ? -1 : this.sizes[this.tool];
     }
 
     setSize(i: number) {
-        this.sizes[this.tool] = i;
-        this.savePrefs();
-        // resize the text box being edited
-        const body = this.tool === "text" ? this.editingText : null;
-        const box = body?.closest<HTMLElement>(".tnote");
-        const pageEl = box?.closest<HTMLElement>(".page");
-        if (box && pageEl) {
-            const page = Number(pageEl.dataset.index);
-            const v = this.views.get(page);
-            const t = this.pageNotes(page).texts.find((n) => n.id === box.dataset.id);
-            if (t && v) {
-                t.size = Math.round(SIZES.text[i] / this.pxPerUnit(v));
-                box.style.fontSize = (t.size * parseFloat(v.el.style.width) / v.w) + "px";
-                this.save();
-            }
+        if (this.tool !== "text") {
+            this.sizes[this.tool] = i;
+            this.savePrefs();
+            this.onChange();
         }
-        this.onChange();
     }
 
     setColor(c: string) {
@@ -533,8 +526,49 @@ export class Annotations {
         grip.innerHTML = ICON_MOVE;
         grip.addEventListener("pointerdown", (e) => this.dragText(e, page, t, box));
 
-        box.append(grip, body, del);
+        const corner = document.createElement("span");
+        corner.className = "tsize";
+        corner.setAttribute("aria-label", "Make the text bigger or smaller");
+        corner.innerHTML = ICON_RESIZE;
+        corner.addEventListener("pointerdown", (e) => this.resizeText(e, page, t, box));
+
+        box.append(grip, body, del, corner);
         return box;
+    }
+
+    // Drag the corner: the box grows or shrinks and the text with it
+    private resizeText(e: PointerEvent, page: number, t: TextNote, box: HTMLElement) {
+        e.preventDefault(); // also keeps the text focused
+        e.stopPropagation();
+        getSelection()?.removeAllRanges();
+        const v = this.views.get(page)!;
+        const handle = e.currentTarget as HTMLElement;
+        handle.setPointerCapture(e.pointerId);
+        const r = box.querySelector(".tbody")!.getBoundingClientRect();
+        const start = { x: e.clientX, y: e.clientY, size: t.size, w: Math.max(20, r.width), h: Math.max(12, r.height) };
+        const shown = () => parseFloat(v.el.style.width) / v.w; // CSS px per page unit as laid out
+        const minSize = MIN_TEXT_PX / this.pxPerUnit(v);
+        const move = (ev: PointerEvent) => {
+            // both directions count, so a diagonal drag feels natural
+            const s = ((start.w + ev.clientX - start.x) / start.w + (start.h + ev.clientY - start.y) / start.h) / 2;
+            t.size = Math.round(Math.max(minSize, start.size * Math.min(8, Math.max(0.2, s))));
+            box.style.fontSize = (t.size * shown()) + "px";
+        };
+        const end = (dropped: boolean) => {
+            handle.removeEventListener("pointermove", move);
+            handle.removeEventListener("pointerup", up);
+            handle.removeEventListener("pointercancel", cancel);
+            if (!dropped) {
+                t.size = start.size;
+                box.style.fontSize = (t.size * shown()) + "px";
+            }
+            this.save();
+        };
+        const up = () => end(true);
+        const cancel = () => end(false);
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", up);
+        handle.addEventListener("pointercancel", cancel);
     }
 
     private dragText(e: PointerEvent, page: number, t: TextNote, box: HTMLElement) {
@@ -666,7 +700,7 @@ export class Annotations {
             id: newId(),
             tool: this.tool,
             color: this.color,
-            width: Math.max(1, Math.round(SIZES[this.tool][this.sizes[this.tool]] / ppu)),
+            width: Math.max(1, Math.round(SIZES[this.tool as "pen" | "highlighter"][this.sizes[this.tool as "pen" | "highlighter"]] / ppu)),
             pts: [x, y],
         };
         const path = this.strokeEl(stroke);
@@ -806,7 +840,7 @@ export class Annotations {
         }
         const { x, y } = this.toUnits(hit.v, e);
         const ppu = this.pxPerUnit(hit.v);
-        const size = Math.round(SIZES.text[this.sizes.text] / ppu);
+        const size = Math.round(TEXT_PX / ppu);
         // put the text's first line where the tap was
         const t: TextNote = { id: newId(), x, y: Math.round(y - size * 0.7), size, color: this.colors.text, text: "" };
         this.pageNotes(hit.index).texts.push(t);

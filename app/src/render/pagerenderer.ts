@@ -33,8 +33,12 @@ export async function ensureFonts(ops: Op[], base: string): Promise<void> {
         if (!p) {
             const url = base + "res/" + encodeURI(resPath.replace(/^:\//, ""));
             const face = new FontFace(familyFor(resPath), `url("${url}")`);
+            // A font the browser refuses must not stop the page being drawn:
+            // its text then falls back to another font (see scripts/fix-fonts.py)
             p = face.load().then((f) => {
                 (document.fonts as any).add(f);
+            }, (err) => {
+                console.warn(`font ${resPath} could not be loaded:`, err);
             });
             fontLoads.set(resPath, p);
         }

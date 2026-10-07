@@ -84,6 +84,20 @@ await page.mouse.click(tx, ty + 200); // one tap outside
 const finished = await bodyAt();
 check(Math.abs(editing.x - finished.x) < 1 && Math.abs(editing.y - finished.y) < 1,
     `the text stays exactly where it was when the box is finished (moved ${(finished.x - editing.x).toFixed(1)}, ${(finished.y - editing.y).toFixed(1)} px)`);
+check(await page.isHidden("#sizes"), "the Text tool has no size dots (the box is resized instead)");
+
+// drag the box's corner: the text gets bigger, and starts where it did
+await page.click(".tnote .tbody");
+const before = await bodyAt();
+const corner = await page.locator(".tnote.sel .tsize").boundingBox();
+await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+await page.mouse.down();
+await page.mouse.move(corner.x + corner.width / 2 + 80, corner.y + corner.height / 2 + 30, { steps: 8 });
+await page.mouse.up();
+const after = await bodyAt();
+check(after.width > before.width * 1.3 && after.height > before.height * 1.3, `dragging the corner makes the text bigger (${Math.round(before.width)}x${Math.round(before.height)} to ${Math.round(after.width)}x${Math.round(after.height)} px)`);
+check(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, "and the text still starts in the same place");
+await page.mouse.click(tx, ty + 200); // finish it
 check(await page.locator(".tnote.sel").count() === 0 && await page.locator(".tnote").count() === 1,
     "one tap outside finishes the text box without adding another");
 check(!(await page.locator(".tnote .tdel").first().isVisible()), "a finished text box is no longer highlighted");
@@ -168,17 +182,20 @@ check(!(await page.isEnabled("#save")), "saved notes are not marked unsaved");
 const c = await page.evaluate(() => app.engine.seekAt(0, 6000, 8000));
 check(!!c && c.secs > 0, "tap-to-seek still works outside notes mode");
 
-// clear
+// clear (the app's own question: a system dialog would stop the sound on iPad)
 await page.click("#notes-toggle");
-page.once("dialog", (d) => d.accept());
 await page.click("#notes-clear");
+await page.waitForSelector("#ask[open]");
+await page.click('#ask button:has-text("Clear all")');
+await page.waitForTimeout(200); // the answer arrives once the question has closed
 check(await page.locator(".page .ink path, .tnote").count() === 0, "Clear removes everything");
 await page.click("#notes-undo");
 check(await page.locator(".page .ink path").count() === 2, "undo after Clear brings them back");
 
 // opening a score with unsaved changes asks first; Don't save drops them
-page.once("dialog", (d) => d.accept());
 await page.click("#notes-clear");
+await page.click('#ask button:has-text("Clear all")');
+await page.waitForTimeout(200);
 await page.setInputFiles("#file-input", scorePath);
 await page.waitForSelector("#ask[open]");
 check(true, "opening a score with unsaved changes asks whether to save");

@@ -25,7 +25,9 @@ build, tests, status) before working here.
   draft so closing the app loses nothing.
 - The README must say plainly that notes stay on the device and are not in the file, so people the
   score is shared with won't see them.
-- The mixer works as soon as a score is open (sounds load on open, not on Play).
+- The mixer works as soon as a score is open (sounds load on open, not on Play). The metronome
+  starts muted and unmuting it turns the clicks on. Opening a score stops playback.
+- Text is sized by dragging the text box corner (no text size buttons).
 - No on-screen playback diagnostics (removed once Android was smooth); use `app.engine.stats`.
 - On phones the score's name sits on its own row above the top buttons.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
@@ -64,9 +66,21 @@ build, tests, status) before working here.
 - **Ask what "save" covers before building it.** A mixer-only Save with a bar after every change was
   not what the user wanted: one Save for everything, asked only when leaving the score. Rule: follow
   the familiar document model (one Save, question on leaving, quiet recovery) unless told otherwise.
-- **A file picker without `accept` offers photos and the camera on iPhone/iPad.** Always list the
-  types wanted; for types iOS doesn't know (`.mscz`), also list the generic ones (`application/zip`,
-  `application/octet-stream`), or iOS greys out every file. Check the result on a real iPad.
+- **iPadOS's file menu can't be limited to `.mscz`.** iOS ignores unknown extensions in `accept` and
+  greys out every file if nothing else is listed; the generic types that do cover `.mscz` also cover
+  pictures, so Photo Library / Take Photo stay. Say so to the user instead of promising to hide them.
+  Keep the file input over the Open button (not `hidden`), or iPadOS opens its menu mid-screen.
+- **Never use `confirm()`/`alert()`.** On iPad a system dialog stops the sound; Clear during playback
+  left the cursor running in silence. Use the app's own `ask()` dialog, pause when the
+  `AudioContext` leaves "running", and never extrapolate a stopped audio clock.
+- **Late messages look behind, never ahead.** On iPad the engine's position reports arrive late and
+  in bursts; snapping or nudging toward each one made the cursor jerk back and forth. Rule: use the
+  upper edge of recent reports, limit corrections per unit of time, and add any newly seen timing
+  pattern to `scripts/cursor-test.mjs` before fixing it.
+- **Chrome rejects fonts that desktop accepts.** MuseScore's BravuraText.otf fails Chrome's font
+  checks, so Paper Hearts' first page (which uses it) was blank on Android, and one failed font
+  blocked the whole page. Rule: `scripts/fix-fonts.py` repairs fonts at build time, page drawing
+  never waits on a font that fails, and every shipped font is loaded in Chrome when fonts change.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.

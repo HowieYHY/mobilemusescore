@@ -231,6 +231,46 @@ if (instruments.length >= 2) {
     }
 }
 
+// Metronome: muted by default; unmuting it in the mixer turns the clicks on
+{
+    const met = JSON.parse(callStr("mss_tracks")).find((t) => t.metronome);
+    if (!met) {
+        console.error("FAIL: no metronome in the mixer");
+        failures++;
+    } else {
+        if (!met.mute) {
+            console.error("FAIL: the metronome is not muted by default");
+            failures++;
+        }
+        const parts = JSON.parse(callStr("mss_tracks")).filter((t) => !t.metronome);
+        for (const t of parts) {
+            call("mss_set_track_mute", t.key, 1);
+        }
+        const clicks = (label) => {
+            call("mss_seek", 0.0);
+            call("mss_play");
+            return capture(4, label);
+        };
+        const off = clicks("metronome muted, parts muted");
+        call("mss_set_track_mute", met.key, 0);
+        const on = clicks("metronome unmuted, parts muted");
+        call("mss_set_track_mute", met.key, 1);
+        const offAgain = clicks("metronome muted again");
+        console.log(`metronome: muted peak ${off.peak.toFixed(3)}, unmuted peak ${on.peak.toFixed(3)}, muted again ${offAgain.peak.toFixed(3)}`);
+        if (off.tailPeak > 0.001 || offAgain.tailPeak > 0.001) {
+            console.error("FAIL: a muted metronome still clicks");
+            failures++;
+        }
+        if (on.peak < 0.01) {
+            console.error("FAIL: unmuting the metronome gives no clicks");
+            failures++;
+        }
+        for (const t of parts) {
+            call("mss_set_track_mute", t.key, t.mute ? 1 : 0);
+        }
+    }
+}
+
 call("mss_seek", 30);
 const seekPos = events.filter((e) => e.type === "position").pop();
 console.log("after seek to 30 s:", JSON.stringify(seekPos && seekPos.data));

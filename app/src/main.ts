@@ -402,21 +402,68 @@ engine.on("position", (c: CursorInfo) => {
     ui.bar.textContent = c.measure ? `Bar ${c.measure}` : "";
     const clock = engine.audioTime;
     if (state.playing && clock > 0) {
-        // Reports come in bursts and wobble with the audio queued ahead (a lot
-        // on Android): a jump in position (a seek) moves the cursor at once,
-        // small differences only nudge it, so it doesn't stutter.
-        const err = c.secs - (anchor.secs + (clock - anchor.clock));
-        if (Math.abs(err) > 0.3) {
-            anchor.secs = c.secs;
-            anchor.clock = clock;
-        } else {
-            anchor.secs += err * 0.05;
-        }
+        followReports(c.secs, clock);
         return;
     }
     anchor.secs = c.secs;
     anchor.clock = clock;
     showPosition(c.secs, c);
+});
+
+// While playing, the cursor runs on the audio clock: music and clock move at
+// exactly the same rate, so the engine's position reports are only needed to
+// know the offset between them. Reports wobble with the audio queued ahead
+// (Android) and can arrive late and in bursts (iPad Safari delays messages
+// from the workers): a late report always looks behind, never ahead. So the
+// offset follows the upper edge of the last 0.6 s of reports, in limited steps,
+// and only a seek (or a difference over half a second) moves the cursor at once.
+const reports: { t: number; offset: number }[] = [];
+let resyncCursor = true;
+let lastCorrection = 0;
+let ignoreReportsUntil = 0;
+
+function followReports(secs: number, clock: number) {
+    const now = performance.now();
+    if (now < ignoreReportsUntil) {
+        return; // just started: these still assume the short queue used while stopped
+    }
+    if (resyncCursor) {
+        resyncCursor = false;
+        reports.length = 0;
+        anchor.secs = secs;
+        anchor.clock = clock;
+    }
+    reports.push({ t: now, offset: secs - clock });
+    while (reports.length && reports[0].t < now - 600) {
+        reports.shift();
+    }
+    const sorted = reports.map((r) => r.offset).sort((a, b) => a - b);
+    const target = sorted[Math.floor((sorted.length - 1) * 0.9)];
+    const err = target - (anchor.secs - anchor.clock);
+    if (Math.abs(err) > 1) {
+        // a jump no late report explains (seeks resync by themselves)
+        anchor.secs = clock + target;
+        anchor.clock = clock;
+        reports.length = 0;
+    } else {
+        // Corrections are limited by the time passed, not per report (reports
+        // come in bursts): at most 30% faster or slower, so the cursor never
+        // goes backwards and a start-up offset is worked off within a second.
+        const dt = Math.min(0.1, (now - lastCorrection) / 1000);
+        anchor.secs += Math.max(-0.3 * dt, Math.min(0.3 * dt, err * 0.2));
+    }
+    lastCorrection = now;
+}
+
+engine.on("seeked", () => (resyncCursor = true));
+
+// The device can stop the sound by itself (a call, Siri, a system dialog, another
+// app taking the audio). Pause then, so the cursor stops with the sound.
+engine.on("audioState", (st: string) => {
+    if (st !== "running" && state.playing) {
+        void engine.pause();
+        setStatus("Playback paused because the device stopped the sound. Tap Play to go on.", "info", 6000);
+    }
 });
 
 function showPosition(secs: number, fallback?: CursorInfo) {
@@ -430,7 +477,8 @@ function showPosition(secs: number, fallback?: CursorInfo) {
 
 function animate() {
     if (state.playing) {
-        const secs = Math.min(state.duration, Math.max(0, anchor.secs + (engine.audioTime - anchor.clock)));
+        // before the sound reaches the speaker the cursor waits where it is
+        const secs = Math.min(state.duration, Math.max(0, anchor.secs + Math.max(0, engine.audioTime - anchor.clock)));
         showPosition(secs);
     }
     requestAnimationFrame(animate);
@@ -440,8 +488,14 @@ requestAnimationFrame(animate);
 engine.on("status", (s) => {
     const nowPlaying = s.status === "playing";
     if (nowPlaying && !state.playing) {
+        // The music is heard once the audio queued ahead reaches the speaker:
+        // the cursor waits at the start until then, and the first reports
+        // (made with the stopped queue's latency) are not used.
         anchor.secs = state.position;
-        anchor.clock = engine.audioTime;
+        anchor.clock = engine.audioTime + engine.playLatency;
+        resyncCursor = false;
+        reports.length = 0;
+        ignoreReportsUntil = performance.now() + 500;
     }
     state.playing = nowPlaying;
     ui.play.innerHTML = state.playing ? ICON_PAUSE : ICON_PLAY;
@@ -1000,11 +1054,20 @@ engine.on("playbackReady", async (tracks: TrackInfo[]) => {
 
 // ---------------------------------------------------------------- opening
 
+// Opening another score stops the music first (also while the file is being chosen)
+$("open-label").addEventListener("click", () => {
+    if (state.playing) {
+        void engine.pause();
+    }
+});
 ui.fileInput.onchange = async () => {
     const file = ui.fileInput.files?.[0];
     ui.fileInput.value = "";
     if (!file) {
         return;
+    }
+    if (state.playing) {
+        await engine.stop();
     }
     if (hasUnsaved()) {
         const choice = await ask("Save your changes?",
@@ -1259,23 +1322,22 @@ function updateNotesBar() {
     const hints: Record<Tool, string> = {
         pen: how("Write"),
         highlighter: how("Highlight"),
-        text: `Double-${tap} the score to add a text box. ${tap[0].toUpperCase() + tap.slice(1)} a box to edit it; ${tap} outside it when you're done. Drag the arrows to move it.`,
+        text: `Double-${tap} the score to add a text box. ${tap[0].toUpperCase() + tap.slice(1)} a box to edit it; ${tap} outside it when you're done. Drag the arrows to move it, the corner to make it bigger or smaller.`,
         eraser: touch && !finger ? "Tap or rub over a note with a stylus to remove it." : "Tap or rub over a note to remove it.",
     };
     ui.notesHint.textContent = hints[notes.tool];
 
+    // text is sized by dragging its box's corner instead
+    ui.sizes.hidden = notes.tool === "text";
     ui.sizes.querySelectorAll<HTMLButtonElement>(".size").forEach((b, i) => {
         const on = i === notes.size;
         b.classList.toggle("on", on);
         b.setAttribute("aria-checked", String(on));
-        // a dot (text: a letter) that grows step by step, easy to tell apart
+        // a dot that grows step by step, easy to tell apart
         const dot = b.querySelector<HTMLElement>("i")!;
-        dot.style.width = dot.style.height = notes.tool === "text" ? "" : [4, 7, 11, 16][i] + "px";
-        dot.textContent = notes.tool === "text" ? "A" : "";
-        dot.style.fontSize = notes.tool === "text" ? [10, 13, 17, 22][i] + "px" : "";
-        b.setAttribute("aria-label", (notes.tool === "text" ? ["Small", "Medium", "Large", "Extra large"] : ["Thin", "Medium", "Thick", "Extra thick"])[i]);
+        dot.style.width = dot.style.height = [4, 7, 11, 16][i] + "px";
+        b.setAttribute("aria-label", ["Thin", "Medium", "Thick", "Extra thick"][i]);
     });
-    ui.sizes.classList.toggle("text", notes.tool === "text");
     updateSaveState();
 }
 
@@ -1310,8 +1372,12 @@ ui.notesToggle.onclick = () => {
 };
 ui.notesDone.onclick = () => closeLayer(closeNotes);
 ui.notesUndo.onclick = () => notes.undo();
-ui.notesClear.onclick = () => {
-    if (confirm("Remove all your notes from this score (in this view)? You can undo this.")) {
+// The app's own question, not confirm(): a system dialog stops the sound on iPad
+ui.notesClear.onclick = async () => {
+    const choice = await ask("Clear all notes?",
+        "This removes all your notes from this score (in this view). You can undo it.",
+        [["cancel", "Cancel"], ["clear", "Clear all"]]);
+    if (choice === "clear") {
         notes.clear();
     }
 };

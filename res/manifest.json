@@ -1,0 +1,274 @@
+[
+ {
+  "path": "engraving/instruments/instruments.xml",
+  "size": 837463
+ },
+ {
+  "path": "engraving/instruments/orders.xml",
+  "size": 10726
+ },
+ {
+  "path": "engraving/instruments/string_tunings_presets.json",
+  "size": 8303
+ },
+ {
+  "path": "engraving/styles/legacy-style-defaults-v1.mss",
+  "size": 56434
+ },
+ {
+  "path": "engraving/styles/legacy-style-defaults-v2.mss",
+  "size": 56454
+ },
+ {
+  "path": "engraving/styles/legacy-style-defaults-v3.mss",
+  "size": 56434
+ },
+ {
+  "path": "engraving/styles/migration-306-style-Leland.mss",
+  "size": 1387
+ },
+ {
+  "path": "engraving/styles/migration-306-style-Edwin.mss",
+  "size": 5098
+ },
+ {
+  "path": "engraving/styles/legacy-style-defaults-v302.mss",
+  "size": 64754
+ },
+ {
+  "path": "engraving/styles/gp-style.mss",
+  "size": 2355
+ },
+ {
+  "path": "data/harmony_to_diagram.xml",
+  "size": 2555581
+ },
+ {
+  "path": "engraving/styles/stdchords.xml",
+  "size": 14238
+ },
+ {
+  "path": "engraving/styles/jazzchords.xml",
+  "size": 14624
+ },
+ {
+  "path": "engraving/styles/chords_std.xml",
+  "size": 16115
+ },
+ {
+  "path": "engraving/styles/chords_legacy.xml",
+  "size": 11638
+ },
+ {
+  "path": "engraving/styles/chords_jazz.xml",
+  "size": 16535
+ },
+ {
+  "path": "engraving/styles/chords.xml",
+  "size": 31275
+ },
+ {
+  "path": "engraving/styles/cchords_sym.xml",
+  "size": 42454
+ },
+ {
+  "path": "engraving/styles/cchords_rb.xml",
+  "size": 42463
+ },
+ {
+  "path": "engraving/styles/cchords_nrb.xml",
+  "size": 42453
+ },
+ {
+  "path": "engraving/styles/cchords_muse.xml",
+  "size": 42452
+ },
+ {
+  "path": "fonts/bravura/metadata.json",
+  "size": 784667
+ },
+ {
+  "path": "fonts/bravura/Bravura.otf",
+  "size": 512924
+ },
+ {
+  "path": "fonts/bravura/BravuraText.otf",
+  "size": 1236512
+ },
+ {
+  "path": "fonts/campania/Campania.otf",
+  "size": 121172
+ },
+ {
+  "path": "fonts/edwin/Edwin-Roman.otf",
+  "size": 120408
+ },
+ {
+  "path": "fonts/edwin/Edwin-Bold.otf",
+  "size": 121404
+ },
+ {
+  "path": "fonts/edwin/Edwin-Italic.otf",
+  "size": 122520
+ },
+ {
+  "path": "fonts/edwin/Edwin-BdIta.otf",
+  "size": 123632
+ },
+ {
+  "path": "fonts/finalebroadway/metadata.json",
+  "size": 65901
+ },
+ {
+  "path": "fonts/finalebroadway/FinaleBroadway.otf",
+  "size": 77564
+ },
+ {
+  "path": "fonts/finalebroadway/FinaleBroadwayText.otf",
+  "size": 64544
+ },
+ {
+  "path": "fonts/finalemaestro/metadata.json",
+  "size": 418036
+ },
+ {
+  "path": "fonts/finalemaestro/FinaleMaestro.otf",
+  "size": 280952
+ },
+ {
+  "path": "fonts/finalemaestro/FinaleMaestroText.otf",
+  "size": 43220
+ },
+ {
+  "path": "fonts/FreeSans.ttf",
+  "size": 1563256
+ },
+ {
+  "path": "fonts/FreeSerif.ttf",
+  "size": 3303588
+ },
+ {
+  "path": "fonts/FreeSerifBold.ttf",
+  "size": 1310828
+ },
+ {
+  "path": "fonts/FreeSerifItalic.ttf",
+  "size": 922088
+ },
+ {
+  "path": "fonts/FreeSerifBoldItalic.ttf",
+  "size": 608708
+ },
+ {
+  "path": "fonts/gootville/metadata.json",
+  "size": 192398
+ },
+ {
+  "path": "fonts/gootville/Gootville.otf",
+  "size": 40612
+ },
+ {
+  "path": "fonts/gootville/GootvilleText.otf",
+  "size": 41652
+ },
+ {
+  "path": "fonts/leland/Leland.otf",
+  "size": 89132
+ },
+ {
+  "path": "fonts/leland/LelandText.otf",
+  "size": 42388
+ },
+ {
+  "path": "fonts/leland/metadata.json",
+  "size": 157662
+ },
+ {
+  "path": "fonts/mscore/metadata.json",
+  "size": 115535
+ },
+ {
+  "path": "fonts/mscore/MScore.otf",
+  "size": 168000
+ },
+ {
+  "path": "fonts/mscore/MScoreText.otf",
+  "size": 163868
+ },
+ {
+  "path": "fonts/mscoreTab.ttf",
+  "size": 24396
+ },
+ {
+  "path": "fonts/mscore-BC.ttf",
+  "size": 12396
+ },
+ {
+  "path": "fonts/musejazz/metadata.json",
+  "size": 120928
+ },
+ {
+  "path": "fonts/musejazz/MuseJazz.otf",
+  "size": 133744
+ },
+ {
+  "path": "fonts/musejazz/MuseJazzText.otf",
+  "size": 217872
+ },
+ {
+  "path": "fonts/petaluma/metadata.json",
+  "size": 395405
+ },
+ {
+  "path": "fonts/petaluma/Petaluma.otf",
+  "size": 397440
+ },
+ {
+  "path": "fonts/petaluma/PetalumaText.otf",
+  "size": 413924
+ },
+ {
+  "path": "fonts/petaluma/PetalumaScript.otf",
+  "size": 193560
+ },
+ {
+  "path": "fonts/smufl/classes.json",
+  "size": 108350
+ },
+ {
+  "path": "fonts/smufl/ranges.json",
+  "size": 102646
+ },
+ {
+  "path": "fonts/smufl/glyphnames.json",
+  "size": 313634
+ },
+ {
+  "path": "fonts/fonts_tablature.xml",
+  "size": 38946
+ },
+ {
+  "path": "fonts/fonts_figuredbass.xml",
+  "size": 4485
+ },
+ {
+  "path": "mpe/resources/general_keyboard_articulations_profile.json",
+  "size": 206863
+ },
+ {
+  "path": "mpe/resources/general_percussion_articulations_profile.json",
+  "size": 374064
+ },
+ {
+  "path": "mpe/resources/general_strings_articulations_profile.json",
+  "size": 334145
+ },
+ {
+  "path": "mpe/resources/general_voice_articulations_profile.json",
+  "size": 249314
+ },
+ {
+  "path": "mpe/resources/general_winds_articulations_profile.json",
+  "size": 253563
+ }
+]

@@ -1,0 +1,3 @@
+*.wasm -text
+*.sf3 -text
+*.mjs -text

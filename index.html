@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#1e2a3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Score Player</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <script type="module" crossorigin src="./assets/index-CL3lAuk7.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BC6ciLJc.css">
+</head>
+<body>
+  <header class="topbar">
+    <label class="btn primary" id="open-label">
+      <input type="file" id="file-input" hidden>
+      <span>Open score</span>
+    </label>
+    <div class="title" id="score-title">No score open</div>
+    <select id="view-mode" aria-label="View mode" disabled>
+      <option value="page">Page view</option>
+      <option value="continuous_h">Continuous (vertical)</option>
+      <option value="continuous_v">Continuous (horizontal)</option>
+    </select>
+  </header>
+
+  <div class="status" id="status" hidden></div>
+
+  <main class="viewer" id="viewer">
+    <div class="empty" id="empty">
+      <p><strong>Open a MuseScore file (.mscz)</strong> to view and play it.</p>
+      <p class="hint">Scores are laid out and played by MuseScore's own engine with the MS Basic sounds. Everything runs on this device.</p>
+    </div>
+    <div class="pages" id="pages"></div>
+  </main>
+
+  <div class="zoom">
+    <button class="btn round" id="zoom-out" aria-label="Zoom out">−</button>
+    <span id="zoom-label">100%</span>
+    <button class="btn round" id="zoom-in" aria-label="Zoom in">+</button>
+  </div>
+
+  <section class="mixer" id="mixer" hidden>
+    <div class="mixer-head">
+      <strong>Mixer</strong>
+      <button class="btn" id="mixer-close">Done</button>
+    </div>
+    <div class="mixer-body" id="mixer-body"></div>
+  </section>
+
+  <footer class="transport">
+    <button class="btn round" id="rewind" aria-label="Back to start" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor"/></svg></button>
+    <button class="btn round big" id="play" aria-label="Play" disabled><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button>
+    <div class="timeline">
+      <input type="range" id="seek" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
+      <div class="times"><span id="time">0:00</span><span id="bar"></span><span id="duration">0:00</span></div>
+    </div>
+    <button class="btn" id="mixer-toggle" disabled>Mixer</button>
+  </footer>
+
+</body>
+</html>

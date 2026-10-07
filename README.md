@@ -42,9 +42,8 @@ the yellow bar. This is the same on every device. The version number is on the s
 
 ### Open a score
 Tap **Open score** and choose a `.mscz` file. On iPad and iPhone, first save your scores to the
-**Files** app (AirDrop them, or save them from email or a cloud drive), then tap **Choose File**
-(iPad and iPhone also list *Photo Library* and *Take Photo*; PocketScore can't hide those, so just
-ignore them). If music is playing, it stops when you open another score.
+**Files** app (AirDrop them, or save them from email or a cloud drive); **Open score** opens
+Files straight away. If music is playing, it stops when you open another score.
 
 ### Play
 | To… | Do this |

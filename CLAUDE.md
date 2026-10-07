@@ -66,10 +66,12 @@ build, tests, status) before working here.
 - **Ask what "save" covers before building it.** A mixer-only Save with a bar after every change was
   not what the user wanted: one Save for everything, asked only when leaving the score. Rule: follow
   the familiar document model (one Save, question on leaving, quiet recovery) unless told otherwise.
-- **iPadOS's file menu can't be limited to `.mscz`.** iOS ignores unknown extensions in `accept` and
-  greys out every file if nothing else is listed; the generic types that do cover `.mscz` also cover
-  pictures, so Photo Library / Take Photo stay. Say so to the user instead of promising to hide them.
-  Keep the file input over the Open button (not `hidden`), or iPadOS opens its menu mid-screen.
+- **The device decides, not a web search.** From web reports I told the user iPadOS's photo and
+  camera options could not be removed; on their iPad (0.3.2: `accept` with `.mscz` plus generic
+  types, and the file input over the Open button instead of `hidden`) Open score already went straight
+  to Files. Rule: say "I can't test this here, please check" rather than declaring something
+  impossible from secondhand reports. Keep the input over the button, or iPadOS opens its menu
+  mid-screen.
 - **Never use `confirm()`/`alert()`.** On iPad a system dialog stops the sound; Clear during playback
   left the cursor running in silence. Use the app's own `ask()` dialog, pause when the
   `AudioContext` leaves "running", and never extrapolate a stopped audio clock.

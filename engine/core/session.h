@@ -62,6 +62,7 @@ public:
     void setTrackMute(int trackKey, bool mute);
     void setTrackSolo(int trackKey, bool solo);
     void setMasterVolume(double db);
+    double masterVolume() const;
     void setReverbSend(int trackKey, double amount);
     // Plays a track with another MS Basic sound (an id from soundsJson()), as
     // choosing a sound in desktop's mixer.

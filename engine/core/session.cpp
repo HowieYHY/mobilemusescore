@@ -1142,6 +1142,12 @@ void Session::setMasterVolume(double db)
     }
 }
 
+// The master volume in dB: the score's saved setting until changed
+double Session::masterVolume() const
+{
+    return rawValue(m_master.volume);
+}
+
 std::string Session::tracksJson() const
 {
     std::string s = "[";

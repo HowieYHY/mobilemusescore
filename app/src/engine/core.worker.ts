@@ -152,6 +152,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "sounds":
             result = JSON.parse(callStr("mss_sounds"));
             break;
+        case "getMasterVolume":
+            result = core._mss_master_volume();
+            break;
         case "masterVolume": callVoid("mss_set_master_volume", req.db); break;
         case "latency": callVoid("mss_set_output_latency", req.secs); break;
         case "metronome": callVoid("mss_set_metronome", req.on ? 1 : 0); break;

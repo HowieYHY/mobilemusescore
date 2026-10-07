@@ -9,14 +9,18 @@ build, tests, status) before working here.
   updating the README and DEVELOPMENT.md so each is one current picture, not a log.
 - Their test scores are in `real test musescores/` (gitignored, copied by hand between machines),
   with desktop MP3 exports in `real test musescores/audio equivalents/`. Run the tests on every score.
-- Android gets the **installable web app from Chrome**, not an APK (the Capacitor project was removed
-  in 0.2.0). iPad/iPhone use Safari's Add to Home Screen. One web app, one update path.
+- Android gets the **installable web app from Chrome** (the Capacitor project was removed in 0.2.0).
+  iPad/iPhone use Safari's Add to Home Screen. One web app, one update path. Don't mention APKs in the
+  README: the user was the only one who used one.
 - Match desktop MuseScore 4.7.5 where there is a desktop equivalent (sound menu, sound names, mixer
   rules); read its source in `third_party/musescore-4.7` rather than guessing.
 - Mixer volume is shown as loudness in % against the score's own setting (100% = as saved); the user
   asked for this over dB.
 - Notes: black is the default colour; double-tap adds a text box, one tap outside finishes it;
-  *Draw with finger* is a visible switch for people without a stylus.
+  *Draw with finger* is a visible switch for people without a stylus. Notes save by themselves and
+  say so; mixer changes are unsaved until **Save**, with Discard, a reminder when leaving the score,
+  and a draft offered back after the app was closed.
+- On phones the score's name sits on its own row above the top buttons.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 
@@ -34,6 +38,18 @@ build, tests, status) before working here.
   Bash tool can fail to parse; write the script to the scratchpad and run it.
 - **emsdk on Windows** picked the Microsoft Store `python3` stub and emcc was "not found";
   `scripts/env.sh` now sets `EMSDK_PYTHON`.
+- **Check layout at every device size, not one.** The notes bar looked fine on a phone and in
+  landscape but wrapped Undo/Clear/Done onto their own row on iPad portrait (820 px), leaving big empty
+  bands. Rule: lay toolbars out as a grid with an explicit arrangement per width range, and run
+  `scripts/layout-shots.mjs` (phone, iPad mini, Air both ways, Pro 13) and look at every shot.
+- **Diagnostics must be right on every device.** The playback check said "1002666.7x faster" on
+  iPad because Safari's worker timer counts whole milliseconds, so a sub-millisecond block measured 0;
+  on Android it showed huge numbers while stopped. Rule: measure only while it matters, over seconds,
+  and when the timer is too coarse say so ("under 5%") instead of dividing by almost zero.
+- **The cursor must not follow a stepped clock.** On Android the audio clock moves in ~100 ms batches
+  (some devices give no output timestamp) and position reports wobble, so the cursor stuttered while
+  the sound was fine. Rule: run the cursor on the system clock and pull it gently toward the audio
+  clock; test with `scripts/cursor-test.mjs`, which imitates those clocks.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.

@@ -71,6 +71,8 @@ export class Annotations {
     private views = new Map<number, PageView>();
     private undoStack: Undo[] = [];
     private saveTimer = 0;
+    /** Notes save by themselves: "" (nothing written yet), "saving", "saved" or "failed". */
+    saveState: "" | "saving" | "saved" | "failed" = "";
     private drawing: { pointerId: number; page: number; stroke: Stroke; path: SVGPathElement; lastX: number; lastY: number } | null = null;
     private erasing: { pointerId: number; page: number } | null = null;
     private touches = new Map<number, { x: number; y: number }>();
@@ -175,6 +177,7 @@ export class Annotations {
     /** Load the notes for a score (`key` identifies the file). */
     open(key: string, mode: string) {
         this.key = key;
+        this.saveState = "";
         this.mode = mode;
         this.undoStack = [];
         this.data = { v: 1, modes: {} };
@@ -216,6 +219,7 @@ export class Annotations {
 
     private save() {
         clearTimeout(this.saveTimer);
+        this.saveState = "saving";
         this.saveTimer = window.setTimeout(() => {
             if (!this.key) {
                 return;
@@ -237,9 +241,12 @@ export class Annotations {
                 } else {
                     localStorage.removeItem(STORAGE_PREFIX + this.key);
                 }
+                this.saveState = "saved";
             } catch (err) {
+                this.saveState = "failed";
                 this.onError("Your notes could not be saved on this device (storage is full or blocked).");
             }
+            this.onChange();
         }, 300);
         this.onChange();
     }

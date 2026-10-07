@@ -20,6 +20,7 @@ export type WorkerRequest =
     | Req<{ cmd: "reverb"; key: number; amount: number }>
     | Req<{ cmd: "sound"; key: number; soundId: string }>
     | Req<{ cmd: "sounds" }>
+    | Req<{ cmd: "getMasterVolume" }>
     | Req<{ cmd: "masterVolume"; db: number }>
     | Req<{ cmd: "latency"; secs: number }>
     | Req<{ cmd: "metronome"; on: boolean }>;

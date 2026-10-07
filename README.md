@@ -25,9 +25,6 @@ You don't need an app store.
    (If you don't see the button, tap Chrome's **⋮** menu, then **Add to Home screen**, then **Install**.)
 3. Open **PocketScore** from your home screen or app list. It opens in its own window, like any app.
 
-No APK or "unknown apps" permission is needed. If you installed the old PocketScore APK, uninstall it:
-the installed web app replaces it and updates itself.
-
 ### Computer
 Open the link in Chrome, Edge or Safari. Chrome and Edge also offer **Install PocketScore**.
 
@@ -75,9 +72,10 @@ Tap the **pencil** button at the top:
   or pick any colour. While you're typing in a text box, a new colour changes that box.
 - **Undo** and **Clear** (everything on this score).
 
-Tap **Done** to go back to playing. Your notes are saved on this device and come back when you open
-the same score again, even if you rename the file. They stay on the device: they are not added to
-the `.mscz` file and are not shared. Notes made in page view and in the continuous views are kept separately.
+**Notes save by themselves** as you write: the bar says *Saved on this device*. There is no Save
+button to remember. Tap **Done** to go back to playing. Your notes come back when you open the same
+score again, even if you rename the file. They stay on the device: they are not added to the `.mscz`
+file and are not shared. Notes made in page view and in the continuous views are kept separately.
 
 ### Mixer: practise your part
 Tap **Mixer**:
@@ -87,12 +85,23 @@ Tap **Mixer**:
 - **S** (solo): plays only that part; you can solo several. The other parts are dimmed.
 - **The sound under a part's name** (for example *Grand Piano*): tap it to play that part with a
   different instrument sound. The sounds are grouped as in MuseScore's mixer; *In score* marks the
-  one the score uses. Your choice is kept for this score on this device (the file isn't changed).
+  one the score uses.
 - **Reverb**: tap **Reverb** at the top to show how much room echo each part has.
 - **Master**: the overall volume.
 
 PocketScore starts with the volume, mute and solo settings saved in your score, as MuseScore does.
 If a score opens with no sound, check whether its parts were saved muted.
+
+**Saving mixer changes.** Mixer changes are for practising now, until you keep them:
+- After a change, the mixer says *Changes not saved*, with **Save** and **Discard**, and the
+  **Mixer** button gets a yellow dot.
+- **Save** keeps them for this score on this device, for next time you open it.
+  **Discard** puts the mixer back as it was.
+- If you open another score first, PocketScore asks whether to save them. If you close the app
+  without saving, they come back next time you open the score, and you can save or discard them then.
+- Once saved, the mixer says *Using your saved settings*. **Use score's settings** goes back to the
+  score's own mixer.
+- Your score file is never changed.
 
 ---
 
@@ -128,7 +137,7 @@ MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
 - **No sound on iPhone or iPad:** check the volume buttons, and that Bluetooth isn't sending sound to another device.
 - **"Audio could not start":** close PocketScore completely, reopen it, and tap Play again.
 - **Drawing scrolls the page instead (or the page won't scroll):** check **Draw with finger** in the notes bar.
-- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen, and at the bottom of the mixer). If it still happens, play the score for a minute, open the **Mixer**, and send a screenshot of the *Playback check* line at the bottom, with your phone model.
+- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen, and at the bottom of the mixer). If it still happens, play the score for a minute, open the **Mixer**, and send a screenshot of the *Playback check* line at the bottom, with your phone model. It says how busy the sound engine is (well under 100% is fine), whether the moving line jumped, and whether the sound had gaps.
 - **A score won't open:** make sure it is a `.mscz` file saved by MuseScore.
 
 To report a problem, [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or send the

@@ -22,11 +22,14 @@ export class Engine {
     private audioStarting: Promise<void> | null = null;
     private audioWorker: Worker | null = null;
     private lastLatency = -1;
-    private lastClock = 0;
+    private clock = { t: 0, perf: 0, raw: 0, set: false };
     /** Gaps in the sound while playing (the device fell behind). */
     underruns = 0;
     /** For the playback check: how the audio engine is keeping up. */
-    stats = { speed: 0, slowestMs: 0, queuedSecs: 0, targetSecs: 0 };
+    // load: share of the time the audio engine spends rendering while music
+    // plays (null until measured); loadUnder: an upper bound instead, on
+    // devices whose timer is too coarse to measure it (iPad)
+    stats = { load: null as number | null, loadUnder: null as number | null, slowestMs: 0, queuedSecs: 0, targetSecs: 0 };
     readonly base: string;
 
     private lastStatus = "";
@@ -134,7 +137,8 @@ export class Engine {
                     if (m.type === "ready") {
                         resolve();
                     } else if (m.type === "stats") {
-                        this.stats.speed = m.speed;
+                        this.stats.load = m.load;
+                        this.stats.loadUnder = m.loadUnder;
                         this.stats.slowestMs = m.slowestMs;
                         this.stats.targetSecs = m.target / ctx.sampleRate;
                     } else if (m.type === "underrun") {
@@ -224,21 +228,39 @@ export class Engine {
     // moves when the device takes a batch of audio, which on Android can be
     // ~10 times a second; the output timestamp says when that was, so the
     // clock can be read smoothly between batches.
+    //
+    // Both readings still move in steps on Android (some devices give no output
+    // timestamp at all), so the clock used for the cursor runs on the system
+    // clock and is pulled gently toward the audio clock whenever that gives a
+    // new reading. It never steps backwards; a big difference (start, a stall,
+    // resuming) is followed at once.
     get audioTime(): number {
         const ctx = this.ctx;
         if (!ctx) {
             return 0;
         }
-        let t = ctx.currentTime;
+        let raw = ctx.currentTime;
         const ts = ctx.getOutputTimestamp?.();
         if (ts && ts.performanceTime && ts.contextTime) {
-            t = ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
+            raw = ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
         }
-        // small steps back happen when a new timestamp arrives; hold instead
-        if (t < this.lastClock && this.lastClock - t < 0.25) {
-            t = this.lastClock;
+        const now = performance.now();
+        const c = this.clock;
+        if (!c.set || ctx.state !== "running") {
+            Object.assign(c, { t: raw, perf: now, raw, set: true });
+            return raw;
         }
-        this.lastClock = t;
+        let t = c.t + (now - c.perf) / 1000;
+        if (raw !== c.raw) { // a new reading of the audio clock
+            const err = raw - t;
+            if (Math.abs(err) > 0.25) {
+                t = raw;
+            } else {
+                t += err * 0.1;
+            }
+        }
+        t = Math.max(t, c.t);
+        Object.assign(c, { t, perf: now, raw });
         return t;
     }
 
@@ -287,5 +309,7 @@ export class Engine {
     setReverb(key: number, amount: number) { return this.request({ cmd: "reverb", key, amount }); }
     setSound(key: number, soundId: string) { return this.request({ cmd: "sound", key, soundId }); }
     sounds(): Promise<SoundList> { return this.request({ cmd: "sounds" }); }
+    /** The master volume in dB (the score's saved setting until changed). */
+    masterVolume(): Promise<number> { return this.request({ cmd: "getMasterVolume" }); }
     setMasterVolume(db: number) { return this.request({ cmd: "masterVolume", db }); }
 }

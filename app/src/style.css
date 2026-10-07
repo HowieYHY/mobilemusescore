@@ -65,6 +65,8 @@ body {
 .btn.round { width: 44px; min-width: 44px; padding: 0; border-radius: 50%; font-size: 18px; }
 .btn.round.big { width: 54px; min-width: 54px; height: 54px; font-size: 22px; }
 .btn.small { min-height: 34px; padding: 4px 10px; font-size: 14px; }
+/* on light panels */
+.btn.plain { background: #fff; color: var(--ink); border-color: #c4c9cf; }
 
 .topbar {
   display: flex;
@@ -82,6 +84,22 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+@media (max-width: 600px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "title title title title"
+      "open . notes view";
+    row-gap: 4px;
+    column-gap: 8px;
+    padding-top: calc(6px + var(--safe-t));
+  }
+  .topbar .title { grid-area: title; font-size: 16px; line-height: 1.3; padding: 0 2px; }
+  .topbar #open-label { grid-area: open; }
+  .topbar #notes-toggle { grid-area: notes; }
+  .topbar #view-mode { grid-area: view; }
 }
 .topbar select {
   -webkit-appearance: none;
@@ -210,6 +228,30 @@ body {
   flex: none;
 }
 .mixer-head strong { flex: 1; font-size: 15px; }
+.mixer-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
+  background: #fff8e1;
+  border-bottom: 1px solid #ecdca8;
+  font-size: 13px;
+  color: #5b4600;
+  flex: none;
+}
+.mixer-save-text { flex: 1; min-width: 0; }
+#mixer-toggle { position: relative; }
+#mixer-toggle.unsaved::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f5b82e;
+  box-shadow: 0 0 0 2px var(--chrome);
+}
 .chip {
   appearance: none;
   font: inherit;
@@ -379,16 +421,60 @@ body {
 #notes-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
 @media (max-width: 480px) { #notes-toggle .label { display: none; } }
 
+/* Laid out as a grid so the groups always sit on full rows:
+   tablets: tools, colours | actions on top; finger switch, hint | saved below.
+   wide screens: everything but the hint on one row.
+   phones: tools | actions; colours | finger; hint | saved. */
 .notesbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "tools swatches . actions"
+    "finger hint hint saved";
   align-items: center;
-  gap: 6px 12px;
-  padding: 6px 12px;
+  gap: 6px 14px;
+  padding: 6px 12px 7px;
   background: var(--chrome-2);
   color: var(--text-on-chrome);
   flex: none;
   position: relative;
+}
+.notesbar .tools { grid-area: tools; }
+.notesbar .swatches { grid-area: swatches; }
+.notesbar .finger { grid-area: finger; justify-self: start; }
+.notesbar .actions { grid-area: actions; }
+.notesbar .hint { grid-area: hint; }
+.notesbar .saved { grid-area: saved; }
+.notesbar .finger[hidden] + .actions + .hint { grid-column: 1 / 4; }
+@media (min-width: 1100px) {
+  .notesbar {
+    grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tools swatches finger . actions"
+      "hint hint hint hint saved";
+  }
+  .notesbar .finger[hidden] + .actions + .hint { grid-column: auto; }
+}
+@media (max-width: 699px) {
+  .notesbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tools . actions"
+      "swatches swatches finger"
+      "hint hint saved";
+    column-gap: 8px;
+  }
+  .notesbar .finger { justify-self: end; }
+  .notesbar .finger[hidden] + .actions + .hint { grid-column: auto; }
+  .notesbar .actions .lbl { display: none; }
+  .notesbar .actions .btn:not(.primary) { width: 38px; padding: 0; }
+  .notesbar .finger .long { display: none; }
+}
+@media (min-width: 700px) { .notesbar .finger .short { display: none; } }
+@media (max-width: 380px) {
+  .notesbar .tool { min-width: 42px; padding: 4px 2px; }
+  .notesbar .swatches { gap: 4px; }
+  .notesbar .swatch { width: 26px; height: 26px; }
 }
 .notesbar .tools { display: flex; gap: 2px; }
 .notesbar .tool {
@@ -470,8 +556,12 @@ body {
 }
 .finger[aria-pressed="true"] .switch { background: var(--accent-bright); }
 .finger[aria-pressed="true"] .switch::after { transform: translateX(12px); }
-.notesbar .actions { display: flex; gap: 6px; margin-left: auto; }
-.notesbar .hint { flex-basis: 100%; font-size: 12px; opacity: 0.85; }
+.notesbar .actions { display: flex; gap: 6px; justify-self: end; }
+.notesbar .hint { font-size: 12px; opacity: 0.85; min-width: 0; }
+.notesbar .saved { font-size: 12px; opacity: 0.85; justify-self: end; white-space: nowrap; }
+.notesbar .saved:not(:empty)::before { content: "✓ "; }
+.notesbar .saved.failed { opacity: 1; color: #ffb4a8; }
+.notesbar .saved.failed::before { content: ""; }
 
 .palette {
   position: fixed;
@@ -538,6 +628,22 @@ body {
 .pages.annotating[data-tool="pen"] .page, .pages.annotating[data-tool="highlighter"] .page { cursor: crosshair; }
 /* a finger that draws must not scroll (two fingers scroll, handled in script) */
 .pages.finger-draw { touch-action: none; }
+
+/* ---------------------------------------------------------------- questions */
+
+.ask {
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px 20px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 16px 48px rgba(16, 24, 36, 0.3), 0 2px 6px rgba(16, 24, 36, 0.18);
+}
+.ask::backdrop { background: rgba(16, 24, 36, 0.45); }
+.ask h2 { margin: 0 0 8px; font-size: 18px; line-height: 1.3; }
+.ask p { margin: 0 0 18px; font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.ask-buttons { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------------- playback check */
 

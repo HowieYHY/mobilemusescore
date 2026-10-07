@@ -183,16 +183,79 @@ await page.goBack();
 await page.waitForTimeout(200);
 check(!(await page.isVisible("#mixer")), "Back closes the mixer");
 
-// reopen the score: the sound choice comes back
-await open();
+// ---- saving mixer changes
+check(await page.locator("#mixer-toggle.unsaved").count() === 1, "the Mixer button shows there are unsaved changes");
+const soundOf = () => page.evaluate(async (k) => (await app.engine.tracks()).find((t) => t.key === k), firstKey);
+async function reopen() {
+    await open();
+    await page.tap("#play");
+    await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
+    await page.waitForTimeout(800);
+    await page.tap("#play"); // pause
+}
+async function openMixer() {
+    if (await page.isHidden("#mixer")) {
+        await page.tap("#mixer-toggle");
+    }
+    await page.waitForSelector(".strip:not(.master)");
+    await page.waitForTimeout(200);
+}
+page.on("dialog", (d) => d.accept()); // "Leave site?" when closing with unsaved changes
+
+// closed without saving: the changes come back, with a reminder
+await reopen();
+check((await soundOf()).soundId === after.soundId, "unsaved changes come back after closing the app");
+check(/unsaved mixer changes/i.test(await page.textContent("#status")), "a message says unsaved changes are back");
+check(await page.locator("#mixer-toggle.unsaved").count() === 1, "and the Mixer button still marks them unsaved");
+
+// Discard goes back to the score's settings
+await openMixer();
+check(await page.isVisible("#mixer-discard") && await page.isVisible("#mixer-savebtn"), "the mixer offers Save and Discard");
+await page.tap("#mixer-discard");
+await page.waitForTimeout(400);
+check((await soundOf()).soundId === before.soundId, "Discard puts the score's sound back");
+check(await page.locator("#mixer-toggle.unsaved").count() === 0 && !(await page.isVisible("#mixer-save")), "after Discard nothing is unsaved");
+
+// Save keeps the change for next time
+await page.locator(".strip:not(.master):not(.metronome)").first().locator(".sound").tap();
+await page.waitForSelector("#sounds:not([hidden])");
+const cat2 = page.locator("#sounds-body > details").filter({ hasText: "Strings" }).first();
+await cat2.locator("> summary").tap();
+await cat2.locator(".pick").first().tap();
+await page.waitForSelector("#sounds", { state: "hidden" });
+await page.waitForTimeout(300);
+await page.tap("#mixer-savebtn");
+check(await page.locator("#mixer-toggle.unsaved").count() === 0, "Save clears the unsaved mark");
+await page.tap("#mixer-close");
+await reopen();
+check((await soundOf()).soundId === after.soundId, `a saved sound comes back after reopening (${(await soundOf()).sound})`);
+check(await page.locator("#mixer-toggle.unsaved").count() === 0, "saved settings are not marked unsaved");
+await openMixer();
+check((await page.textContent("#mixer-save-text")).includes("saved settings"), "the mixer says it is using your saved settings");
+
+// opening another score with unsaved changes asks first
+await page.locator(".strip:not(.master):not(.metronome)").first().locator(".toggle.m").tap();
+await page.waitForTimeout(300);
+await page.setInputFiles("#file-input", scorePath);
+await page.waitForSelector("#ask[open]");
+check(true, "opening another score with unsaved changes asks whether to save them");
+await page.click('#ask button:has-text("Don\'t save")');
+await page.waitForSelector(".page canvas", { timeout: 180000 });
+
+// "Use score's settings" removes the saved settings
 await page.tap("#play");
 await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
 await page.waitForTimeout(800);
-const reopened = await page.evaluate(async (k) => (await app.engine.tracks()).find((t) => t.key === k), firstKey);
-check(reopened.soundId === after.soundId, `the chosen sound comes back after reopening (${reopened.sound})`);
-
-// reset it, so the next run starts clean
-await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("pocketscore.sounds.")).forEach((k) => localStorage.removeItem(k)));
+await page.tap("#play");
+check((await soundOf()).mute === false, "Don't save dropped the unsaved mute");
+await openMixer();
+await page.tap("#mixer-reset");
+await page.waitForSelector("#ask[open]");
+await page.click('#ask button:has-text("Use score")');
+await page.waitForTimeout(500);
+check((await soundOf()).soundId === before.soundId, "Use score's settings puts the score's sound back");
+await reopen();
+check((await soundOf()).soundId === before.soundId, "and it stays that way after reopening");
 
 await browser.close();
 console.log(failures ? `${failures} failure(s)` : "all phone checks passed");

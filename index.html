@@ -10,17 +10,16 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-DhFmcZXy.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-B9CfBl8B.css">
+  <script type="module" crossorigin src="./assets/index-Cm88vhxf.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-sbow1AGY.css">
 </head>
 <body>
   <header class="topbar">
     <label class="btn primary" id="open-label">
-      <!-- Asks for MuseScore files. iOS doesn't know .mscz: with only that listed it greys out every
-           file, so the generic types it files .mscz under are listed too (the app checks the
-           extension when opening). Those also cover pictures, so iPadOS still offers Photo Library
-           and Take Photo; that can't be avoided. The input lies over the Open button (not hidden)
-           so iPadOS opens its menu at the button rather than mid-screen. -->
+      <!-- Asks for MuseScore files. iOS doesn't know .mscz, so generic types are listed too (the app
+           checks the extension when opening). With this list, on iPadOS 26 (0.3.2) Open score goes
+           straight to the Files app, with no Photo Library or camera options. The input lies over
+           the Open button (not hidden), so iPadOS opens its menu at the button, not mid-screen. -->
       <input type="file" id="file-input" aria-label="Open score" accept=".mscz,.mscx,application/x-musescore,application/zip,application/octet-stream">
       <span class="long">Open score</span><span class="short" aria-hidden="true">Open</span>
     </label>

@@ -95,9 +95,9 @@ EMSCRIPTEN_KEEPALIVE void mss_pause() { Session::instance()->pause(); }
 EMSCRIPTEN_KEEPALIVE void mss_stop() { Session::instance()->stop(); }
 EMSCRIPTEN_KEEPALIVE void mss_seek(double secs) { Session::instance()->seek(secs); }
 
-EMSCRIPTEN_KEEPALIVE const char* mss_seek_at(int page, double x, double y)
+EMSCRIPTEN_KEEPALIVE const char* mss_seek_at(int page, double x, double y, double radius, int playNote)
 {
-    return ret(Session::instance()->seekAt(page, x, y));
+    return ret(Session::instance()->seekAt(page, x, y, radius, playNote != 0));
 }
 
 

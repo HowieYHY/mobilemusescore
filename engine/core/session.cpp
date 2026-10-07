@@ -25,12 +25,14 @@
 
 #include "engraving/compat/engravingcompat.h"
 #include "engraving/dom/box.h"
+#include "engraving/dom/chord.h"
 #include "engraving/dom/drumset.h"
 #include "engraving/dom/figuredbass.h"
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/mscore.h"
+#include "engraving/dom/note.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/repeatlist.h"
@@ -914,33 +916,71 @@ void Session::seek(double secs)
 // Like clicking the score during playback on desktop: the chord or rest under
 // the finger becomes the play position (PlaybackController::seekElement, with
 // NotationPlayback::playPositionTickByRawTick for repeats).
-std::string Session::seekAt(int pageIndex, double x, double y)
+std::string Session::seekAt(int pageIndex, double x, double y, double radius, bool playNote)
 {
     const Score* score = m_project ? m_project->masterScore() : nullptr;
     if (!score || pageIndex < 0 || pageIndex >= int(score->pages().size())) {
         return "null";
     }
-    const Page* page = score->pages()[pageIndex];
+    Page* page = score->pages()[pageIndex];
     const PointF p = PointF(x, y) + page->pos();
 
-    const Measure* m = score->searchMeasure(p);
-    if (!m) {
-        return "null";
-    }
-
-    const Segment* chosen = m->first(SegmentType::ChordRest);
-    for (const Segment* s = chosen; s; s = s->next(SegmentType::ChordRest)) {
-        if (s->canvasPos().x() <= p.x()) {
-            chosen = s;
-        } else {
-            break;
+    // The note nearest the tap, within `radius` (a fingertip is bigger than a notehead)
+    const Note* note = nullptr;
+    double best = radius;
+    const PointF onPage(x, y);
+    for (EngravingItem* item : page->items(RectF(x - radius, y - radius, 2 * radius, 2 * radius))) {
+        if (!item->isNote() || !item->visible() || !item->isPlayable()) {
+            continue;
+        }
+        const RectF r = item->pageBoundingRect();
+        const double dx = std::max({ r.left() - onPage.x(), 0.0, onPage.x() - r.right() });
+        const double dy = std::max({ r.top() - onPage.y(), 0.0, onPage.y() - r.bottom() });
+        const double d = std::hypot(dx, dy);
+        if (d < best) {
+            best = d;
+            note = toNote(item);
         }
     }
-    const int rawTick = chosen ? chosen->tick().ticks() : m->tick().ticks();
+
+    const Segment* chosen = nullptr;
+    if (note) {
+        chosen = note->chord()->segment();
+    } else {
+        const Measure* m = score->searchMeasure(p);
+        if (!m) {
+            return "null";
+        }
+        chosen = m->first(SegmentType::ChordRest);
+        for (const Segment* s = chosen; s; s = s->next(SegmentType::ChordRest)) {
+            if (s->canvasPos().x() <= p.x()) {
+                chosen = s;
+            } else {
+                break;
+            }
+        }
+        if (!chosen) {
+            chosen = m->first();
+        }
+    }
+    const int rawTick = chosen->tick().ticks();
     const int utick = score->repeatList(true).tick2utick(rawTick);
     const double secs = uticksToSecs(score, utick);
+
+    // As desktop MuseScore does when a note is selected: sound it, for the
+    // default 500 ms. Only while stopped; during playback a tap just moves.
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+    if (note && playNote && !playing && m_playbackModel) {
+        m_playbackModel->triggerEventsForItems({ note }, 500000, true);
+    }
+
     seek(secs);
-    return cursorJson(secs);
+    std::string json = cursorJson(secs);
+    if (note && json.size() > 1 && json.back() == '}') {
+        json.pop_back();
+        json += ",\"note\":true}";
+    }
+    return json;
 }
 
 // ---------------------------------------------------------------------------

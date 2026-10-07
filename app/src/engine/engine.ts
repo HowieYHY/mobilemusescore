@@ -22,8 +22,14 @@ export class Engine {
     private audioStarting: Promise<void> | null = null;
     private audioWorker: Worker | null = null;
     private lastLatency = -1;
+    private lastClock = 0;
+    /** Gaps in the sound while playing (the device fell behind). */
     underruns = 0;
+    /** For the playback check: how the audio engine is keeping up. */
+    stats = { speed: 0, slowestMs: 0, queuedSecs: 0, targetSecs: 0 };
     readonly base: string;
+
+    private lastStatus = "";
 
     constructor(base = import.meta.env.BASE_URL) {
         this.base = new URL(base, location.href).href;
@@ -36,6 +42,10 @@ export class Engine {
         this.request({ cmd: "init", base: this.base, rpcPort: channel.port1 }, [channel.port1])
             .then(() => this.emit("engineReady", {}))
             .catch((err) => this.emit("error", { message: "Score engine failed to start: " + err.message }));
+        this.on("status", (s) => {
+            this.lastStatus = s.status;
+            this.setPlaying(s.status === "playing");
+        });
     }
 
     on(event: string, fn: Listener): () => void {
@@ -112,7 +122,7 @@ export class Engine {
             node.connect(ctx.destination);
             node.port.onmessage = (e) => {
                 if (e.data.type === "queued") {
-                    this.onQueued(e.data.frames, e.data.underruns);
+                    this.onQueued(e.data.frames);
                 }
             };
 
@@ -123,6 +133,12 @@ export class Engine {
                     const m = e.data;
                     if (m.type === "ready") {
                         resolve();
+                    } else if (m.type === "stats") {
+                        this.stats.speed = m.speed;
+                        this.stats.slowestMs = m.slowestMs;
+                        this.stats.targetSecs = m.target / ctx.sampleRate;
+                    } else if (m.type === "underrun") {
+                        this.underruns = m.count;
                     } else if (m.type === "error") {
                         reject(new Error(m.text));
                     } else if (m.type === "log" && /ERROR|WARN|underrun/.test(m.text)) {
@@ -137,7 +153,7 @@ export class Engine {
 
             // The score engine must be listening before the audio engine announces itself
             await this.request({ cmd: "startAudio", sampleRate: ctx.sampleRate, blockSize: 1024, soundFontUri: "file://" + SOUND_FONT_PATH });
-            worker.postMessage({ type: "init", rpcPort: this.rpcForAudio, outPort: audioPath.port1, soundFont: sf, soundFontPath: SOUND_FONT_PATH },
+            worker.postMessage({ type: "init", rpcPort: this.rpcForAudio, outPort: audioPath.port1, soundFont: sf, soundFontPath: SOUND_FONT_PATH, sampleRate: ctx.sampleRate },
                 [this.rpcForAudio, audioPath.port1, sf]);
             await ready;
             this.emit("audioStatus", { text: "" });
@@ -186,11 +202,11 @@ export class Engine {
     // How far the engine is ahead of the speaker: the queued audio plus the
     // device's own output latency. The score engine shifts the cursor and the
     // pause point by this much so they match what is heard.
-    private onQueued(frames: number, underruns: number) {
+    private onQueued(frames: number) {
         if (!this.ctx) {
             return;
         }
-        this.underruns = underruns;
+        this.stats.queuedSecs = frames / this.ctx.sampleRate;
         const out = (this.ctx as any).outputLatency || 0;
         const latency = frames / this.ctx.sampleRate + (this.ctx.baseLatency || 0) + out;
         if (Math.abs(latency - this.lastLatency) > 0.01) {
@@ -204,12 +220,39 @@ export class Engine {
         this.node?.port.postMessage({ type: "flush" });
     }
 
-    // The audio clock, in seconds (0 before audio starts)
+    // The audio clock, in seconds (0 before audio starts). currentTime only
+    // moves when the device takes a batch of audio, which on Android can be
+    // ~10 times a second; the output timestamp says when that was, so the
+    // clock can be read smoothly between batches.
     get audioTime(): number {
-        return this.ctx ? this.ctx.currentTime : 0;
+        const ctx = this.ctx;
+        if (!ctx) {
+            return 0;
+        }
+        let t = ctx.currentTime;
+        const ts = ctx.getOutputTimestamp?.();
+        if (ts && ts.performanceTime && ts.contextTime) {
+            t = ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
+        }
+        // small steps back happen when a new timestamp arrives; hold instead
+        if (t < this.lastClock && this.lastClock - t < 0.25) {
+            t = this.lastClock;
+        }
+        this.lastClock = t;
+        return t;
+    }
+
+    // Tell the audio engine whether music is playing: while stopped it keeps
+    // only a little audio queued, so tapped notes sound without delay.
+    private setPlaying(on: boolean) {
+        this.audioWorker?.postMessage({ type: "playing", on });
     }
 
     timeline(): Promise<[number, number, number, number, number][]> { return this.request({ cmd: "timeline" }); }
+
+    get sampleRate(): number {
+        return this.ctx ? this.ctx.sampleRate : 0;
+    }
 
     get audioRunning() {
         return this.ctx?.state === "running";
@@ -223,13 +266,18 @@ export class Engine {
     page(index: number): Promise<string> { return this.request({ cmd: "page", index }); }
     cursor(secs: number): Promise<CursorInfo> { return this.request({ cmd: "cursor", secs }); }
     tracks(): Promise<TrackInfo[]> { return this.request({ cmd: "tracks" }); }
-    play() { return this.request({ cmd: "play" }); }
-    async pause() { await this.request({ cmd: "pause" }); this.flush(); }
-    async stop() { await this.request({ cmd: "stop" }); this.flush(); }
+    play() { this.setPlaying(true); return this.request({ cmd: "play" }); }
+    async pause() { await this.request({ cmd: "pause" }); this.setPlaying(false); this.flush(); }
+    async stop() { await this.request({ cmd: "stop" }); this.setPlaying(false); this.flush(); }
     async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); }
-    async seekAt(page: number, x: number, y: number): Promise<CursorInfo | null> {
-        const c = await this.request<CursorInfo | null>({ cmd: "seekAt", page, x, y });
-        this.flush();
+    // Move to the note or beat at a point on a page (page units); `radius` is
+    // how far from the point a note may be. While stopped, that note sounds.
+    async seekAt(page: number, x: number, y: number, radius = 0, playNote = false): Promise<CursorInfo | null> {
+        const playing = this.lastStatus === "playing";
+        const c = await this.request<CursorInfo | null>({ cmd: "seekAt", page, x, y, radius, playNote });
+        if (playing) {
+            this.flush(); // only playing audio is queued far ahead
+        }
         return c;
     }
     setVolume(key: number, db: number) { return this.request({ cmd: "volume", key, db }); }

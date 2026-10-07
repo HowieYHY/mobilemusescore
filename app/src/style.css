@@ -225,3 +225,97 @@ body {
 }
 
 [hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- notes */
+
+#notes-toggle { display: inline-flex; align-items: center; gap: 6px; }
+#notes-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+@media (max-width: 480px) { #notes-toggle .label { display: none; } }
+
+.notesbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 12px;
+  background: var(--chrome-2);
+  color: var(--text-on-chrome);
+  flex: none;
+}
+.notesbar .tools { display: flex; gap: 4px; }
+.notesbar .tool {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 52px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-on-chrome);
+  font-size: 11px;
+  touch-action: manipulation;
+}
+.notesbar .tool.on { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.35); }
+.notesbar .swatches { display: flex; gap: 6px; }
+.notesbar .swatch {
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  touch-action: manipulation;
+}
+.notesbar .swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.notesbar .swatches.off { visibility: hidden; }
+.btn.small { min-height: 34px; padding: 4px 10px; font-size: 14px; }
+.notesbar .hint { flex-basis: 100%; font-size: 12px; opacity: 0.8; }
+
+.page .ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.ink path.highlighter { stroke-opacity: 0.4; stroke-linecap: butt; mix-blend-mode: multiply; }
+.page .texts { position: absolute; inset: 0; pointer-events: none; }
+.tnote {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  max-width: 60%;
+  line-height: 1.25;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.tnote .tbody { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 1ch; outline: none; padding: 0 2px; }
+.tnote .tgrip, .tnote .tdel { display: none; }
+.annotating .texts .tnote { pointer-events: auto; }
+.annotating .tnote .tbody { background: rgba(255, 255, 210, 0.85); border: 1px dashed rgba(0, 0, 0, 0.35); border-radius: 3px; min-height: 1.25em; min-width: 3ch; }
+.annotating .tnote .tgrip, .annotating .tnote .tdel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 16px;
+  line-height: 1;
+  color: #333;
+  background: #fff;
+  border: 1px solid #bbb;
+  border-radius: 50%;
+  flex: none;
+  touch-action: none;
+}
+.annotating .tnote .tgrip { cursor: move; margin-right: 2px; }
+.annotating .tnote .tdel { margin-left: 2px; padding: 0; appearance: none; }
+.pages.annotating[data-tool="text"] .page { cursor: text; }
+.pages.annotating[data-tool="pen"] .page, .pages.annotating[data-tool="highlighter"] .page { cursor: crosshair; }
+
+/* ---------------------------------------------------------------- playback check */
+
+.diag { padding: 6px 12px 8px; font-size: 11px; color: #666; border-top: 1px solid #e3e5e8; }

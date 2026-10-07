@@ -140,7 +140,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "stop": callVoid("mss_stop"); break;
         case "seek": callVoid("mss_seek", req.secs); break;
         case "seekAt":
-            result = JSON.parse(callStr("mss_seek_at", req.page, req.x, req.y));
+            result = JSON.parse(callStr("mss_seek_at", req.page, req.x, req.y, req.radius, req.playNote ? 1 : 0));
             core._mss_process();
             break;
         case "volume": callVoid("mss_set_track_volume", req.key, req.db); break;

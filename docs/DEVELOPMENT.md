@@ -38,6 +38,9 @@ on that phone.
 | View modes | Page (default); Continuous vertical and horizontal. |
 | Play, pause, back to start | MuseScore's audio engine in a Web Worker, rendering ahead into an AudioWorklet. |
 | Seek | Position slider, or **tap a note or rest** to play from there. Repeats are respected. |
+| Hear a note | While stopped, a tapped note sounds for 500 ms, as when selecting a note on desktop (`PlaybackModel::triggerEventsForItems`, MuseScore's off-stream). The nearest note within a fingertip's reach is chosen. |
+| Notes on the score | Pen, highlighter, text boxes, eraser, undo (`app/src/annotations.ts`). Stored in `localStorage` per score (SHA-256 of the file) and view mode, in page units. Not written to the `.mscz`. |
+| Playback check | Line at the bottom of the mixer: render speed, slowest block, queued audio, gaps, sample rate, version. Ask testers for a screenshot. |
 | Playback cursor | Moves smoothly with the sound you hear (driven by the audio clock, corrected for the audio queued ahead). Follows playback across pages and pauses following while you scroll. |
 | Mixer | Master volume, plus per-part volume, mute, solo and reverb send. Same solo/mute rules as desktop. Each part's saved sound, volume and mute/solo are read from the score. |
 | Metronome | Engine switch, matching desktop's transport metronome (no button in the app yet). |
@@ -79,10 +82,12 @@ exported audio file.
 | Browser test on "I am move it": open, all 22 pages drawn, play, audio clock vs position (8.00 s vs 8.01 s), solo, seek, tap-to-seek | Chromium | pass |
 | Same test | WebKit (Safari engine) on Windows | display passes; **audio not testable** in this build |
 | Offline: cache, cut network, reload, open, play | Chromium, local build **and the live GitHub Pages site** | pass |
-| Slow-phone simulation: play 20 s with the CPU slowed 1×, 4×, 6× (`stress-test.mjs`) | Chromium | 0 audio gaps at every rate; cursor 60 / 59 / 43 fps |
+| Slow-phone simulation: play 20 s with the CPU slowed 1×, 4×, 6× (`stress-test.mjs`) | Chromium | 0 audio gaps at every rate; cursor 60 / 59 / 43 fps. DevTools throttling may not slow the audio worker, and this test did not catch the Pixel 9a problem |
 | Android: open, play, audio clock vs position (7.99 s vs 7.91 s), audio gaps (0), mute, seek | Android 16 emulator (software graphics) | pass |
 | Your tests: open, draw, play, mixer, seek | iPad (A16, iPadOS 26.6.2), web app | pass |
-| Android phone | — | first test choppy; **fix not yet checked on the phone** |
+| Note preview: tapped note sounds (−47 dB vs silence), stops, empty space is silent (`note-preview-test.mjs`) | Node.js | pass |
+| Notes: draw, highlight, text, erase, undo, zoom, reload, clear (`notes-test.mjs`) | Chromium | pass |
+| Android phone (Pixel 9a, APK 0.1.1) | user | **still choppy**; 0.1.2 adds a smooth clock, a deeper queue and the playback check, not yet checked on the phone |
 
 ### Not supported or not yet checked
 
@@ -142,7 +147,10 @@ exported audio file.
 inside the worklet and was called for every 128-frame slice. A slow phone could
 not always finish that within the slice's ~2.7 ms deadline, so the sound
 stuttered. Now `msaudio-worker.js` renders 1024-frame blocks about 170 ms ahead.
-On an underrun the queue grows by two blocks, up to about 0.5 s. The worklet
+While playing it keeps about 340 ms queued (16 blocks), growing by four blocks
+on each underrun up to about 1 s. While stopped it keeps only ~85 ms queued, so
+a tapped note sounds quickly. Blocks carry a flush generation, so audio rendered
+before a seek is never played after it. The worklet
 (`msaudio-worklet.js`) only copies from its queue.
 - **Keeping the cursor in time.** The worklet reports how much audio is
   queued, and the page passes that latency to the score engine
@@ -150,7 +158,9 @@ On an underrun the queue grows by two blocks, up to about 0.5 s. The worklet
 - **Seek, pause and stop** flush the queue, and pause rewinds to the heard
   position.
 - **Moving the cursor.** It is animated each frame from the audio clock and a
-  timeline of note positions (`mss_timeline`), not from position messages.
+  timeline of note positions (`mss_timeline`), not from position messages. The
+  clock comes from `getOutputTimestamp()`: on Android `currentTime` only moves
+  when the device takes a batch of audio (about 10 times a second).
 - **Speed.** `muse_audio_engine` and FluidSynth are built with WebAssembly SIMD.
   This takes rendering of 1024-frame blocks from about 16× to about 20× real time
   on a desktop CPU.
@@ -228,6 +238,8 @@ METRONOME=1 RATE=48000 node scripts/compare-audio.mjs "real test musescore files
 (cd app && npm run build && npx vite preview --port 5181) & node scripts/offline-test.mjs <score>
 node scripts/android-test.mjs <score>    # emulator or USB device, adb on PATH
 node scripts/stress-test.mjs <score> 4   # dev server; CPU slowed 4x, reports audio gaps and fps
+node scripts/note-preview-test.mjs <score>
+node scripts/notes-test.mjs <score> chromium   # dev server
 ```
 
 To make the desktop references, run your desktop MuseScore 4.7.5 with

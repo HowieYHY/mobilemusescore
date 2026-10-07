@@ -13,7 +13,7 @@ export type WorkerRequest =
     | Req<{ cmd: "timeline" }>
     | Req<{ cmd: "play" | "pause" | "stop" }>
     | Req<{ cmd: "seek"; secs: number }>
-    | Req<{ cmd: "seekAt"; page: number; x: number; y: number }>
+    | Req<{ cmd: "seekAt"; page: number; x: number; y: number; radius: number; playNote: boolean }>
     | Req<{ cmd: "volume"; key: number; db: number }>
     | Req<{ cmd: "balance"; key: number; value: number }>
     | Req<{ cmd: "mute" | "solo"; key: number; on: boolean }>
@@ -70,4 +70,5 @@ export interface CursorInfo {
     y?: number;
     w?: number;
     h?: number;
+    note?: boolean; // seekAt: a note was found at the point
 }

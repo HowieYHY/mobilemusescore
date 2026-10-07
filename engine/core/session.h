@@ -54,7 +54,7 @@ public:
     void seek(double secs);
     // Moves playback to the note or rest nearest a point on a page (page
     // coordinates). Returns the new cursor JSON, or "null" if nothing is there.
-    std::string seekAt(int pageIndex, double x, double y);
+    std::string seekAt(int pageIndex, double x, double y, double radius, bool playNote);
 
     // Mixer. trackKey identifies an instrument track (see tracksJson()).
     void setTrackVolume(int trackKey, double db);

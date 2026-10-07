@@ -44,11 +44,23 @@ Tap **Open score** and choose a `.mscz` file. On iPad and iPhone, first save you
 | Go back to the start | Tap **⏮** |
 | Jump anywhere | Drag the position slider |
 | Play from a particular note | Tap the note or rest in the score |
+| Hear a note | While stopped, tap it: it sounds, and Play starts from there |
 | Zoom | Pinch, or use **−** and **+** |
 | Change the layout | Use the menu at the top right: *Page view*, *Continuous (vertical)* or *Continuous (horizontal)* |
 
 A blue line shows where you are in the music, and the page follows it as it plays.
 If you scroll away, it waits a moment before following again.
+
+### Write on the score
+Tap the **pencil** button at the top:
+- **Pen** and **Highlight**: write or mark with a stylus (Apple Pencil, S Pen) or your finger. Once you use a stylus, fingers scroll the page again; while drawing with a finger, scroll with two fingers.
+- **Text**: tap the score to add a text box and type. Drag **⠿** to move it, tap **×** to delete it.
+- **Erase**: tap or rub over a mark or text box.
+- **Undo**, **Clear** (everything on this score) and the colours.
+
+Tap **Done** to go back to playing. Your notes are saved on this device and come back when you open
+the same score again, even if you rename the file. They stay on the device: they are not added to
+the `.mscz` file and are not shared. Notes made in page view and in the continuous views are kept separately.
 
 ### Mixer: practise your part
 Tap **Mixer**:
@@ -94,7 +106,7 @@ MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
 
 - **No sound on iPhone or iPad:** check the volume buttons, and that Bluetooth isn't sending sound to another device.
 - **"Audio could not start":** close PocketScore completely, reopen it, and tap Play again.
-- **Choppy sound or jumpy scrolling on Android:** update to the latest version (reinstall the APK, or reload the website). If it still happens, please report it with your phone model.
+- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen, and at the bottom of the mixer). If it still happens, play the score for a minute, open the **Mixer**, and send a screenshot of the *Playback check* line at the bottom, with your phone model.
 - **A score won't open:** make sure it is a `.mscz` file saved by MuseScore.
 
 To report a problem, [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or send the

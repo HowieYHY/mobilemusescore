@@ -1,6 +1,7 @@
 import { Engine } from "./engine/engine";
 import type { CursorInfo, ScoreInfo, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, drawPage, ensureFonts, ensureImages } from "./render/pagerenderer";
+import { Annotations, COLORS, type Tool } from "./annotations";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -25,7 +26,18 @@ const ui = {
     mixer: $("mixer"),
     mixerBody: $("mixer-body"),
     mixerClose: $<HTMLButtonElement>("mixer-close"),
+    diag: $("diag"),
+    notesToggle: $<HTMLButtonElement>("notes-toggle"),
+    notesbar: $("notesbar"),
+    swatches: $("swatches"),
+    notesUndo: $<HTMLButtonElement>("notes-undo"),
+    notesClear: $<HTMLButtonElement>("notes-clear"),
+    notesDone: $<HTMLButtonElement>("notes-done"),
+    notesHint: $("notes-hint"),
 };
+
+declare const __APP_VERSION__: string;
+$("version").textContent = "PocketScore " + __APP_VERSION__;
 
 const engine = new Engine();
 
@@ -95,6 +107,7 @@ function unitsToCss(u: number) {
 
 function buildPages() {
     ui.pages.innerHTML = "";
+    notes.detachAll();
     state.pageEls = [];
     state.rendered.clear();
     const score = state.score;
@@ -111,6 +124,7 @@ function buildPages() {
         el.style.height = unitsToCss(p.h) + "px";
         ui.pages.appendChild(el);
         state.pageEls.push(el);
+        notes.attach(el, i, p.w, p.h);
         observer.observe(el);
     });
     ui.zoomLabel.textContent = Math.round(state.zoom * 100) + "%";
@@ -231,7 +245,9 @@ ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
     });
 }
 
-// Tap a note or rest to play from there (a tap, not a scroll or pinch)
+// Tap a note or rest to play from there (a tap, not a scroll or pinch).
+// While stopped, a tapped note also sounds, as in desktop MuseScore.
+let pendingPreview: { page: number; x: number; y: number; radius: number } | null = null;
 {
     let down: { x: number; y: number; t: number; id: number } | null = null;
     ui.pages.addEventListener("pointerdown", (e) => {
@@ -241,7 +257,7 @@ ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
     ui.pages.addEventListener("pointerup", async (e) => {
         const d = down;
         down = null;
-        if (!d || d.id !== e.pointerId || !state.score) {
+        if (!d || d.id !== e.pointerId || !state.score || notes.active) {
             return;
         }
         if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10 || performance.now() - d.t > 500) {
@@ -253,7 +269,18 @@ ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
         }
         const r = pageEl.getBoundingClientRect();
         const toUnits = (css: number) => css / (CSS_PX_PER_INCH * state.zoom) * UNITS_PER_INCH;
-        const c = await engine.seekAt(Number(pageEl.dataset.index), toUnits(e.clientX - r.left), toUnits(e.clientY - r.top));
+        // a fingertip is wider than a notehead: accept notes within ~18 px, but
+        // not so far that a neighbouring staff's note is picked
+        const sp = state.score.spatium;
+        const radius = Math.max(0.75 * sp, Math.min(toUnits(18), 3 * sp));
+        const tap = { page: Number(pageEl.dataset.index), x: toUnits(e.clientX - r.left), y: toUnits(e.clientY - r.top), radius };
+        const audioReady = engine.audioRunning && state.playbackReady;
+        if (!audioReady && !state.playing) {
+            // the first tap starts audio (it must start from a tap on iOS); the note sounds once it's ready
+            pendingPreview = tap;
+            void startAudioFromTap();
+        }
+        const c = await engine.seekAt(tap.page, tap.x, tap.y, tap.radius, audioReady);
         if (c) {
             state.followUntil = 0;
         }
@@ -401,6 +428,15 @@ engine.on("status", (s) => {
 
 // ---------------------------------------------------------------- transport
 
+async function startAudioFromTap() {
+    setStatus("Starting audio…");
+    try {
+        await engine.startAudio();
+    } catch (err: any) {
+        setStatus("Audio could not start: " + (err && err.message || err), "error");
+    }
+}
+
 ui.play.onclick = async () => {
     if (!state.score) {
         return;
@@ -541,7 +577,12 @@ engine.on("playbackReady", (tracks: TrackInfo[]) => {
     setStatus("");
     if (pendingPlay) {
         pendingPlay = false;
+        pendingPreview = null;
         void engine.play();
+    } else if (pendingPreview) {
+        const t = pendingPreview;
+        pendingPreview = null;
+        void engine.seekAt(t.page, t.x, t.y, t.radius, true);
     }
 });
 
@@ -564,6 +605,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     state.playbackReady = false;
     state.pageOps.clear();
     ui.mixerToggle.disabled = true;
+    const key = await scoreKey(name, data); // before the data goes to the engine
     const res = await engine.load(name, data);
     if (!res.ok || !res.score) {
         setStatus(res.error || "Could not open this score.", "error");
@@ -586,6 +628,9 @@ async function openScore(name: string, data: ArrayBuffer) {
     ui.seek.value = "0";
     state.zoom = fitWidthZoom();
     renderGeneration++;
+    setNotesActive(false);
+    notes.open(key, "page");
+    ui.notesToggle.disabled = false;
     buildPages();
     void loadTimeline();
     ui.viewer.scrollTop = 0;
@@ -596,6 +641,7 @@ async function openScore(name: string, data: ArrayBuffer) {
 ui.viewMode.onchange = async () => {
     setStatus("Laying out…");
     state.score = await engine.setViewMode(ui.viewMode.value as ViewMode);
+    notes.setMode(ui.viewMode.value); // notes belong to the layout they were written on
     await loadTimeline();
     rerenderAll(false);
     setStatus("");
@@ -615,5 +661,95 @@ if (inNativeApp && "serviceWorker" in navigator) {
     caches?.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
 }
 
+// A file's notes are found again by its contents, so a renamed copy keeps them
+async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
+    try {
+        const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+        return Array.from(hash.slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
+    } catch (err) {
+        return name + ":" + data.byteLength; // no WebCrypto (plain http)
+    }
+}
+
+// ---------------------------------------------------------------- notes
+
+const notes = new Annotations(ui.pages, ui.viewer, () => updateNotesBar(), (msg) => setStatus(msg, "error", 6000));
+
+for (const c of COLORS) {
+    const b = document.createElement("button");
+    b.className = "swatch";
+    b.style.background = c;
+    b.dataset.color = c;
+    b.setAttribute("aria-label", "Colour " + c);
+    b.onclick = () => {
+        notes.setColor(c);
+        updateNotesBar();
+    };
+    ui.swatches.appendChild(b);
+}
+
+ui.notesbar.querySelectorAll<HTMLButtonElement>(".tool").forEach((b) => {
+    b.onclick = () => {
+        notes.setTool(b.dataset.tool as Tool);
+        updateNotesBar();
+    };
+});
+
+function updateNotesBar() {
+    ui.notesbar.querySelectorAll<HTMLButtonElement>(".tool").forEach((b) => {
+        const on = b.dataset.tool === notes.tool;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-checked", String(on));
+    });
+    ui.swatches.classList.toggle("off", notes.tool === "eraser");
+    ui.swatches.querySelectorAll<HTMLButtonElement>(".swatch").forEach((b) => b.classList.toggle("on", b.dataset.color === notes.color));
+    ui.notesUndo.disabled = !notes.canUndo;
+    ui.notesClear.disabled = notes.count === 0;
+    const touch = matchMedia("(pointer: coarse)").matches;
+    const hints: Record<Tool, string> = {
+        pen: touch ? "Write with a stylus or your finger. Scroll with two fingers." : "Draw on the score.",
+        highlighter: touch ? "Highlight with a stylus or your finger. Scroll with two fingers." : "Highlight on the score.",
+        text: "Tap the score to add a text box. Drag ⠿ to move it, × to delete it.",
+        eraser: "Tap or rub over a note to remove it.",
+    };
+    ui.notesHint.textContent = hints[notes.tool];
+}
+
+function setNotesActive(on: boolean) {
+    notes.setActive(on);
+    notes.setTool(notes.tool);
+    ui.notesbar.hidden = !on;
+    ui.notesToggle.setAttribute("aria-pressed", String(on));
+    updateNotesBar();
+}
+
+ui.notesToggle.onclick = () => setNotesActive(!notes.active);
+ui.notesDone.onclick = () => setNotesActive(false);
+ui.notesUndo.onclick = () => notes.undo();
+ui.notesClear.onclick = () => {
+    if (confirm("Remove all your notes from this score (in this view)? You can undo this.")) {
+        notes.clear();
+    }
+};
+
+// ---------------------------------------------------------------- playback check
+
+// Shown under the mixer; helps diagnose choppy sound on a particular device
+setInterval(() => {
+    if (ui.mixer.hidden) {
+        return;
+    }
+    const s = engine.stats;
+    const rate = engine.sampleRate || 48000;
+    if (!s.speed) {
+        ui.diag.textContent = "Playback check: starts when sound is playing.";
+        return;
+    }
+    ui.diag.textContent = `Playback check: sound engine ${s.speed.toFixed(1)}× faster than needed `
+        + `(slowest step ${s.slowestMs.toFixed(1)} of ${(1024 / rate * 1000).toFixed(0)} ms) · `
+        + `${s.queuedSecs.toFixed(2)} s queued (aim ${s.targetSecs.toFixed(2)} s) · `
+        + `${engine.underruns} gap${engine.underruns === 1 ? "" : "s"} · ${rate} Hz · version ${__APP_VERSION__}`;
+}, 1000);
+
 // Let tests and the console drive the app
-(window as any).app = { engine, state, openScore };
+(window as any).app = { engine, state, openScore, notes };

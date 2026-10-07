@@ -4,7 +4,9 @@
 //
 // Messages on this.port (from the page):
 //   {type:"init", inPort}    inPort carries audio from the engine worker
-//   {type:"flush"}           drop queued audio (seek, pause, stop)
+//   {type:"flush"}           drop queued audio (seek, pause, stop); audio the
+//                            worker rendered before it hears of the flush
+//                            carries the old generation and is dropped too
 // To the page: {type:"queued", frames, underruns} about every 100 ms.
 
 class MsAudioPlayer extends AudioWorkletProcessor {
@@ -17,6 +19,7 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         this.underruns = 0;
         this.starved = false;
         this.sinceReport = 0;
+        this.gen = 0;
         this.in = null;
         this.port.onmessage = (e) => this.onMessage(e.data);
     }
@@ -25,7 +28,7 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         if (msg.type === "init") {
             this.in = msg.inPort;
             this.in.onmessage = (e) => {
-                if (e.data.type === "audio") {
+                if (e.data.type === "audio" && e.data.gen === this.gen) {
                     this.queue.push(e.data.data);
                     this.queuedFrames += e.data.data.length / 2;
                 }
@@ -35,8 +38,9 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             this.readPos = 0;
             this.queuedFrames = 0;
             this.consumed = 0;
+            this.gen++;
             if (this.in) {
-                this.in.postMessage({ type: "flush" });
+                this.in.postMessage({ type: "flush", gen: this.gen });
             }
         }
     }

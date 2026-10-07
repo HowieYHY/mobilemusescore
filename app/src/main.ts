@@ -67,6 +67,8 @@ function setStatus(text: string, kind: "info" | "error" = "info", autoHideMs = 0
     ui.status.hidden = !text;
     ui.status.textContent = text;
     ui.status.classList.toggle("error", kind === "error");
+    ui.status.classList.remove("action");
+    ui.status.onclick = null;
     clearTimeout(statusTimer);
     if (autoHideMs) {
         statusTimer = window.setTimeout(() => (ui.status.hidden = true), autoHideMs);
@@ -651,7 +653,33 @@ ui.viewMode.onchange = async () => {
 // Not inside the Android app, which already ships every file.
 const inNativeApp = !!(window as any).Capacitor?.isNativePlatform?.();
 if ("serviceWorker" in navigator && import.meta.env.PROD && !inNativeApp) {
-    navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("service worker:", err));
+    const sw = navigator.serviceWorker;
+    const isUpdate = !!sw.controller; // an older version is running this page
+    sw.register("./sw.js").then((reg) => {
+        // a home-screen app can stay open for days: look for updates when it comes back
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                reg.update().catch(() => {});
+            }
+        });
+    }).catch((err) => console.warn("service worker:", err));
+    sw.addEventListener("message", (e) => {
+        if (isUpdate && e.data?.type === "sw-progress" && !state.playing) {
+            setStatus(`Downloading an update to PocketScore… ${Math.round(e.data.done / e.data.total * 100)}%`);
+        }
+    });
+    sw.addEventListener("controllerchange", () => {
+        if (!isUpdate) {
+            return; // first visit, not an update
+        }
+        if (!state.score) {
+            location.reload();
+            return;
+        }
+        setStatus("PocketScore has been updated. Tap here to restart it (reopen your score afterwards).");
+        ui.status.classList.add("action");
+        ui.status.onclick = () => location.reload();
+    });
 }
 
 // The Android app used to register the service worker; remove it so it can't
@@ -742,7 +770,7 @@ setInterval(() => {
     const s = engine.stats;
     const rate = engine.sampleRate || 48000;
     if (!s.speed) {
-        ui.diag.textContent = "Playback check: starts when sound is playing.";
+        ui.diag.textContent = `Playback check: starts when sound is playing. Version ${__APP_VERSION__}.`;
         return;
     }
     ui.diag.textContent = `Playback check: sound engine ${s.speed.toFixed(1)}× faster than needed `

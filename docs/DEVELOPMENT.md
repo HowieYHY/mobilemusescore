@@ -87,6 +87,7 @@ exported audio file.
 | Your tests: open, draw, play, mixer, seek | iPad (A16, iPadOS 26.6.2), web app | pass |
 | Note preview: tapped note sounds (−47 dB vs silence), stops, empty space is silent (`note-preview-test.mjs`) | Node.js | pass |
 | Notes: draw, highlight, text, erase, undo, zoom, reload, clear (`notes-test.mjs`) | Chromium | pass |
+| Web app update: 0.1.2 → 0.1.3 downloads 0.1 MB (unchanged files kept by content hash), shows the new version on reopening; from 0.1.3 on, the open app reloads itself when an update is ready; works offline after (`update-test.mjs`) | Chromium | pass |
 | Android phone (Pixel 9a, APK 0.1.1) | user | **still choppy**; 0.1.2 adds a smooth clock, a deeper queue and the playback check, not yet checked on the phone |
 
 ### Not supported or not yet checked
@@ -239,6 +240,7 @@ METRONOME=1 RATE=48000 node scripts/compare-audio.mjs "real test musescore files
 node scripts/android-test.mjs <score>    # emulator or USB device, adb on PATH
 node scripts/stress-test.mjs <score> 4   # dev server; CPU slowed 4x, reports audio gaps and fps
 node scripts/note-preview-test.mjs <score>
+node scripts/update-test.mjs build/ghpages   # installed web app updates to app/dist
 node scripts/notes-test.mjs <score> chromium   # dev server
 ```
 

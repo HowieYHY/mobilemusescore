@@ -21,8 +21,10 @@ const hash = crypto.createHash("sha256");
             walk(p);
         } else if (rel !== "precache.json" && rel !== "sw.js") {
             const st = fs.statSync(p);
-            hash.update(rel + ":" + st.size + ":" + crypto.createHash("sha1").update(fs.readFileSync(p)).digest("hex"));
-            files.push({ url: rel.split("/").map(encodeURIComponent).join("/"), size: st.size });
+            const h = crypto.createHash("sha1").update(fs.readFileSync(p)).digest("hex");
+            hash.update(rel + ":" + st.size + ":" + h);
+            // h lets an update keep files it already has (see sw.js)
+            files.push({ url: rel.split("/").map(encodeURIComponent).join("/"), size: st.size, h });
         }
     }
 })(dist);

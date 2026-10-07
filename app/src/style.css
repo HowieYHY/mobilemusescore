@@ -86,6 +86,7 @@ body {
   border-bottom: 1px solid #e6d58a;
   flex: none;
 }
+.status.action { cursor: pointer; font-weight: 600; text-decoration: underline; }
 .status.error { background: #fde3e3; color: #6b0b0b; border-color: #f0b3b3; }
 
 .viewer {

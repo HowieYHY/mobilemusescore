@@ -29,6 +29,13 @@ Open the link in Chrome, Edge or Safari.
 **The first time you press Play**, PocketScore downloads its instrument sounds (about 50 MB),
 so use Wi-Fi. After that it works offline.
 
+### Updates
+- **iPad, iPhone and the website:** when you open PocketScore with internet, it checks for a new
+  version and downloads only what changed. When it's ready, PocketScore restarts by itself, or, if a
+  score is open, asks you to tap the yellow bar. The version number is on the start screen.
+- **Android app:** download the newest APK from the [download page](https://github.com/HowieYHY/mobilemusescore/releases)
+  and install it over the old one.
+
 ---
 
 ## Using PocketScore

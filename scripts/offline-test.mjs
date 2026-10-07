@@ -13,7 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
 const { chromium } = require("playwright");
 
-const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
+const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const url = process.env.APP_URL || "http://localhost:5181/";
 
 const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });

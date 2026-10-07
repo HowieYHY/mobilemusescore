@@ -6,7 +6,7 @@
 import path from "node:path";
 import { createNodeEngine, root } from "./lib/node-engine.mjs";
 
-const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
+const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const eng = await createNodeEngine({ sampleRate: 48000 });
 const score = eng.load(scorePath);
 const sp = score.spatium;

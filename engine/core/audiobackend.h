@@ -48,6 +48,8 @@ public:
     virtual void removeAllTracks() = 0;
 
     virtual void setTrackOutput(TrackId id, const OutputParams& out) = 0;
+    // Changes the sound a track plays (as choosing a sound in desktop's mixer).
+    virtual void setTrackInput(TrackId id, const muse::audio::AudioInputParams& in) = 0;
     virtual void setMasterOutput(const OutputParams& out) = 0;
 
     // Transport

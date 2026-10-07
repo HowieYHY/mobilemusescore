@@ -106,6 +106,8 @@ EMSCRIPTEN_KEEPALIVE void mss_set_track_balance(int key, double b) { Session::in
 EMSCRIPTEN_KEEPALIVE void mss_set_track_mute(int key, int mute) { Session::instance()->setTrackMute(key, mute != 0); }
 EMSCRIPTEN_KEEPALIVE void mss_set_track_solo(int key, int solo) { Session::instance()->setTrackSolo(key, solo != 0); }
 EMSCRIPTEN_KEEPALIVE void mss_set_track_reverb(int key, double amount) { Session::instance()->setReverbSend(key, amount); }
+EMSCRIPTEN_KEEPALIVE void mss_set_track_sound(int key, const char* id) { Session::instance()->setTrackSound(key, id); }
+EMSCRIPTEN_KEEPALIVE const char* mss_sounds() { return ret(Session::instance()->soundsJson()); }
 EMSCRIPTEN_KEEPALIVE void mss_set_master_volume(double db) { Session::instance()->setMasterVolume(db); }
 EMSCRIPTEN_KEEPALIVE void mss_set_metronome(int on) { Session::instance()->setMetronome(on != 0); }
 EMSCRIPTEN_KEEPALIVE void mss_set_output_latency(double secs) { Session::instance()->setOutputLatency(secs); }

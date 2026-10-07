@@ -1,8 +1,7 @@
-// Your own notes on the score: pen and highlighter ink (stylus, or finger
-// until a stylus is seen) and text boxes. Kept on this device, per score and
-// per view mode, in page units so they stay put when zooming.
-
-import { CSS_PX_PER_INCH, UNITS_PER_INCH } from "./render/pagerenderer";
+// Your own notes on the score: pen and highlighter ink and text boxes. Kept on
+// this device, per score and per view mode, in page units so they stay put
+// when zooming. A stylus always draws; a finger draws when "Draw with finger"
+// is on (by default until a stylus is seen), and two fingers then scroll.
 
 export type Tool = "pen" | "highlighter" | "text" | "eraser";
 
@@ -21,7 +20,22 @@ interface PageView { el: HTMLElement; svg: SVGSVGElement; texts: HTMLElement; w:
 
 const SVG = "http://www.w3.org/2000/svg";
 const STORAGE_PREFIX = "pocketscore.notes.";
-export const COLORS = ["#d62828", "#1d5fd1", "#2a9d4b", "#222222", "#f2c200"];
+const PREFS_KEY = "pocketscore.notesPrefs";
+const DOUBLE_TAP_MS = 400;
+
+/** The colours in the toolbar. */
+export const COLORS = ["#000000", "#ffffff", "#d62828", "#1d5fd1", "#2a9d4b", "#f2c200"];
+/** The fuller palette behind the toolbar's "More colours" button. */
+export const MORE_COLORS = [
+    "#000000", "#4d4d4d", "#8c8c8c", "#c8c8c8", "#ffffff",
+    "#7a1010", "#d62828", "#f26b5b", "#e8590c", "#f59f00",
+    "#f2c200", "#ffe066", "#5c940d", "#2a9d4b", "#8ce99a",
+    "#0b7285", "#22b8cf", "#1d5fd1", "#74a7f2", "#1b2a80",
+    "#5f3dc4", "#9c6ade", "#c2255c", "#f783ac", "#7b4a26",
+];
+
+const ICON_CLOSE = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+const ICON_MOVE = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2l3.5 3.5h-2.5v5h5V8l3.5 3.5-3.5 3.5v-2.5h-5v5h2.5L12 21l-3.5-3.5H11v-5H6V15l-3.5-3.5L6 8v2.5h5v-5H8.5z" fill="currentColor"/></svg>`;
 
 const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -47,8 +61,10 @@ function segDist(px: number, py: number, ax: number, ay: number, bx: number, by:
 export class Annotations {
     active = false;
     tool: Tool = "pen";
-    private colors: Record<Tool, string> = { pen: COLORS[0], highlighter: COLORS[4], text: COLORS[0], eraser: "" };
+    private colors: Record<Tool, string> = { pen: "#000000", highlighter: "#f2c200", text: "#000000", eraser: "" };
     private sawStylus = false;
+    /** "Draw with finger" as the reader set it; null = automatic (on until a stylus is seen). */
+    private fingerChoice: boolean | null = null;
     private key = "";
     private mode = "page";
     private data: Stored = { v: 1, modes: {} };
@@ -60,6 +76,7 @@ export class Annotations {
     private touches = new Map<number, { x: number; y: number }>();
     private lastPointerType = "";
     private tapStart: { id: number; x: number; y: number } | null = null;
+    private lastTap: { t: number; x: number; y: number } | null = null;
 
     constructor(
         private pagesEl: HTMLElement,
@@ -67,26 +84,86 @@ export class Annotations {
         private onChange: () => void, // undo availability etc.
         private onError: (msg: string) => void,
     ) {
+        this.loadPrefs();
         pagesEl.addEventListener("pointerdown", (e) => this.onDown(e));
         pagesEl.addEventListener("pointermove", (e) => this.onMove(e));
         pagesEl.addEventListener("pointerup", (e) => this.onUp(e));
         pagesEl.addEventListener("pointercancel", (e) => this.onCancel(e));
-        // Stop the page scrolling under the pen. Pointer events alone can't, so
-        // this decides on touchstart: a stylus always draws; a finger draws
-        // until a stylus has been seen, after which fingers scroll.
+        // Stop the page scrolling under the pen. CSS (touch-action, see
+        // updateTouchMode) does this for fingers; a stylus on iOS also needs
+        // touchstart cancelled, decided here: a stylus always draws.
         pagesEl.addEventListener("touchstart", (e) => {
             const t = e.changedTouches[0] as Touch & { touchType?: string };
             if (t?.touchType === "stylus") {
-                this.sawStylus = true;
+                this.noteStylus();
             }
-            if (!this.active || this.tool === "text" || (e.target as Element).closest?.(".tnote")) {
+            if (!this.active || !this.drawingTool || (e.target as Element).closest?.(".tnote")) {
                 return;
             }
             const stylus = t?.touchType === "stylus" || this.lastPointerType === "pen";
-            if (e.touches.length === 1 && (stylus || !this.sawStylus)) {
+            if (e.touches.length === 1 && (stylus || this.fingerDraws)) {
                 e.preventDefault();
             }
         }, { passive: false });
+    }
+
+    private get drawingTool() {
+        return this.tool === "pen" || this.tool === "highlighter" || this.tool === "eraser";
+    }
+
+    /** Whether one finger draws (true) or scrolls (false). */
+    get fingerDraws(): boolean {
+        return this.fingerChoice ?? !this.sawStylus;
+    }
+
+    setFingerDraws(on: boolean) {
+        this.fingerChoice = on;
+        this.savePrefs();
+        this.updateTouchMode();
+        this.onChange();
+    }
+
+    private noteStylus() {
+        if (!this.sawStylus) {
+            this.sawStylus = true;
+            this.updateTouchMode();
+            this.onChange(); // "Draw with finger" turns off, unless set by hand
+        }
+    }
+
+    // A finger that draws must not also scroll the page. The browser decides
+    // that from touch-action when the touch starts, so it is set ahead of time;
+    // otherwise the browser takes the gesture over and cancels the stroke
+    // (Chrome on Android).
+    private updateTouchMode() {
+        this.pagesEl.classList.toggle("finger-draw", this.active && this.drawingTool && this.fingerDraws);
+    }
+
+    private loadPrefs() {
+        try {
+            const p = JSON.parse(localStorage.getItem(PREFS_KEY) || "null");
+            if (p && typeof p === "object") {
+                for (const t of ["pen", "highlighter", "text"] as const) {
+                    const c = p.colors?.[t];
+                    if (typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)) {
+                        this.colors[t] = c;
+                    }
+                }
+                if (typeof p.finger === "boolean") {
+                    this.fingerChoice = p.finger;
+                }
+            }
+        } catch (err) {
+            // storage unavailable: defaults
+        }
+    }
+
+    private savePrefs() {
+        try {
+            localStorage.setItem(PREFS_KEY, JSON.stringify({ colors: this.colors, finger: this.fingerChoice }));
+        } catch (err) {
+            // storage unavailable: the choice lasts until the app closes
+        }
     }
 
     get canUndo() {
@@ -176,13 +253,32 @@ export class Annotations {
             v.texts.querySelectorAll<HTMLElement>(".tbody").forEach((b) => (b.contentEditable = on ? "true" : "false"));
         }
         if (!on) {
-            (document.activeElement as HTMLElement | null)?.blur?.();
+            this.deselect();
         }
+        this.updateTouchMode();
     }
 
     setTool(tool: Tool) {
         this.tool = tool;
         this.pagesEl.dataset.tool = tool;
+        this.lastTap = null;
+        if (tool !== "text") {
+            this.deselect();
+        }
+        this.updateTouchMode();
+    }
+
+    /** Finish editing a text box: it stops being highlighted and the keyboard closes. */
+    deselect() {
+        const a = document.activeElement as HTMLElement | null;
+        if (a && a !== document.body && this.pagesEl.contains(a)) {
+            a.blur();
+        }
+    }
+
+    private get editingText(): HTMLElement | null {
+        const a = document.activeElement as HTMLElement | null;
+        return a && a.classList.contains("tbody") && this.pagesEl.contains(a) ? a : null;
     }
 
     get color() {
@@ -190,8 +286,22 @@ export class Annotations {
     }
 
     setColor(c: string) {
-        if (this.tool !== "eraser") {
-            this.colors[this.tool] = c;
+        if (this.tool === "eraser") {
+            return;
+        }
+        this.colors[this.tool] = c;
+        this.savePrefs();
+        // recolour the text box being edited, as a text editor would
+        const body = this.tool === "text" ? this.editingText : null;
+        const box = body?.closest<HTMLElement>(".tnote");
+        const pageEl = box?.closest<HTMLElement>(".page");
+        if (box && pageEl) {
+            const t = this.pageNotes(Number(pageEl.dataset.index)).texts.find((n) => n.id === box.dataset.id);
+            if (t) {
+                t.color = c;
+                box.style.color = c;
+                this.save();
+            }
         }
     }
 
@@ -298,11 +408,14 @@ export class Annotations {
         body.textContent = t.text;
         body.contentEditable = this.active ? "true" : "false";
         body.spellcheck = false;
+        // highlighted (frame, move and delete buttons) only while being edited
+        body.addEventListener("focus", () => box.classList.add("sel"));
         body.addEventListener("input", () => {
             t.text = body.innerText;
             this.save();
         });
         body.addEventListener("blur", () => {
+            box.classList.remove("sel");
             t.text = body.innerText.trim();
             if (!t.text) {
                 this.removeText(page, t, false);
@@ -314,14 +427,17 @@ export class Annotations {
         del.className = "tdel";
         del.type = "button";
         del.setAttribute("aria-label", "Delete text");
-        del.textContent = "×";
-        del.addEventListener("pointerdown", (e) => e.stopPropagation());
+        del.innerHTML = ICON_CLOSE;
+        del.addEventListener("pointerdown", (e) => {
+            e.stopPropagation();
+            e.preventDefault(); // keep the text focused until the click lands
+        });
         del.addEventListener("click", () => this.removeText(page, t, true));
 
         const grip = document.createElement("span");
         grip.className = "tgrip";
         grip.setAttribute("aria-label", "Move");
-        grip.textContent = "⠿";
+        grip.innerHTML = ICON_MOVE;
         grip.addEventListener("pointerdown", (e) => this.dragText(e, page, t, box));
 
         box.append(grip, body, del);
@@ -329,28 +445,39 @@ export class Annotations {
     }
 
     private dragText(e: PointerEvent, page: number, t: TextNote, box: HTMLElement) {
-        e.preventDefault();
+        e.preventDefault(); // also keeps the text focused
         e.stopPropagation();
         const v = this.views.get(page)!;
         const grip = e.currentTarget as HTMLElement;
         grip.setPointerCapture(e.pointerId);
         const ppu = this.pxPerUnit(v);
         const start = { x: e.clientX, y: e.clientY, tx: t.x, ty: t.y };
-        const move = (ev: PointerEvent) => {
-            t.x = Math.round(start.tx + (ev.clientX - start.x) / ppu);
-            t.y = Math.round(start.ty + (ev.clientY - start.y) / ppu);
+        const place = () => {
             box.style.left = (t.x / v.w * 100) + "%";
             box.style.top = (t.y / v.h * 100) + "%";
         };
-        const up = () => {
+        const move = (ev: PointerEvent) => {
+            t.x = Math.round(start.tx + (ev.clientX - start.x) / ppu);
+            t.y = Math.round(start.ty + (ev.clientY - start.y) / ppu);
+            place();
+        };
+        const end = (dropped: boolean) => {
             grip.removeEventListener("pointermove", move);
             grip.removeEventListener("pointerup", up);
-            grip.removeEventListener("pointercancel", up);
+            grip.removeEventListener("pointercancel", cancel);
+            if (!dropped) {
+                // the system took the gesture away: put the box back
+                t.x = start.tx;
+                t.y = start.ty;
+                place();
+            }
             this.save();
         };
+        const up = () => end(true);
+        const cancel = () => end(false);
         grip.addEventListener("pointermove", move);
         grip.addEventListener("pointerup", up);
-        grip.addEventListener("pointercancel", up);
+        grip.addEventListener("pointercancel", cancel);
     }
 
     private removeText(page: number, t: TextNote, undoable: boolean) {
@@ -386,10 +513,10 @@ export class Annotations {
 
     private allowed(e: PointerEvent) {
         if (e.pointerType === "pen") {
-            this.sawStylus = true;
+            this.noteStylus();
             return true;
         }
-        return e.pointerType === "mouse" || !this.sawStylus;
+        return e.pointerType === "mouse" || this.fingerDraws;
     }
 
     private onDown(e: PointerEvent) {
@@ -408,11 +535,21 @@ export class Annotations {
         if (target.closest(".tnote") && this.tool !== "eraser") {
             return; // editing or moving a text box
         }
-        const hit = this.pageAt(e);
         if (this.tool === "text") {
             this.tapStart = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            if (this.isSecondTap(e)) {
+                // The second tap of a double tap makes a text box and focuses it.
+                // A finger's tap is followed by emulated mouse events that move the
+                // focus away again (and the empty box would be removed); cancelling
+                // the pointerdown stops them.
+                e.preventDefault();
+            }
             return;
         }
+        if (this.editingText) {
+            this.deselect(); // a touch outside the text box finishes it
+        }
+        const hit = this.pageAt(e);
         if (!hit || !this.allowed(e)) {
             return;
         }
@@ -447,7 +584,7 @@ export class Annotations {
     private onMove(e: PointerEvent) {
         if (e.pointerType === "touch" && this.touches.has(e.pointerId)) {
             const prev = this.touches.get(e.pointerId)!;
-            if (this.active && this.touches.size === 2 && !this.drawing) {
+            if (this.active && this.touches.size === 2 && !this.drawing && this.pagesEl.classList.contains("finger-draw")) {
                 // two-finger scroll while fingers draw (the page can't scroll by itself then)
                 this.viewer.scrollLeft -= (e.clientX - prev.x) / 2;
                 this.viewer.scrollTop -= (e.clientY - prev.y) / 2;
@@ -501,7 +638,7 @@ export class Annotations {
         this.tapStart = null;
         if (this.active && this.tool === "text" && tap && tap.id === e.pointerId
             && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 10 && !(e.target as HTMLElement).closest(".tnote")) {
-            this.addTextAt(e);
+            this.onTextTap(e);
         }
     }
 
@@ -512,6 +649,9 @@ export class Annotations {
         }
         if (this.erasing?.pointerId === e.pointerId) {
             this.erasing = null;
+        }
+        if (this.tapStart?.id === e.pointerId) {
+            this.tapStart = null;
         }
     }
 
@@ -545,6 +685,25 @@ export class Annotations {
             this.undoStack.push({ op: "remove", page, kind: "stroke", item: s });
         }
         this.save();
+    }
+
+    // Text tool: one tap outside a text box finishes it, so the reader can go
+    // on (scroll, switch tools); a double tap on the score adds a new box.
+    private isSecondTap(e: PointerEvent) {
+        const prev = this.lastTap;
+        return !!prev && performance.now() - prev.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 30;
+    }
+
+    private onTextTap(e: PointerEvent) {
+        const isDouble = this.isSecondTap(e);
+        this.lastTap = isDouble ? null : { t: performance.now(), x: e.clientX, y: e.clientY };
+        if (this.editingText) {
+            this.deselect();
+            return;
+        }
+        if (isDouble) {
+            this.addTextAt(e);
+        }
     }
 
     private addTextAt(e: PointerEvent) {

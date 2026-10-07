@@ -2,7 +2,7 @@
 // worklet, connects them with a MessageChannel (MuseScore's audio RPC), and
 // exposes a small promise-based API to the UI.
 
-import type { CursorInfo, ScoreInfo, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
+import type { CursorInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
 
 type Listener = (data: any) => void;
 
@@ -285,5 +285,7 @@ export class Engine {
     setMute(key: number, on: boolean) { return this.request({ cmd: "mute", key, on }); }
     setSolo(key: number, on: boolean) { return this.request({ cmd: "solo", key, on }); }
     setReverb(key: number, amount: number) { return this.request({ cmd: "reverb", key, amount }); }
+    setSound(key: number, soundId: string) { return this.request({ cmd: "sound", key, soundId }); }
+    sounds(): Promise<SoundList> { return this.request({ cmd: "sounds" }); }
     setMasterVolume(db: number) { return this.request({ cmd: "masterVolume", db }); }
 }

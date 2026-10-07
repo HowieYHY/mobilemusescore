@@ -1,8 +1,0 @@
-{
-  "appId": "io.github.howieyhy.pocketscore",
-  "appName": "PocketScore",
-  "webDir": "dist",
-  "android": {
-    "allowMixedContent": false
-  }
-}

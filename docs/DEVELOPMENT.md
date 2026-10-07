@@ -18,15 +18,14 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
-> Android app ID: `io.github.howieyhy.pocketscore`.
 
-## Current status (7 Oct 2026)
+## Current status (7 Oct 2026, version 0.2.0)
 
-**Working prototype.** It runs in browsers (Chromium and WebKit), in an
-Android emulator and, as the web app, on an iPad (A16, iPadOS 26.6.2), where it
-passed every check. A first Android phone test played choppily; the audio
-redesign below (render ahead in a worker) is the fix and still needs checking
-on that phone.
+**Working prototype.** It runs in browsers (Chromium and WebKit) and, as the
+installable web app, on an iPad (A16, iPadOS 26.6.2), where it passed every
+check. On Android it is now installed from Chrome as a web app (the Capacitor
+APK is retired); 0.2.0 still needs checking on the user's Pixel 9a, where an
+older APK played choppily.
 
 ### What works
 
@@ -39,13 +38,15 @@ on that phone.
 | Play, pause, back to start | MuseScore's audio engine in a Web Worker, rendering ahead into an AudioWorklet. |
 | Seek | Position slider, or **tap a note or rest** to play from there. Repeats are respected. |
 | Hear a note | While stopped, a tapped note sounds for 500 ms, as when selecting a note on desktop (`PlaybackModel::triggerEventsForItems`, MuseScore's off-stream). The nearest note within a fingertip's reach is chosen. |
-| Notes on the score | Pen, highlighter, text boxes, eraser, undo (`app/src/annotations.ts`). Stored in `localStorage` per score (SHA-256 of the file) and view mode, in page units. Not written to the `.mscz`. |
+| Notes on the score | Pen, highlighter, text boxes, eraser, undo (`app/src/annotations.ts`). Stored in `localStorage` per score (SHA-256 of the file) and view mode, in page units. Not written to the `.mscz`. Black by default; six toolbar colours, a 25-colour palette and the system colour picker. *Draw with finger* switch (on until a stylus is seen; sets `touch-action: none` so Chrome can't take the stroke over). Text boxes: double-tap adds one, one tap outside finishes it. |
 | Playback check | Line at the bottom of the mixer: render speed, slowest block, queued audio, gaps, sample rate, version. Ask testers for a screenshot. |
 | Playback cursor | Moves smoothly with the sound you hear (driven by the audio clock, corrected for the audio queued ahead). Follows playback across pages and pauses following while you scroll. |
-| Mixer | Master volume, plus per-part volume, mute, solo and reverb send. Same solo/mute rules as desktop. Each part's saved sound, volume and mute/solo are read from the score. |
+| Mixer | Master volume, plus per-part volume, mute, solo and reverb send. Same solo/mute rules as desktop. Each part's saved sound, volume and mute/solo are read from the score. Volume is shown as loudness against the score's setting (100% = as saved, twice as loud per +10 dB; the engine still works in dB, -60 to +10). Reverb sliders are behind a *Reverb* switch. |
+| Sound per part | Any MS Basic preset, grouped as desktop's mixer menu (`MS_BASIC_PRESET_CATEGORIES`, "Choose automatically" first, "Expr." presets hidden, names as `audioSourceName`). Engine: `mss_sounds`, `mss_set_track_sound` -> `IPlayback::setInputParams`. The choice is kept in `localStorage` per score and reapplied when playback is ready. |
+| Back button | Mixer, sound list, colour palette and notes mode each add a history entry, so Android's Back closes them instead of leaving the app. |
 | Metronome | Engine switch, matching desktop's transport metronome (no button in the app yet). |
-| Offline | After the first visit, the web app opens and plays scores with no network. The Android app is offline by design. |
-| Android app | Capacitor wrapper. The debug APK builds and runs on an Android 16 emulator. |
+| Offline | After the first visit, the web app opens and plays scores with no network. |
+| Install | Chrome/Edge's `beforeinstallprompt` shows an *Install PocketScore* button on the start screen; Safari uses Share -> Add to Home Screen. |
 
 ### Sound compared with desktop
 
@@ -82,13 +83,16 @@ exported audio file.
 | Browser test on "I am move it": open, all 22 pages drawn, play, audio clock vs position (8.00 s vs 8.01 s), solo, seek, tap-to-seek | Chromium | pass |
 | Same test | WebKit (Safari engine) on Windows | display passes; **audio not testable** in this build |
 | Offline: cache, cut network, reload, open, play | Chromium, local build **and the live GitHub Pages site** | pass |
-| Slow-phone simulation: play 20 s with the CPU slowed 1×, 4×, 6× (`stress-test.mjs`) | Chromium | 0 audio gaps at every rate; cursor 60 / 59 / 43 fps. DevTools throttling may not slow the audio worker, and this test did not catch the Pixel 9a problem |
-| Android: open, play, audio clock vs position (7.99 s vs 7.91 s), audio gaps (0), mute, seek | Android 16 emulator (software graphics) | pass |
+| Slow-phone simulation: play 20 s with the CPU slowed 1×, 4×, 6× (`stress-test.mjs`) | Chromium | 0 audio gaps at every rate; cursor 60 fps at 4x and 6x (0.2.0). DevTools throttling may not slow the audio worker, and this test did not catch the Pixel 9a problem |
+| Android (APK 0.1.x, retired): open, play, audio clock vs position (7.99 s vs 7.91 s), audio gaps (0), mute, seek | Android 16 emulator (software graphics) | pass |
+| Phone (412x915, touch, Chromium): finger drawing on/off, double-tap text, palette, Back closes panels, mixer % volume (50% = -10.0 dB), Muted label, Reverb switch, sound picker, sound kept after reopening, install button (`mobile-test.mjs`) | Chromium | pass |
+| Sound change on all 4 test scores: another preset changes the sound (similarity 0.00-0.19 to the original); switching back matches the original as closely as a second take does (`headless-test.mjs`) | Node.js | pass |
+| Engine rebuilt with Emscripten 6.0.11, vs desktop MP3 exports in `real test musescores/audio equivalents` | Node.js + Chromium decoder | level within 0.4-1.1 dB, loudness 0.95-0.99, spectrum 0.97-0.99, no drift |
 | Your tests: open, draw, play, mixer, seek | iPad (A16, iPadOS 26.6.2), web app | pass |
 | Note preview: tapped note sounds (−47 dB vs silence), stops, empty space is silent (`note-preview-test.mjs`) | Node.js | pass |
-| Notes: draw, highlight, text, erase, undo, zoom, reload, clear (`notes-test.mjs`) | Chromium | pass |
-| Web app update: 0.1.2 → 0.1.3 downloads 0.1 MB (unchanged files kept by content hash), shows the new version on reopening; from 0.1.3 on, the open app reloads itself when an update is ready; works offline after (`update-test.mjs`) | Chromium | pass |
-| Android phone (Pixel 9a, APK 0.1.1) | user | **still choppy**; 0.1.2 adds a smooth clock, a deeper queue and the playback check, not yet checked on the phone |
+| Notes: black default, draw, highlight, double-tap text, tap outside finishes it, palette colour, erase, undo, zoom, reload, clear (`notes-test.mjs`) | Chromium | pass |
+| Web app update: live 0.1.3 -> 0.2.0 downloads 11.3 MB (the rebuilt engine; unchanged files kept by content hash), shows the new version on reopening; the open app reloads itself when an update is ready; works offline after (`update-test.mjs`) | Chromium | pass |
+| Android phone (Pixel 9a, APK 0.1.1) | user | **still choppy**; the web app 0.2.0 (render ahead, smooth clock, deeper queue, playback check) is not yet checked on the phone |
 
 ### Not supported or not yet checked
 
@@ -118,10 +122,12 @@ exported audio file.
    - in the **Mixer**: volume, M, S and reverb for each part, plus master volume.
 5. Offline check: after one successful play, switch on Airplane mode, close the app fully, reopen it, open a score and play.
 
-**Android**
-- Install the APK from the [releases page](https://github.com/HowieYHY/mobilemusescore/releases/tag/v0.1.0-test), allowing "Install unknown apps" when asked.
-- Or use the website above in Chrome (menu → *Add to Home screen*).
-- Then run the same checks.
+**Android** (Chrome)
+1. Uninstall the old PocketScore APK if it is installed.
+2. Open the link above in Chrome and tap **Install PocketScore** (or the menu, *Add to Home screen*, *Install*).
+3. Run the same checks, plus: drawing with a finger with *Draw with finger* on and off, double-tap
+   for a text box, the phone's Back button closing the mixer and notes, and changing a part's sound.
+4. With the phone on USB debugging, `node scripts/android-test.mjs <score>` drives Chrome on it.
 
 **What to report:** the device and OS version, the score, what you did, and what happened, with a screenshot or screen recording if possible. Mention especially:
 - crackles, stutters, or sound that runs slow;
@@ -177,7 +183,7 @@ This is the same split as upstream MuseScore's experimental web build
   - `fonts50.cpp` holds the font engine.
   - The remaining files are small Qt-free stand-ins for desktop services.
 - `engine/audio/`: the `msaudio` module (upstream's `src/web/audioengine`).
-- `app/`: web app (Vite + TypeScript), service worker, Capacitor Android project (`app/android`).
+- `app/`: web app (Vite + TypeScript) and service worker. (Up to 0.1.3 there was also a Capacitor Android project; Android now installs the web app from Chrome.)
 - `scripts/`: build helpers, resource bundler, and the test drivers (`headless-test`, `browser-test`, `offline-test`, `android-test`, `compare-audio`).
 
 ### MuseScore code used
@@ -206,11 +212,13 @@ git clone --recurse-submodules <this repo> && cd <repo>
 bash scripts/apply-patches.sh
 
 # toolchain (once): CMake + Ninja from PyPI, Emscripten from github.com/emscripten-core/emsdk
+# (the submodules can be fetched shallow: git submodule update --init --depth 1)
 python -m pip install --user cmake ninja
 git clone https://github.com/emscripten-core/emsdk.git ~/tools/emsdk
-~/tools/emsdk/emsdk install latest && ~/tools/emsdk/emsdk activate latest
+~/tools/emsdk/emsdk install latest && ~/tools/emsdk/emsdk activate latest   # Windows: emsdk.bat
 
-# 1. MuseScore 4.7.5 engine -> WebAssembly (first build ~ 20 min)
+# 1. MuseScore 4.7.5 engine -> WebAssembly (first build 8-20 min)
+#    env.sh points emsdk at the real Python (on Windows `python3` is often the Store stub)
 source scripts/env.sh
 emcmake cmake -S engine -B build/wasm47 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build build/wasm47
@@ -222,22 +230,15 @@ npm run dev                 # http://localhost:5173
 npm run build               # production build + offline file list in app/dist
 ```
 
-**Android** (JDK 21 and the Android SDK):
-
-```bash
-cd app && npm run build && npx cap sync android
-cd android && JAVA_HOME=... ANDROID_HOME=... ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
 **Tests:**
 
 ```bash
-node scripts/headless-test.mjs "real test musescore files/I am move it edited.mscz"
-METRONOME=1 RATE=48000 node scripts/compare-audio.mjs "real test musescore files" build/reference
+node scripts/headless-test.mjs "real test musescores/I am move it(howie version).mscz"
+METRONOME=1 RATE=48000 node scripts/compare-audio.mjs "real test musescores" build/reference
 (cd app && npx vite --port 5180) & node scripts/browser-test.mjs <score> chromium|webkit
 (cd app && npm run build && npx vite preview --port 5181) & node scripts/offline-test.mjs <score>
-node scripts/android-test.mjs <score>    # emulator or USB device, adb on PATH
+node scripts/android-test.mjs <score>    # Chrome on a USB-debugging phone, adb on PATH (APP_URL picks the site)
+node scripts/mobile-test.mjs [score]     # dev server; phone-sized touch screen in Chromium
 node scripts/stress-test.mjs <score> 4   # dev server; CPU slowed 4x, reports audio gaps and fps
 node scripts/note-preview-test.mjs <score>
 node scripts/update-test.mjs build/ghpages   # installed web app updates to app/dist
@@ -247,13 +248,18 @@ node scripts/notes-test.mjs <score> chromium   # dev server
 To make the desktop references, run your desktop MuseScore 4.7.5 with
 `MuseScore4.exe -o build/reference/<name>.wav <score>.mscz`.
 
+Browser tests store the whole app (80 MB) in a fresh browser profile. If the
+system drive is nearly full, Chromium silently fails to cache the 49 MB sound
+font and the update test reports a large download; set `TMP`/`TEMP` to a folder
+on a drive with space.
+
 ## Getting it onto devices
 
 - **iPad / iPhone: installable web app.** Safari → Share → *Add to Home Screen*.
   - It works offline after the first visit.
   - Safari only allows the audio engine on HTTPS pages. The app is published with GitHub Pages from the `gh-pages` branch; `bash scripts/deploy-pages.sh` (after `npm run build` in `app/`) publishes a new build.
   - This route also avoids the App Store's conflict with the GPL, and needs no Mac.
-- **Android:** install the APK, or open the same web app in Chrome.
+- **Android:** the same web app, installed from Chrome (*Install PocketScore*). No APK, no "unknown apps" permission, and it updates like the iPad version.
 - **First download:** about 80 MB, of which MS Basic is 49 MB. Updates replace the cached copy.
 
 ## Licences

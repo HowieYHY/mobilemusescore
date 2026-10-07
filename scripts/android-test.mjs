@@ -1,9 +1,11 @@
-// Drives the installed Android app (Capacitor WebView) through adb with
+// Drives PocketScore in Chrome on an Android phone through adb with
 // Playwright's Android support: opens a score, checks page drawing, plays it
 // through the real audio path and checks timing, mixer and seeking.
 //
-// Needs a running emulator or USB-debugging device with the debug APK
-// installed, and adb on PATH.
+// Needs a USB-debugging phone (or emulator) with Chrome, and adb on PATH.
+// APP_URL picks the site (default: the published web app). To test a local
+// build, run `npx vite preview --host` in app/ and `adb reverse tcp:4173 tcp:4173`,
+// then APP_URL=http://localhost:4173/ (Chrome allows audio on localhost).
 // Usage: node scripts/android-test.mjs <score.mscz> [outDir]
 
 import fs from "node:fs";
@@ -15,9 +17,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
 const { _android: android } = require("playwright");
 
-const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
+const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const outDir = path.resolve(process.argv[3] || path.join(root, "build/android"));
-const PKG = "io.github.howieyhy.pocketscore";
+const url = process.env.APP_URL || "https://howieyhy.github.io/mobilemusescore/";
 fs.mkdirSync(outDir, { recursive: true });
 
 let failures = 0;
@@ -33,10 +35,9 @@ if (!device) {
 }
 console.log(`device: ${device.model()} (${device.serial()})`);
 
-await device.shell(`am force-stop ${PKG}`);
-await device.shell(`am start -n ${PKG}/.MainActivity`);
-const webview = await device.webView({ pkg: PKG });
-const page = await webview.page();
+const browser = await device.launchBrowser(); // Chrome
+const page = await browser.newPage();
+await page.goto(url);
 
 try {
     let t0 = Date.now();

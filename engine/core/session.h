@@ -63,6 +63,14 @@ public:
     void setTrackSolo(int trackKey, bool solo);
     void setMasterVolume(double db);
     void setReverbSend(int trackKey, double amount);
+    // Plays a track with another MS Basic sound (an id from soundsJson()), as
+    // choosing a sound in desktop's mixer.
+    void setTrackSound(int trackKey, const std::string& resourceId);
+
+    // The MS Basic sounds, grouped as in desktop's mixer sound menu
+    // (InputResourceItem::buildMsBasicMenuItem):
+    // {"auto": id, "tree": [{"t": category, "c": [...]} | {"id": id, "n": name}]}
+    std::string soundsJson() const;
 
     // Metronome on/off, as desktop's transport button (off by default, as in
     // NotationConfiguration). The metronome track is muted while it is off.
@@ -99,6 +107,7 @@ private:
         OutputParams out;
         SoloMuteState soloMute;
         std::string soundName;
+        std::string scoreSoundId; // the sound the score asked for, as first applied
         std::string substitutionNote; // set when the score asked for a sound we do not have
     };
 
@@ -123,6 +132,7 @@ private:
     std::unique_ptr<AudioBackend> m_audio;
     bool m_audioReady = false;
     std::map<muse::mpe::PlaybackSetupData, muse::audio::AudioResourceMeta> m_basicProfile;
+    std::map<std::string, muse::audio::AudioResourceMeta> m_fluidResources; // MS Basic, by id
 
     std::shared_ptr<mu::engraving::EngravingProject> m_project;
     std::unique_ptr<mu::engraving::PlaybackModel> m_playbackModel;

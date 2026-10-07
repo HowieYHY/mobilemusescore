@@ -139,6 +139,11 @@ public:
         m_playback->setAuxSendsParams(id, out.auxSends);
     }
 
+    void setTrackInput(TrackId id, const AudioInputParams& in) override
+    {
+        m_playback->setSourceParams(id, in);
+    }
+
     void setMasterOutput(const OutputParams& out) override
     {
         m_playback->setMasterFxChainParams(out.fxChain);

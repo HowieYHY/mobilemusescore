@@ -9,6 +9,7 @@
 #include <emscripten.h>
 
 #include <cmath>
+#include <functional>
 #include <map>
 #include <sstream>
 #include <type_traits>
@@ -33,6 +34,7 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/mscore.h"
 #include "engraving/dom/note.h"
+#include "playback/qml/MuseScore/Playback/msbasicpresetscategories.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/repeatlist.h"
@@ -164,6 +166,18 @@ static std::string num(double v)
 // ---------------------------------------------------------------------------
 // Fonts: registered exactly as EngravingModule::onInit does, remembering which
 // file serves each font so the page recorder can tell the browser.
+
+// A sound's name in the mixer, as audio::audioSourceName: the preset, else the
+// sound font ("MS Basic" when it chooses automatically)
+static std::string soundLabel(const AudioResourceMeta& meta)
+{
+    const String& preset = meta.attributeVal(synth::PRESET_NAME_ATTRIBUTE);
+    if (!preset.empty()) {
+        return preset.toStdString();
+    }
+    const String& soundFont = meta.attributeVal(synth::SOUNDFONT_NAME_ATTRIBUTE);
+    return soundFont.empty() ? meta.id : soundFont.toStdString();
+}
 
 static std::map<std::string, std::string> s_fontFiles; // "family|bold|italic" -> resource path
 
@@ -341,6 +355,9 @@ void Session::startAudio(unsigned sampleRate, unsigned blockSize, const std::str
         // as in SoundProfilesRepository::refresh, for the "MuseScore Basic" profile
         m_audio->availableInputResources([this](const AudioResourceMetaList& resources) {
             for (const AudioResourceMeta& r : resources) {
+                if (AudioInputParams { r, {} }.type() == AudioSourceType::Fluid) {
+                    m_fluidResources.emplace(r.id, r);
+                }
                 auto setup = r.attributes.find(u"playbackSetupData");
                 if (setup != r.attributes.cend() && AudioInputParams { r, {} }.type() == AudioSourceType::Fluid) {
                     m_basicProfile.emplace(mpe::PlaybackSetupData::fromString(setup->second), r);
@@ -753,11 +770,8 @@ void Session::addTrack(Track& t)
             tr->audioTrackId = trackId;
             tr->added = true;
             tr->source = applied;
-            const String& preset = applied.resourceMeta.attributeVal(synth::PRESET_NAME_ATTRIBUTE);
-            tr->soundName = applied.resourceMeta.id;
-            if (!preset.empty()) {
-                tr->soundName += " · " + preset.toStdString();
-            }
+            tr->soundName = soundLabel(applied.resourceMeta);
+            tr->scoreSoundId = applied.resourceMeta.id;
         }
         updateSoloMuteStates();
         --m_pendingTracks;
@@ -1033,6 +1047,79 @@ void Session::setReverbSend(int trackKey, double amount)
     sendControl(*t);
 }
 
+void Session::setTrackSound(int trackKey, const std::string& resourceId)
+{
+    Track* t = findTrack(trackKey);
+    auto it = m_fluidResources.find(resourceId);
+    if (!t || !t->added || t->isMetronome || it == m_fluidResources.end() || !m_audio) {
+        return;
+    }
+    // as choosing a sound in desktop's mixer: the new source replaces the old one
+    t->source = AudioInputParams { it->second, {} };
+    t->soundName = soundLabel(it->second);
+    t->substitutionNote.clear();
+    m_audio->setTrackInput(t->audioTrackId, t->source);
+}
+
+std::string Session::soundsJson() const
+{
+    // by bank and program, as InputResourceItem::buildMsBasicMenuItem
+    std::map<std::pair<int, int>, const AudioResourceMeta*> byProgram;
+    std::string automatic;
+    for (const auto& [id, meta] : m_fluidResources) {
+        if (meta.attributeVal(synth::SOUNDFONT_NAME_ATTRIBUTE) != u"MS Basic") {
+            continue;
+        }
+        bool bankOk = false, programOk = false;
+        const int bank = meta.attributeVal(synth::PRESET_BANK_ATTRIBUTE).toInt(&bankOk);
+        const int program = meta.attributeVal(synth::PRESET_PROGRAM_ATTRIBUTE).toInt(&programOk);
+        if (bankOk && programOk) {
+            byProgram[{ bank, program }] = &meta;
+        } else {
+            automatic = id;
+        }
+    }
+
+    std::function<std::string(const mu::playback::MsBasicItem&)> item = [&](const mu::playback::MsBasicItem& it) -> std::string {
+        if (it.subItems.empty()) {
+            auto found = byProgram.find({ it.preset.bank, it.preset.program });
+            if (found == byProgram.end()) {
+                return "";
+            }
+            // as InputResourceItem::buildMsBasicMenuItem
+            std::string name = found->second->attributeVal(synth::PRESET_NAME_ATTRIBUTE).toStdString();
+            if (name.empty()) {
+                name = "Bank " + std::to_string(it.preset.bank) + ", preset " + std::to_string(it.preset.program);
+            }
+            // desktop hides these (https://github.com/musescore/MuseScore/issues/20142)
+            if (name.find("Expr.") != std::string::npos) {
+                return "";
+            }
+            return "{\"id\":" + jsonStr(found->second->id) + ",\"n\":" + jsonStr(name) + "}";
+        }
+        std::string children;
+        for (const mu::playback::MsBasicItem& sub : it.subItems) {
+            std::string s = item(sub);
+            if (!s.empty()) {
+                children += (children.empty() ? "" : ",") + s;
+            }
+        }
+        if (children.empty()) {
+            return "";
+        }
+        return "{\"t\":" + jsonStr(it.title.toStdString()) + ",\"c\":[" + children + "]}";
+    };
+
+    std::string tree;
+    for (const mu::playback::MsBasicItem& category : mu::playback::MS_BASIC_PRESET_CATEGORIES) {
+        std::string s = item(category);
+        if (!s.empty()) {
+            tree += (tree.empty() ? "" : ",") + s;
+        }
+    }
+    return "{\"auto\":" + jsonStr(automatic) + ",\"tree\":[" + tree + "]}";
+}
+
 void Session::setMetronome(bool on)
 {
     m_metronome = on;
@@ -1077,6 +1164,8 @@ std::string Session::tracksJson() const
              + ",\"solo\":" + (t.soloMute.solo ? "true" : "false")
              + ",\"forceMute\":" + (t.out.forceMute ? "true" : "false")
              + ",\"sound\":" + jsonStr(t.soundName)
+             + ",\"soundId\":" + jsonStr(t.source.resourceMeta.id)
+             + ",\"scoreSoundId\":" + jsonStr(t.scoreSoundId)
              + ",\"note\":" + jsonStr(t.substitutionNote)
              + "}";
     }

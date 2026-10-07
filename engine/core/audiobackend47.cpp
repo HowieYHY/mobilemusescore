@@ -144,6 +144,11 @@ public:
         m_playback->setOutputParams(m_seq, id, toAudio(out));
     }
 
+    void setTrackInput(TrackId id, const AudioInputParams& in) override
+    {
+        m_playback->setInputParams(m_seq, id, in);
+    }
+
     void setMasterOutput(const OutputParams& out) override
     {
         m_playback->setMasterOutputParams(toAudio(out));

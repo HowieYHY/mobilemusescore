@@ -18,6 +18,8 @@ export type WorkerRequest =
     | Req<{ cmd: "balance"; key: number; value: number }>
     | Req<{ cmd: "mute" | "solo"; key: number; on: boolean }>
     | Req<{ cmd: "reverb"; key: number; amount: number }>
+    | Req<{ cmd: "sound"; key: number; soundId: string }>
+    | Req<{ cmd: "sounds" }>
     | Req<{ cmd: "masterVolume"; db: number }>
     | Req<{ cmd: "latency"; secs: number }>
     | Req<{ cmd: "metronome"; on: boolean }>;
@@ -45,8 +47,14 @@ export interface TrackInfo {
     solo: boolean;
     forceMute: boolean;
     sound: string;
+    soundId: string;
+    scoreSoundId: string; // the sound the score set (to show which one that was)
     note: string;
 }
+
+/** MS Basic's sounds, grouped as in desktop MuseScore's mixer menu. */
+export type SoundNode = { t: string; c: SoundNode[] } | { id: string; n: string };
+export interface SoundList { auto: string; tree: SoundNode[] }
 
 export interface ScoreInfo {
     title: string;

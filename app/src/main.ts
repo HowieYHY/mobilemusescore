@@ -1,7 +1,7 @@
 import { Engine } from "./engine/engine";
-import type { CursorInfo, ScoreInfo, TrackInfo, ViewMode } from "./engine/protocol";
+import type { CursorInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, drawPage, ensureFonts, ensureImages } from "./render/pagerenderer";
-import { Annotations, COLORS, type Tool } from "./annotations";
+import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -26,6 +26,11 @@ const ui = {
     mixer: $("mixer"),
     mixerBody: $("mixer-body"),
     mixerClose: $<HTMLButtonElement>("mixer-close"),
+    mixerReverb: $<HTMLButtonElement>("mixer-reverb"),
+    sounds: $("sounds"),
+    soundsTitle: $("sounds-title"),
+    soundsBody: $("sounds-body"),
+    soundsBack: $<HTMLButtonElement>("sounds-back"),
     diag: $("diag"),
     notesToggle: $<HTMLButtonElement>("notes-toggle"),
     notesbar: $("notesbar"),
@@ -34,6 +39,13 @@ const ui = {
     notesClear: $<HTMLButtonElement>("notes-clear"),
     notesDone: $<HTMLButtonElement>("notes-done"),
     notesHint: $("notes-hint"),
+    notesFinger: $<HTMLButtonElement>("notes-finger"),
+    moreColors: $<HTMLButtonElement>("more-colors"),
+    palette: $("palette"),
+    paletteGrid: $("palette-grid"),
+    paletteCustom: $<HTMLInputElement>("palette-custom"),
+    installRow: $("install-row"),
+    install: $<HTMLButtonElement>("install"),
 };
 
 declare const __APP_VERSION__: string;
@@ -58,6 +70,7 @@ const state = {
     tracks: [] as TrackInfo[],
     playbackReady: false,
     masterDb: 0,
+    scoreKey: "",
 };
 
 // ---------------------------------------------------------------- status
@@ -480,61 +493,107 @@ ui.seek.addEventListener("change", () => {
 
 // ---------------------------------------------------------------- mixer
 
-function dbLabel(db: number) {
-    return (db > 0 ? "+" : "") + db.toFixed(1) + " dB";
+// Volume is shown as loudness compared with the score's own setting: 100% is
+// as written, 200% sounds about twice as loud (+10 dB), 50% about half (-10 dB).
+// The engine works in dB like desktop's mixer (-60 to +12).
+const MIN_DB = -60;
+const pctFromDb = (db: number) => (db <= MIN_DB ? 0 : Math.min(200, Math.round(100 * Math.pow(2, db / 10))));
+const dbFromPct = (pct: number) => (pct <= 0 ? MIN_DB : Math.max(MIN_DB, 10 * Math.log2(pct / 100)));
+const fmtDb = (db: number) => (db <= MIN_DB ? "silent" : (db > 0 ? "+" : "") + db.toFixed(1) + " dB");
+
+const ICON_CHEVRON = `<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_WARN = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3L2 21h20zM12 10v5M12 17.5v.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+// A volume slider in percent, snapping to 100% (as written) near the middle mark
+function volumeControl(row: HTMLElement, label: string, db: number, onChange: (db: number) => void) {
+    const vol = row.querySelector<HTMLInputElement>(".vol")!;
+    const out = row.querySelector<HTMLElement>(".db")!;
+    vol.setAttribute("aria-label", label);
+    const show = (pct: number, dbNow: number) => {
+        out.textContent = pct + "%";
+        vol.setAttribute("aria-valuetext", `${pct} percent`);
+        vol.title = fmtDb(dbNow);
+    };
+    const pct0 = pctFromDb(db);
+    vol.value = String(pct0);
+    show(pct0, db);
+    vol.oninput = () => {
+        let pct = Number(vol.value);
+        if (Math.abs(pct - 100) <= 4) {
+            pct = 100;
+            vol.value = "100";
+        }
+        const d = dbFromPct(pct);
+        show(pct, d);
+        onChange(d);
+    };
 }
 
 function buildMixer() {
     ui.mixerBody.innerHTML = "";
+    const stripHtml = `
+        <div class="who"><div class="name"></div></div>
+        <button class="toggle m" aria-label="Mute">M</button>
+        <button class="toggle s" aria-label="Solo">S</button>
+        <div class="level"><input class="vol" type="range" min="0" max="200" step="1"></div>
+        <output class="db"></output>
+        <div class="note"></div>`;
 
     const master = document.createElement("div");
     master.className = "strip master";
-    master.innerHTML = `<div class="name">Master</div><span class="m"></span><span class="s"></span>
-        <input class="vol" type="range" min="-60" max="12" step="0.5" aria-label="Master volume">
-        <span class="db"></span>`;
-    const mvol = master.querySelector<HTMLInputElement>(".vol")!;
-    const mdb = master.querySelector<HTMLElement>(".db")!;
-    mvol.value = String(state.masterDb);
-    mdb.textContent = dbLabel(state.masterDb);
-    mvol.oninput = () => {
-        state.masterDb = Number(mvol.value);
-        mdb.textContent = dbLabel(state.masterDb);
-        void engine.setMasterVolume(state.masterDb);
-    };
+    master.innerHTML = stripHtml;
+    master.querySelector<HTMLElement>(".name")!.textContent = "Master";
+    volumeControl(master, "Master volume", state.masterDb, (db) => {
+        state.masterDb = db;
+        void engine.setMasterVolume(db);
+    });
     ui.mixerBody.appendChild(master);
 
     for (const t of state.tracks) {
         const row = document.createElement("div");
-        row.className = "strip" + (t.forceMute ? " forced" : "");
-        row.innerHTML = `
-            <div class="name"></div>
-            <button class="toggle m" aria-label="Mute">M</button>
-            <button class="toggle s" aria-label="Solo">S</button>
-            <input class="vol" type="range" min="-60" max="12" step="0.5" aria-label="Volume">
-            <span class="db"></span>
-            <div class="note"></div>
-            <label class="rev">Reverb <input type="range" min="0" max="100" step="1" aria-label="Reverb send"></label>`;
-        const name = row.querySelector<HTMLElement>(".name")!;
-        name.textContent = t.title;
-        if (t.sound) {
-            const small = document.createElement("small");
-            small.textContent = t.sound;
-            name.appendChild(small);
+        // silent: muted, or another part is soloed
+        row.className = "strip" + (t.metronome ? " metronome" : "") + (t.mute || t.forceMute ? " silent" : "");
+        row.innerHTML = stripHtml + `
+            <label class="rev">Reverb <input type="range" min="0" max="100" step="1"><output></output></label>`;
+        row.querySelector<HTMLElement>(".name")!.textContent = t.title;
+        if (!t.metronome) {
+            const sound = document.createElement("button");
+            sound.className = "sound";
+            sound.innerHTML = `<span></span>${ICON_CHEVRON}`;
+            sound.querySelector("span")!.textContent = t.sound || "MS Basic";
+            sound.setAttribute("aria-label", `Sound for ${t.title}: ${t.sound || "MS Basic"}. Change`);
+            sound.disabled = !t.ready;
+            sound.onclick = () => void openSounds(t);
+            row.querySelector(".who")!.appendChild(sound);
         }
-        row.querySelector<HTMLElement>(".note")!.textContent = t.note ? "⚠ " + t.note + " — playing MS Basic instead." : "";
+        if (t.note) {
+            row.querySelector<HTMLElement>(".note")!.innerHTML = ICON_WARN + "<span></span>";
+            row.querySelector<HTMLElement>(".note span")!.textContent = t.note + ". Playing MS Basic instead.";
+        }
         const m = row.querySelector<HTMLButtonElement>(".m")!;
         const s = row.querySelector<HTMLButtonElement>(".s")!;
-        const vol = row.querySelector<HTMLInputElement>(".vol")!;
-        const db = row.querySelector<HTMLElement>(".db")!;
-        const rev = row.querySelector<HTMLInputElement>(".rev input")!;
         m.classList.toggle("on", t.mute);
         s.classList.toggle("on", t.solo);
-        vol.value = String(t.volume);
-        db.textContent = dbLabel(t.volume);
+        m.setAttribute("aria-pressed", String(t.mute));
+        s.setAttribute("aria-pressed", String(t.solo));
+        m.setAttribute("aria-label", `Mute ${t.title}`);
+        s.setAttribute("aria-label", `Solo ${t.title}`);
+        volumeControl(row, `Volume of ${t.title}`, t.volume, (db) => {
+            t.volume = db;
+            void engine.setVolume(t.key, db);
+        });
+        if (t.mute) {
+            row.querySelector<HTMLElement>(".db")!.textContent = "Muted";
+        }
+
+        const rev = row.querySelector<HTMLInputElement>(".rev input")!;
+        const revOut = row.querySelector<HTMLElement>(".rev output")!;
+        rev.setAttribute("aria-label", `Reverb for ${t.title}`);
         rev.value = String(Math.round(t.reverb * 100));
+        revOut.textContent = rev.value + "%";
         if (t.metronome) {
-            s.style.visibility = "hidden";
-            row.querySelector<HTMLElement>(".rev")!.style.visibility = "hidden";
+            row.querySelector<HTMLElement>(".rev")!.remove();
         }
 
         m.onclick = async () => {
@@ -545,33 +604,204 @@ function buildMixer() {
             await engine.setSolo(t.key, !t.solo);
             await refreshTracks();
         };
-        vol.oninput = () => {
-            t.volume = Number(vol.value);
-            db.textContent = dbLabel(t.volume);
-            void engine.setVolume(t.key, t.volume);
+        rev.oninput = () => {
+            revOut.textContent = rev.value + "%";
+            void engine.setReverb(t.key, Number(rev.value) / 100);
         };
-        rev.oninput = () => void engine.setReverb(t.key, Number(rev.value) / 100);
 
         ui.mixerBody.appendChild(row);
     }
 }
 
 async function refreshTracks() {
+    const scroll = ui.mixerBody.scrollTop;
     state.tracks = await engine.tracks();
     buildMixer();
+    ui.mixerBody.scrollTop = scroll;
+}
+
+// ---------------------------------------------------------------- sounds
+
+// A part's sound can be changed, as in desktop's mixer. The choice is kept on
+// this device for this score (the .mscz isn't changed).
+let soundList: SoundList | null = null;
+
+function soundsStorageKey() {
+    return "pocketscore.sounds." + state.scoreKey;
+}
+const trackSlot = (t: TrackInfo) => `${t.key}:${t.title}`;
+
+function savedSounds(): Record<string, string> {
+    try {
+        return JSON.parse(localStorage.getItem(soundsStorageKey()) || "{}") || {};
+    } catch (err) {
+        return {};
+    }
+}
+
+function rememberSound(t: TrackInfo, soundId: string) {
+    const all = savedSounds();
+    if (soundId === t.scoreSoundId) {
+        delete all[trackSlot(t)];
+    } else {
+        all[trackSlot(t)] = soundId;
+    }
+    try {
+        if (Object.keys(all).length) {
+            localStorage.setItem(soundsStorageKey(), JSON.stringify(all));
+        } else {
+            localStorage.removeItem(soundsStorageKey());
+        }
+    } catch (err) {
+        setStatus("Your sound choice could not be saved on this device (storage is full or blocked).", "error", 6000);
+    }
+}
+
+async function applySavedSounds() {
+    const all = savedSounds();
+    let changed = false;
+    for (const t of state.tracks) {
+        const id = all[trackSlot(t)];
+        if (id && id !== t.soundId) {
+            await engine.setSound(t.key, id);
+            changed = true;
+        }
+    }
+    if (changed) {
+        state.tracks = await engine.tracks();
+    }
+}
+
+function soundsContain(node: SoundNode, id: string): boolean {
+    return "id" in node ? node.id === id : node.c.some((c) => soundsContain(c, id));
+}
+
+async function openSounds(t: TrackInfo) {
+    soundList ||= await engine.sounds();
+    const list = soundList;
+    ui.soundsTitle.innerHTML = "Sound for <b></b>";
+    ui.soundsTitle.querySelector("b")!.textContent = t.title;
+    ui.soundsBody.innerHTML = "";
+
+    const pick = (id: string, name: string, top = false) => {
+        const b = document.createElement("button");
+        b.className = "pick" + (top ? " top" : "");
+        b.setAttribute("role", "menuitemradio");
+        b.setAttribute("aria-checked", String(id === t.soundId));
+        b.innerHTML = `<span class="check">${id === t.soundId ? ICON_CHECK : ""}</span><span></span>`;
+        b.querySelector("span:last-child")!.textContent = name;
+        if (id === t.scoreSoundId) {
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            tag.textContent = "In score";
+            b.appendChild(tag);
+        }
+        b.onclick = async () => {
+            await engine.setSound(t.key, id);
+            rememberSound(t, id);
+            closeLayer(closeSounds);
+            await refreshTracks();
+        };
+        return b;
+    };
+
+    const group = (node: SoundNode): HTMLElement => {
+        if ("id" in node) {
+            return pick(node.id, node.n);
+        }
+        const d = document.createElement("details");
+        const s = document.createElement("summary");
+        s.textContent = node.t;
+        if (soundsContain(node, t.soundId)) {
+            d.open = true;
+            const dot = document.createElement("span");
+            dot.className = "here";
+            dot.setAttribute("aria-label", "current sound");
+            s.appendChild(dot);
+        }
+        d.appendChild(s);
+        node.c.forEach((c) => d.appendChild(group(c)));
+        return d;
+    };
+
+    if (list.auto) {
+        ui.soundsBody.appendChild(pick(list.auto, "Choose automatically", true));
+    }
+    list.tree.forEach((n) => ui.soundsBody.appendChild(group(n)));
+
+    ui.mixer.classList.add("picking");
+    ui.sounds.hidden = false;
+    openLayer(closeSounds);
+    ui.soundsBody.querySelector<HTMLElement>('[aria-checked="true"]')?.scrollIntoView({ block: "center" });
+}
+
+function closeSounds() {
+    ui.sounds.hidden = true;
+    ui.mixer.classList.remove("picking");
+}
+
+ui.soundsBack.onclick = () => closeLayer(closeSounds);
+
+// ---------------------------------------------------------------- back button
+
+// Panels close with the phone's Back button or gesture instead of leaving the
+// app: each open panel adds a history entry, and going back closes the top one.
+const layers: (() => void)[] = [];
+
+function openLayer(close: () => void) {
+    layers.push(close);
+    history.pushState({ pocketscoreLayer: layers.length }, "");
+}
+
+/** Close a panel from the app's own controls. */
+function closeLayer(close: () => void) {
+    const i = layers.lastIndexOf(close);
+    if (i < 0) {
+        close();
+    } else if (i === layers.length - 1) {
+        history.back(); // popstate closes it
+    } else {
+        layers.splice(i, 1);
+        close();
+    }
+}
+
+window.addEventListener("popstate", () => {
+    layers.pop()?.();
+});
+
+// ---------------------------------------------------------------- mixer panel
+
+function closeMixer() {
+    if (!ui.sounds.hidden) {
+        closeLayer(closeSounds);
+    }
+    ui.mixer.hidden = true;
+    ui.mixerToggle.setAttribute("aria-expanded", "false");
 }
 
 ui.mixerToggle.onclick = () => {
-    ui.mixer.hidden = !ui.mixer.hidden;
     if (!ui.mixer.hidden) {
-        void refreshTracks();
+        closeLayer(closeMixer);
+        return;
     }
+    ui.mixer.hidden = false;
+    ui.mixerToggle.setAttribute("aria-expanded", "true");
+    openLayer(closeMixer);
+    void refreshTracks();
 };
-ui.mixerClose.onclick = () => (ui.mixer.hidden = true);
+ui.mixerClose.onclick = () => closeLayer(closeMixer);
 
-engine.on("playbackReady", (tracks: TrackInfo[]) => {
+ui.mixerReverb.onclick = () => {
+    const on = !ui.mixer.classList.contains("show-reverb");
+    ui.mixer.classList.toggle("show-reverb", on);
+    ui.mixerReverb.setAttribute("aria-pressed", String(on));
+};
+
+engine.on("playbackReady", async (tracks: TrackInfo[]) => {
     state.playbackReady = true;
     state.tracks = tracks;
+    await applySavedSounds();
     ui.mixerToggle.disabled = false;
     if (!ui.mixer.hidden) {
         buildMixer();
@@ -604,10 +834,14 @@ async function openScore(name: string, data: ArrayBuffer) {
         return;
     }
     setStatus(`Opening ${name}…`);
+    if (!ui.sounds.hidden) {
+        closeLayer(closeSounds); // it lists the previous score's parts
+    }
     state.playbackReady = false;
     state.pageOps.clear();
     ui.mixerToggle.disabled = true;
     const key = await scoreKey(name, data); // before the data goes to the engine
+    state.scoreKey = key;
     const res = await engine.load(name, data);
     if (!res.ok || !res.score) {
         setStatus(res.error || "Could not open this score.", "error");
@@ -650,9 +884,7 @@ ui.viewMode.onchange = async () => {
 };
 
 // Offline: keep the app, engine and sounds on the device (production builds only)
-// Not inside the Android app, which already ships every file.
-const inNativeApp = !!(window as any).Capacitor?.isNativePlatform?.();
-if ("serviceWorker" in navigator && import.meta.env.PROD && !inNativeApp) {
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
     const sw = navigator.serviceWorker;
     const isUpdate = !!sw.controller; // an older version is running this page
     sw.register("./sw.js").then((reg) => {
@@ -682,12 +914,33 @@ if ("serviceWorker" in navigator && import.meta.env.PROD && !inNativeApp) {
     });
 }
 
-// The Android app used to register the service worker; remove it so it can't
-// serve a stale copy of the app.
-if (inNativeApp && "serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {});
-    caches?.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
-}
+// Install: Chrome and Edge (Android, Windows, ChromeOS…) offer to install the
+// web app as an app; show a button for it on the start screen. Safari has no
+// such prompt (Share > Add to Home Screen), so the button stays hidden there.
+let installPrompt: (Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> }) | null = null;
+const standalone = matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); // show our own button instead of the mini bar
+    installPrompt = e as typeof installPrompt;
+    ui.installRow.hidden = standalone;
+});
+window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    ui.installRow.hidden = true;
+    setStatus("PocketScore is installed. You can open it from your home screen or app list.", "info", 6000);
+});
+ui.install.onclick = async () => {
+    const p = installPrompt;
+    if (!p) {
+        return;
+    }
+    installPrompt = null;
+    await p.prompt();
+    const { outcome } = await p.userChoice;
+    if (outcome !== "accepted") {
+        ui.installRow.hidden = true; // Chrome offers it again later
+    }
+};
 
 // A file's notes are found again by its contents, so a renamed copy keeps them
 async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
@@ -703,18 +956,63 @@ async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
 
 const notes = new Annotations(ui.pages, ui.viewer, () => updateNotesBar(), (msg) => setStatus(msg, "error", 6000));
 
-for (const c of COLORS) {
+const COLOR_NAMES: Record<string, string> = {
+    "#000000": "Black", "#ffffff": "White", "#d62828": "Red", "#1d5fd1": "Blue", "#2a9d4b": "Green", "#f2c200": "Yellow",
+};
+
+function swatch(c: string): HTMLButtonElement {
     const b = document.createElement("button");
     b.className = "swatch";
     b.style.background = c;
     b.dataset.color = c;
-    b.setAttribute("aria-label", "Colour " + c);
+    b.setAttribute("aria-label", COLOR_NAMES[c] || "Colour " + c);
     b.onclick = () => {
         notes.setColor(c);
+        closeLayer(closePalette);
         updateNotesBar();
     };
-    ui.swatches.appendChild(b);
+    return b;
 }
+
+for (const c of COLORS) {
+    ui.swatches.insertBefore(swatch(c), ui.moreColors);
+}
+for (const c of MORE_COLORS) {
+    ui.paletteGrid.appendChild(swatch(c));
+}
+
+// "More colours": a palette under the button, and any colour from the system picker
+function closePalette() {
+    ui.palette.hidden = true;
+    ui.moreColors.setAttribute("aria-expanded", "false");
+}
+
+ui.moreColors.onclick = () => {
+    if (!ui.palette.hidden) {
+        closeLayer(closePalette);
+        return;
+    }
+    ui.paletteCustom.value = notes.color || "#000000";
+    ui.palette.hidden = false;
+    ui.moreColors.setAttribute("aria-expanded", "true");
+    const r = ui.moreColors.getBoundingClientRect();
+    const w = ui.palette.offsetWidth;
+    ui.palette.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+    ui.palette.style.top = (r.bottom + 8) + "px";
+    openLayer(closePalette);
+};
+ui.paletteCustom.addEventListener("input", () => {
+    notes.setColor(ui.paletteCustom.value.toLowerCase());
+    updateNotesBar();
+});
+ui.paletteCustom.addEventListener("change", () => closeLayer(closePalette));
+// a tap anywhere else closes the palette
+document.addEventListener("pointerdown", (e) => {
+    const t = e.target as Node;
+    if (!ui.palette.hidden && !ui.palette.contains(t) && !ui.moreColors.contains(t)) {
+        closeLayer(closePalette);
+    }
+}, true);
 
 ui.notesbar.querySelectorAll<HTMLButtonElement>(".tool").forEach((b) => {
     b.onclick = () => {
@@ -723,22 +1021,40 @@ ui.notesbar.querySelectorAll<HTMLButtonElement>(".tool").forEach((b) => {
     };
 });
 
+ui.notesFinger.onclick = () => notes.setFingerDraws(!notes.fingerDraws);
+
 function updateNotesBar() {
     ui.notesbar.querySelectorAll<HTMLButtonElement>(".tool").forEach((b) => {
         const on = b.dataset.tool === notes.tool;
         b.classList.toggle("on", on);
         b.setAttribute("aria-checked", String(on));
     });
+    const color = notes.color;
     ui.swatches.classList.toggle("off", notes.tool === "eraser");
-    ui.swatches.querySelectorAll<HTMLButtonElement>(".swatch").forEach((b) => b.classList.toggle("on", b.dataset.color === notes.color));
+    document.querySelectorAll<HTMLButtonElement>(".swatch[data-color]").forEach((b) => b.classList.toggle("on", b.dataset.color === color));
+    // a colour from the palette shows on the "More colours" button
+    const custom = !!color && !COLORS.includes(color);
+    ui.moreColors.classList.toggle("custom", custom);
+    ui.moreColors.classList.toggle("on", custom);
+    ui.moreColors.style.setProperty("--custom", custom ? color : "");
     ui.notesUndo.disabled = !notes.canUndo;
     ui.notesClear.disabled = notes.count === 0;
-    const touch = matchMedia("(pointer: coarse)").matches;
+
+    // "Draw with finger" matters only for touch screens and the drawing tools
+    const touch = matchMedia("(any-pointer: coarse)").matches;
+    const drawing = notes.tool !== "text";
+    ui.notesFinger.hidden = !touch || !drawing;
+    ui.notesFinger.setAttribute("aria-pressed", String(notes.fingerDraws));
+    const finger = touch && notes.fingerDraws;
+    const how = (verb: string) => finger
+        ? `${verb} with your finger or a stylus. Scroll with two fingers.`
+        : touch ? `${verb} with a stylus. Fingers scroll; turn on "Draw with finger" to use your finger.` : `${verb} on the score.`;
+    const tap = touch ? "tap" : "click";
     const hints: Record<Tool, string> = {
-        pen: touch ? "Write with a stylus or your finger. Scroll with two fingers." : "Draw on the score.",
-        highlighter: touch ? "Highlight with a stylus or your finger. Scroll with two fingers." : "Highlight on the score.",
-        text: "Tap the score to add a text box. Drag ⠿ to move it, × to delete it.",
-        eraser: "Tap or rub over a note to remove it.",
+        pen: how("Write"),
+        highlighter: how("Highlight"),
+        text: `Double-${tap} the score to add a text box. ${tap[0].toUpperCase() + tap.slice(1)} a box to edit it; ${tap} outside it when you're done. Drag the arrows to move it.`,
+        eraser: touch && !finger ? "Tap or rub over a note with a stylus to remove it." : "Tap or rub over a note to remove it.",
     };
     ui.notesHint.textContent = hints[notes.tool];
 }
@@ -748,11 +1064,22 @@ function setNotesActive(on: boolean) {
     notes.setTool(notes.tool);
     ui.notesbar.hidden = !on;
     ui.notesToggle.setAttribute("aria-pressed", String(on));
+    if (!on && !ui.palette.hidden) {
+        closeLayer(closePalette);
+    }
     updateNotesBar();
 }
 
-ui.notesToggle.onclick = () => setNotesActive(!notes.active);
-ui.notesDone.onclick = () => setNotesActive(false);
+const closeNotes = () => setNotesActive(false);
+ui.notesToggle.onclick = () => {
+    if (notes.active) {
+        closeLayer(closeNotes);
+    } else {
+        setNotesActive(true);
+        openLayer(closeNotes);
+    }
+};
+ui.notesDone.onclick = () => closeLayer(closeNotes);
 ui.notesUndo.onclick = () => notes.undo();
 ui.notesClear.onclick = () => {
     if (confirm("Remove all your notes from this score (in this view)? You can undo this.")) {

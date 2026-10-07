@@ -13,7 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
 const { chromium } = require("playwright");
 
-const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
+const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const rate = Number(process.argv[3] || 4);
 const seconds = Number(process.argv[4] || 20);
 const url = process.env.APP_URL || "http://localhost:5180/";

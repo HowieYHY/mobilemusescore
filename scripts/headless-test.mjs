@@ -10,7 +10,7 @@ import path from "node:path";
 
 import { createNodeEngine, root, writeWav as writeWavFile } from "./lib/node-engine.mjs";
 
-const scorePath = process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz");
+const scorePath = process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz");
 const seconds = Number(process.argv[3] || 12);
 const outDir = process.argv[4] || path.join(root, "build/headless");
 fs.mkdirSync(outDir, { recursive: true });
@@ -152,6 +152,83 @@ if (instruments.length >= 2) {
     call("mss_set_master_volume", 0);
 } else {
     console.log("(fewer than two instruments; mixer comparison skipped)");
+}
+
+// Changing a part's sound (desktop mixer's sound menu): another MS Basic
+// preset must sound different, and going back to the score's sound must sound
+// as before.
+{
+    const sounds = JSON.parse(callStr("mss_sounds"));
+    const leaves = [];
+    const walk = (n, cat) => ("id" in n ? leaves.push({ ...n, cat }) : n.c.forEach((c) => walk(c, cat || n.t)));
+    sounds.tree.forEach((n) => walk(n));
+    console.log(`sounds: ${sounds.tree.length} categories, ${leaves.length} sounds; automatic = "${sounds.auto}"`);
+    if (sounds.tree.length < 5 || leaves.length < 100 || !sounds.auto) {
+        console.error("FAIL: the MS Basic sound list is incomplete");
+        failures++;
+    }
+    // the part that sounds most in the test window
+    let t = null;
+    let loudest = 0;
+    for (const x of instruments.filter((i) => !i.chords)) {
+        call("mss_set_track_solo", x.key, 1);
+        call("mss_seek", 0.0);
+        call("mss_play");
+        const r = capture(seconds, `level of "${x.title}"`).rms;
+        call("mss_set_track_solo", x.key, 0);
+        if (r > loudest) {
+            loudest = r;
+            t = x;
+        }
+    }
+    if (t) {
+        const before = JSON.parse(callStr("mss_tracks")).find((x) => x.key === t.key);
+        // something unlike a voice or piano: a drum kit if this part isn't one, else a pipe organ
+        const isDrums = /drum|kit|percussion/i.test(before.sound);
+        const other = leaves.find((l) => (isDrums ? /organ/i.test(l.n) : /drum|kit/i.test(l.cat + " " + l.n)) && l.id !== before.soundId);
+        call("mss_set_track_solo", t.key, 1);
+        const take = (label) => {
+            call("mss_seek", 0.0);
+            call("mss_play");
+            return capture(seconds, label);
+        };
+        const corr = (a, b) => {
+            let ab = 0, aa = 0, bb = 0;
+            for (let i = 0; i < Math.min(a.length, b.length); i++) {
+                ab += a[i] * b[i];
+                aa += a[i] * a[i];
+                bb += b[i] * b[i];
+            }
+            return ab / Math.sqrt(aa * bb || 1);
+        };
+        const orig = take(`"${t.title}" as in the score (${before.sound})`);
+        // two takes of the same sound are not sample-identical (FluidSynth's
+        // chorus and the reverb tail of the take before), so compare with that
+        const again = take(`"${t.title}" as in the score, again`);
+        call("mss_set_track_sound", t.key, other.id);
+        const changedInfo = JSON.parse(callStr("mss_tracks")).find((x) => x.key === t.key);
+        const changed = take(`"${t.title}" as ${other.n}`);
+        writeWav(path.join(outDir, "sound-changed.wav"), changed.pcm);
+        call("mss_set_track_sound", t.key, before.scoreSoundId);
+        const back = take(`"${t.title}" back to ${before.sound}`);
+        const cChanged = corr(orig.pcm, changed.pcm);
+        const cBack = corr(orig.pcm, back.pcm);
+        const cSame = corr(orig.pcm, again.pcm);
+        console.log(`sound change: reported "${changedInfo.sound}"; similarity to the original: same sound again ${cSame.toFixed(3)}, other sound ${cChanged.toFixed(3)}, back again ${cBack.toFixed(3)}`);
+        if (changedInfo.soundId !== other.id || changedInfo.sound !== other.n) {
+            console.error("FAIL: the track does not report its new sound");
+            failures++;
+        }
+        if (changed.peak < 0.01 || cChanged > 0.5) {
+            console.error("FAIL: changing the sound did not change what is heard");
+            failures++;
+        }
+        if (cBack < cSame - 0.05) {
+            console.error("FAIL: going back to the score's sound does not sound as before");
+            failures++;
+        }
+        call("mss_set_track_solo", t.key, 0);
+    }
 }
 
 call("mss_seek", 30);

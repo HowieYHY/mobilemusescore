@@ -2,6 +2,11 @@
 # Override the locations with EMSDK_DIR / PY_SCRIPTS if yours differ.
 EMSDK_DIR="${EMSDK_DIR:-$HOME/tools/emsdk}"
 PY_SCRIPTS="${PY_SCRIPTS:-$(python -c "import sysconfig;print(sysconfig.get_path('scripts','nt_user'))" 2>/dev/null)}"
+# On Windows `python3` is often the Microsoft Store stub, which emsdk_env.sh
+# would pick; point emsdk at the real interpreter instead.
+if [ -z "${EMSDK_PYTHON:-}" ] && command -v cygpath >/dev/null 2>&1 && command -v python >/dev/null 2>&1; then
+    export EMSDK_PYTHON="$(cygpath -w "$(command -v python)")"
+fi
 
 # shellcheck disable=SC1091
 source "$EMSDK_DIR/emsdk_env.sh" >/dev/null 2>&1

@@ -148,6 +148,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "mute": callVoid("mss_set_track_mute", req.key, req.on ? 1 : 0); break;
         case "solo": callVoid("mss_set_track_solo", req.key, req.on ? 1 : 0); break;
         case "reverb": callVoid("mss_set_track_reverb", req.key, req.amount); break;
+        case "sound": callVoid("mss_set_track_sound", req.key, req.soundId); break;
+        case "sounds":
+            result = JSON.parse(callStr("mss_sounds"));
+            break;
         case "masterVolume": callVoid("mss_set_master_volume", req.db); break;
         case "latency": callVoid("mss_set_output_latency", req.secs); break;
         case "metronome": callVoid("mss_set_metronome", req.on ? 1 : 0); break;

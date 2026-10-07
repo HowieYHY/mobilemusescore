@@ -110,7 +110,8 @@ if (process.env.DEBUG) {
     }));
 }
 const v2 = await version();
-check(/0\.1\.\d/.test(v2) && v2 !== "(no version shown)", `after reopening it shows: ${v2}`);
+const newVersion = JSON.parse(fs.readFileSync(path.join(root, "app/package.json"), "utf8")).version;
+check(v2.endsWith(" " + newVersion), `after reopening it shows the new version: ${v2}`);
 
 // 3. a later build: this version notices the update and reloads by itself
 serveDir = newerDir;

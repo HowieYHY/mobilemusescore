@@ -19,7 +19,7 @@ import { createRequire } from "node:module";
 
 import { createNodeEngine, root, writeWav } from "./lib/node-engine.mjs";
 
-const scoresDir = path.resolve(process.argv[2] || path.join(root, "real test musescore files"));
+const scoresDir = path.resolve(process.argv[2] || path.join(root, "real test musescores"));
 const exportsDir = path.resolve(process.argv[3] || path.join(scoresDir, "audio equivalents"));
 const outDir = path.join(root, "build/compare");
 fs.mkdirSync(outDir, { recursive: true });

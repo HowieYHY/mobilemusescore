@@ -13,7 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
 const playwright = require("playwright");
 
-const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
+const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const browserName = process.argv[3] || "chromium";
 const url = process.env.APP_URL || "http://localhost:5180/";
 const outDir = path.join(root, "build/notes", browserName);
@@ -53,6 +53,8 @@ for (let i = 1; i <= 20; i++) {
 }
 await page.mouse.up();
 check(await page.locator(".page .ink path.pen").count() === 1, "pen stroke drawn");
+check(await page.locator(".page .ink path.pen").getAttribute("stroke") === "#000000", "the pen is black by default");
+check(await page.locator('#swatches .swatch[data-color="#ffffff"]').count() === 1, "white is in the toolbar's colours");
 const posBefore = await page.evaluate(() => app.state.position);
 
 // highlighter
@@ -63,12 +65,37 @@ await page.mouse.move(sx + 200, sy + 80, { steps: 10 });
 await page.mouse.up();
 check(await page.locator(".page .ink path.highlighter").count() === 1, "highlight drawn");
 
-// text box
+// text box: a single tap does nothing, a double tap adds one
 await page.click('.tool[data-tool="text"]');
-await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.4);
+const tx = box.x + box.width * 0.6;
+const ty = box.y + box.height * 0.4;
+await page.mouse.click(tx, ty);
+await page.waitForTimeout(500); // longer than a double tap
+check(await page.locator(".tnote").count() === 0, "a single tap with the text tool adds no text box");
+await page.mouse.dblclick(tx, ty);
+check(await page.locator(".tnote.sel").count() === 1, "a double tap adds a text box, ready to type");
 await page.keyboard.type("Breathe here");
-await page.click('.tool[data-tool="pen"]'); // leaves the text box
+check(await page.locator(".tnote.sel .tdel").isVisible(), "the box being edited shows its delete button");
+await page.mouse.click(tx, ty + 200); // one tap outside
+check(await page.locator(".tnote.sel").count() === 0 && await page.locator(".tnote").count() === 1,
+    "one tap outside finishes the text box without adding another");
+check(!(await page.locator(".tnote .tdel").first().isVisible()), "a finished text box is no longer highlighted");
 check((await page.locator(".tnote .tbody").first().innerText()) === "Breathe here", "text box typed");
+await page.click('.tool[data-tool="pen"]');
+
+// more colours: the palette sets the pen colour
+await page.click("#more-colors");
+check(await page.isVisible("#palette"), "More colours opens the palette");
+await page.click('#palette .swatch[data-color="#5f3dc4"]');
+check(!(await page.isVisible("#palette")), "choosing a colour closes the palette");
+check(await page.locator("#more-colors.custom").count() === 1, "a palette colour shows on the More colours button");
+await page.mouse.move(sx, sy + 140);
+await page.mouse.down();
+await page.mouse.move(sx + 120, sy + 150, { steps: 6 });
+await page.mouse.up();
+check(await page.locator('.page .ink path.pen[stroke="#5f3dc4"]').count() === 1, "the pen draws in the palette colour");
+await page.click("#notes-undo");
+await page.click('#swatches .swatch[data-color="#000000"]');
 check(await page.evaluate(() => app.state.position) === posBefore, "drawing did not move the playback position");
 
 // eraser removes the highlight, undo brings it back

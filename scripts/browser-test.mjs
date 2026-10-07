@@ -15,7 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
 const playwright = require("playwright");
 
-const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescore files/I am move it edited.mscz"));
+const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const browserName = process.argv[3] || "chromium";
 const outDir = path.resolve(process.argv[4] || path.join(root, "build/browser", browserName));
 const url = process.env.APP_URL || "http://localhost:5180/";
@@ -136,7 +136,7 @@ try {
     console.log("mixer strips:", strips.join(" | "));
     await page.locator(".strip:not(.master) .toggle.s").first().click();
     await page.waitForTimeout(300);
-    const forced = await page.locator(".strip.forced").count();
+    const forced = await page.locator(".strip.silent:not(.metronome)").count();
     console.log(`solo on first part -> ${forced} other strips force-muted`);
     if (forced < 1) {
         fail("solo did not force-mute the other parts");

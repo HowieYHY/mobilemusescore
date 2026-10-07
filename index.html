@@ -9,9 +9,9 @@
   <title>PocketScore</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-ei_bYRhs.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CnJFqd92.css">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <script type="module" crossorigin src="./assets/index-DHIRCoKM.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BWS7_V0m.css">
 </head>
 <body>
   <header class="topbar">
@@ -35,11 +35,21 @@
       <button class="tool" data-tool="text" role="radio" aria-checked="false" aria-label="Text box"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 4v3h5.5v12h3V7H19V4z" fill="currentColor"/></svg><span>Text</span></button>
       <button class="tool" data-tool="eraser" role="radio" aria-checked="false" aria-label="Eraser"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M16.24 3.56l4.95 4.94a1.5 1.5 0 0 1 0 2.12L12 19.8h7v2H8.5l-4.69-4.69a1.5 1.5 0 0 1 0-2.12l10.31-10.3a1.5 1.5 0 0 1 2.12 0zM6.64 13.6L4.93 15.3l3.98 3.98h.92l2.64-2.64z" fill="currentColor"/></svg><span>Erase</span></button>
     </div>
-    <div class="swatches" id="swatches" aria-label="Colour"></div>
-    <button class="btn small" id="notes-undo" disabled>Undo</button>
-    <button class="btn small" id="notes-clear">Clear</button>
-    <button class="btn small primary" id="notes-done">Done</button>
+    <div class="swatches" id="swatches" role="group" aria-label="Colour">
+      <button class="swatch more" id="more-colors" aria-label="More colours" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+    </div>
+    <button class="finger" id="notes-finger" aria-pressed="true" title="When on, one finger draws and two fingers scroll. A stylus always draws."><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 11.2V4.8a1.8 1.8 0 0 1 3.6 0v5.4l4.7.9c1.3.25 2.2 1.45 2.05 2.77l-.6 5.1A2.5 2.5 0 0 1 16.3 21h-5.1a2.5 2.5 0 0 1-2-1l-3.9-5.3a1.6 1.6 0 0 1 2.3-2.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Draw with finger</span><i class="switch" aria-hidden="true"></i></button>
+    <div class="actions">
+      <button class="btn small" id="notes-undo" disabled>Undo</button>
+      <button class="btn small" id="notes-clear">Clear</button>
+      <button class="btn small primary" id="notes-done">Done</button>
+    </div>
     <div class="hint" id="notes-hint"></div>
+  </div>
+
+  <div class="palette" id="palette" role="dialog" aria-label="More colours" hidden>
+    <div class="palette-grid" id="palette-grid"></div>
+    <label class="palette-custom"><input type="color" id="palette-custom" value="#000000"><span>Any colour…</span></label>
   </div>
 
   <div class="status" id="status" hidden></div>
@@ -48,6 +58,10 @@
     <div class="empty" id="empty">
       <p><strong>Open a MuseScore file (.mscz)</strong> to view and play it.</p>
       <p class="hint">Scores are laid out and played by MuseScore's own engine with the MS Basic sounds. Everything runs on this device.</p>
+      <p class="install" id="install-row" hidden>
+        <button class="btn primary" id="install">Install PocketScore</button>
+        <span class="hint">Adds PocketScore to your home screen and app list, so it opens like an app and works offline.</span>
+      </p>
       <p class="hint" id="version"></p>
     </div>
     <div class="pages" id="pages"></div>
@@ -62,9 +76,17 @@
   <section class="mixer" id="mixer" hidden>
     <div class="mixer-head">
       <strong>Mixer</strong>
-      <button class="btn" id="mixer-close">Done</button>
+      <button class="chip" id="mixer-reverb" aria-pressed="false">Reverb</button>
+      <button class="btn small" id="mixer-close">Done</button>
     </div>
     <div class="mixer-body" id="mixer-body"></div>
+    <div class="sounds" id="sounds" hidden>
+      <div class="sounds-head">
+        <button class="btn small" id="sounds-back"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Mixer</button>
+        <div class="sounds-title" id="sounds-title"></div>
+      </div>
+      <div class="sounds-body" id="sounds-body"></div>
+    </div>
     <div class="diag" id="diag"></div>
   </section>
 
@@ -77,6 +99,6 @@
     </div>
     <button class="btn" id="mixer-toggle" disabled>Mixer</button>
   </footer>
-
+
 </body>
 </html>

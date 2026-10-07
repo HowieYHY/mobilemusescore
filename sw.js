@@ -4,7 +4,7 @@
 
 // Replaced with the build's content hash by scripts/gen-precache.mjs, so every
 // build is a new service worker and a new cache (old ones are deleted).
-const VERSION = "def6164b89b497b9";
+const VERSION = "ababaa10eede98d0";
 const CACHE = "pocketscore-" + VERSION;
 
 async function sha1(res) {

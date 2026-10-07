@@ -15,7 +15,10 @@
 <body>
   <header class="topbar">
     <label class="btn primary" id="open-label">
-      <input type="file" id="file-input" hidden>
+      <!-- MuseScore files only: no photo library or camera. iOS doesn't know .mscz, and greys out
+           every file when the only types listed are unknown, so the generic types .mscz is seen
+           as are listed too (the app checks the extension when opening). -->
+      <input type="file" id="file-input" hidden accept=".mscz,.mscx,application/x-musescore,application/zip,application/octet-stream">
       <span class="long">Open score</span><span class="short" aria-hidden="true">Open</span>
     </label>
     <div class="title" id="score-title">PocketScore</div>

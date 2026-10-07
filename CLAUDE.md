@@ -64,6 +64,9 @@ build, tests, status) before working here.
 - **Ask what "save" covers before building it.** A mixer-only Save with a bar after every change was
   not what the user wanted: one Save for everything, asked only when leaving the score. Rule: follow
   the familiar document model (one Save, question on leaving, quiet recovery) unless told otherwise.
+- **A file picker without `accept` offers photos and the camera on iPhone/iPad.** Always list the
+  types wanted; for types iOS doesn't know (`.mscz`), also list the generic ones (`application/zip`,
+  `application/octet-stream`), or iOS greys out every file. Check the result on a real iPad.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.

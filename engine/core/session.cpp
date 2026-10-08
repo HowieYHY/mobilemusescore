@@ -458,6 +458,10 @@ std::string Session::load(const std::string& path)
 
     compat::EngravingCompat::doPreLayoutCompatIfNeeded(ms);
     ms->updateCapo(/* ignoreNotationUpdate */ true);
+    // The staves' swing maps come from the score's Swing texts; without this
+    // only the style's swing played, and "Swing" markings did nothing (issue
+    // #10). Desktop does it in MasterNotation::setMasterScore.
+    ms->updateSwing();
     ms->lockUpdates(false);
     LOGI() << "load step 5";
     ms->setLayoutAll();

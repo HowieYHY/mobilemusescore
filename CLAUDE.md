@@ -34,6 +34,10 @@ build, tests, status) before working here.
 - On phones the score's name sits on its own row above the top buttons.
 - **Don't clutter the UI, especially on mobile.** New controls that most people won't need every time
   go behind a small button or link (e.g. the sound list's *Several parts*), not as permanent rows.
+- **Commits are made as `HowieYHY <177769334+HowieYHY@users.noreply.github.com>`** on every machine
+  (no real name or personal email). The history was rewritten to this on 9 Oct 2026; a clone made
+  before then must be reset to `origin/main` (and `build/ghpages` to `origin/gh-pages`) before
+  any push, or it brings the old identities back.
 - **Issues live on GitHub** (`gh issue list`). One commit per issue, `Fixes #N` when it is verified,
   `Refs #N` when it still needs checking on the user's device (e.g. Android playback, picker filters).
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s

@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (8 Oct 2026, version 0.3.3)
+## Current status (8 Oct 2026, version 0.3.4)
 
 **Working prototype.** It runs in browsers (Chromium and WebKit) and, as the
 installable web app, on an iPad (A16, iPadOS 26.6.2) and an Android phone
@@ -33,16 +33,18 @@ the Pixel 9a; the iPad still showed the same choppiness, which 0.3.2 addresses
 | --- | --- |
 | Open a local `.mscz` / `.mscx` | Through the file picker. MuseScore 2.x to 4.7 files tested. |
 | Score display | MuseScore's layout. Page counts of all five test scores match desktop 4.7.5, and page 1 of "I am move it" matches its saved thumbnail. Pictures (PNG, JPEG, GIF, BMP) are drawn. |
-| Zoom and scroll | Opens fitted to the screen width. Zoom with − / + or pinch. |
+| Zoom and scroll | Opens fitted to the screen width. Zoom with − / + (around the middle of the view) or pinch (around the point between the fingers, which stays under them while pinching and after the redraw: `zoomAround`, anchored to a page and the fraction across it). Two fingers are handled in one place, in and out of notes mode: a plain scroll that follows the fingers until their distance changes by 8% (`PINCH_START`), then a pinch scaled with CSS and redrawn at the new size when the fingers lift. Page drawing waits while fingers are down, and the viewer has `overflow-anchor: none` (the app keeps the reader's place). |
 | View modes | Page (default); Continuous vertical and horizontal. |
 | Play, pause, back to start | MuseScore's audio engine in a Web Worker, rendering ahead into an AudioWorklet. |
 | Seek | Position slider, or **tap a note or rest** to play from there. Repeats are respected. |
 | Hear a note | While stopped, a tapped note sounds for 500 ms, as when selecting a note on desktop (`PlaybackModel::triggerEventsForItems`, MuseScore's off-stream). The nearest note within a fingertip's reach is chosen. |
 | Notes on the score | Pen, highlighter, text boxes, eraser, undo (`app/src/annotations.ts`). Stored in `localStorage` per score (SHA-256 of the file) and view mode, in page units. Not written to the `.mscz`. Black by default; six toolbar colours, a 25-colour palette and the system colour picker; four sizes for pen, highlighter and eraser (`SIZES`, in screen px); text is sized by dragging its box's corner (the text scales with the box). Text boxes keep their place when finished (the move and delete buttons sit outside the text); the box being edited is outlined, not filled. *Draw with finger* switch (on until a stylus is seen; sets `touch-action: none` so Chrome can't take the stroke over). Text boxes: double-tap adds one, one tap outside finishes it. |
-| Playback figures | No longer shown (the on-screen *Playback check* was removed in 0.3.0 once Android was smooth). `app.engine.stats` and `app.engine.underruns` in the console still give the engine load (share of time spent rendering while music plays; an upper bound where the worker timer only counts whole milliseconds, as in iPad Safari), busiest block, queued audio and gaps. |
+| Playback self-check | Gaps in the sound (the worklet's queue ran dry while playing) and frames over 120 ms are logged in `app.engine.health` (last 100, for diagnosing a device over USB debugging); `app.engine.stats` and `app.engine.underruns` give the engine load, busiest block, queued audio and gaps. After a gap the audio worker keeps ~170 ms more sound ready (up to ~1 s) and the reader is told once per score. Android starts with ~510 ms ready (others ~340 ms). No permanent on-screen figures. |
+| Page drawing | In pieces (`pageDrawer`): about 6 ms per frame while playing, 12 ms when stopped, one page at a time, starting 1500 px ahead of the view. Drawing a whole page at once took 35-108 ms with the CPU slowed 4x and froze the playback line at every page turn; the worst frame went from 183 to 67 ms. |
 | Playback cursor | Moves smoothly with the sound you hear (driven by the audio clock, corrected for the audio queued ahead). Follows playback across pages and pauses following while you scroll. |
-| Mixer | Master volume, plus per-part volume, mute, solo and reverb send. Same solo/mute rules as desktop. Each part's saved sound, volume and mute/solo are read from the score. Volume is shown as loudness against the score's setting (100% = as saved, twice as loud per +10 dB; the engine still works in dB, -60 to +10). Reverb sliders are behind a *Reverb* switch. |
-| Sound per part | Any MS Basic preset, grouped as desktop's mixer menu (`MS_BASIC_PRESET_CATEGORIES`, "Choose automatically" first, "Expr." presets hidden, names as `audioSourceName`). Engine: `mss_sounds`, `mss_set_track_sound` -> `IPlayback::setInputParams`. The choice is kept in `localStorage` per score and reapplied when playback is ready. |
+| Mixer | Master volume, plus per-part volume, mute, solo and reverb send. Same solo/mute rules as desktop. Each part's saved sound, volume and mute/solo are read from the score. Volume is shown as loudness against the score's own setting (100% = as saved, twice as loud per +10 dB, 0-200%; the engine works in dB, -60 to +12, desktop's range). A slider still at its starting mark keeps the exact setting, so touching one changes nothing (it used to round, and cut parts saved at +12 dB to +10, lighting Save). Reverb sliders are behind a *Reverb* switch. |
+| Sound per part | Any MS Basic preset, grouped as desktop's mixer menu (`MS_BASIC_PRESET_CATEGORIES`, "Choose automatically" first, "Expr." presets hidden, names as `audioSourceName`). Engine: `mss_sounds`, `mss_set_track_sound` -> `IPlayback::setInputParams`. The choice is kept in `localStorage` per score and reapplied when playback is ready. *Several parts* (a small button by the sound list's title, so the list stays uncluttered) shows chips for every part and All parts; a sound picked goes to all chosen parts, and *Each part's sound in the score* restores them. |
+| Notes mode taps | With *Draw with finger* off, a finger's tap on a note plays it and moves the playback (`Annotations.fingerTapIsFree`), except with the Text tool, whose taps make text boxes. |
 | Back button | Mixer, sound list, colour palette and notes mode each add a history entry, so Android's Back closes them instead of leaving the app. |
 | Save | One **Save** in the top bar for everything changed on a score: notes (`annotations.ts`) and mixer (`mixerstore.ts`), in `localStorage` per score (SHA-256 of the file). Nothing is saved until then; a draft is kept on every change, so closing the app loses nothing and the changes come back next time, still unsaved, with a message (iOS home-screen apps get no `beforeunload`). The only question: opening another score with unsaved changes (Save / Don't save / Cancel). Ctrl/Cmd+S. Notes saved by 0.2.x are read as saved; 0.2.1 saved mixers and 0.2.0 sound choices are carried over. A part's sound is stored only when it isn't the score's own. The score's saved master volume is read (`mss_master_volume`). |
 | Mixer before Play | The audio engine starts when a score opens (the `AudioContext` starts suspended until a tap; Play or tapping a note resumes it), so the sounds load straight away. The mixer works from the moment the score is open: the engine sets each part's volume, reverb and mute/solo from the score at load (no longer when the sounds are added), so changes made before the sounds arrive are kept. Sound choices made or restored before then are applied once the sounds are loaded. |
@@ -103,7 +105,12 @@ exported audio file.
 | Note preview: tapped note sounds (−47 dB vs silence), stops, empty space is silent (`note-preview-test.mjs`) | Node.js | pass |
 | Notes: black default, draw, highlight, double-tap text, tap outside finishes it without the text moving (under 1 px), see-through while editing, palette colour, thickest pen, erase, undo, zoom; Save lights up, unsaved notes back after reopening, kept after Save, Clear, question when opening another score (`notes-test.mjs`) | Chromium | pass |
 | Web app update: live 0.1.3 -> 0.2.0 downloads 11.3 MB (the rebuilt engine; unchanged files kept by content hash), shows the new version on reopening; the open app reloads itself when an update is ready; works offline after (`update-test.mjs`) | Chromium | pass |
-| Android phone (Pixel 9a, APK 0.1.1) | user | **still choppy**; the web app 0.2.0 (render ahead, smooth clock, deeper queue, playback check) is not yet checked on the phone |
+| Android phone (Pixel 9a, web app 0.3.3) | user | sound and playback line **still laggy at times** (issue #4); 0.3.4 (page drawing in pieces, self-check, deeper Android queue) not yet checked on the phone |
+| Pinch zoom and two-finger scroll (`pinch-test.mjs`, real touch input): the point between the fingers stays within 0.5 px during and after a pinch (9 failures on 0.3.3), the − / + buttons keep the middle, two-finger scroll in reading and notes mode follows the fingers exactly | Chromium | pass |
+| Save stays dark when nothing changed (`no-change-test.mjs`): waits for sounds, mixer, sound list, touching every slider, notes mode, play/pause, tapping a note, zoom, views, reopening | Chromium, 5 scores | pass (27 failures on 0.3.3) |
+| Several parts' sound at once and back (`sounds-multi-test.mjs`) | Chromium | pass |
+| Self-check (`selfcheck-test.mjs`): a gap caused on purpose is detected, logged, told once, the queue grows, no further gaps | Chromium | pass |
+| Notes-mode taps (`notes-tap-test.mjs`): finger draws a dot with Draw with finger on; plays the note with it off (pen, highlighter, eraser), not with Text | Chromium | pass |
 
 ### Not supported or not yet checked
 
@@ -267,6 +274,12 @@ node scripts/layout-shots.mjs [score]    # dev server; screenshots at phone and 
 SLOW=1 node scripts/reopen-test.mjs [score] [times]   # dev server; saved sounds survive reopening (slow-device race)
 node scripts/stress-test.mjs <score> 4   # dev server; CPU slowed 4x, reports audio gaps and fps
 node scripts/note-preview-test.mjs <score>
+node scripts/pinch-test.mjs <score>          # pinch zoom and two-finger scroll (touch)
+node scripts/no-change-test.mjs <folder>     # Save stays dark when nothing changed
+node scripts/sounds-multi-test.mjs <score>   # several parts' sound at once
+node scripts/selfcheck-test.mjs <score>      # playback self-check after a gap
+node scripts/notes-tap-test.mjs <score>      # finger taps in notes mode
+# app/public/picker-test.html: try six Open filters on a device (issue #7)
 node scripts/update-test.mjs build/ghpages   # installed web app updates to app/dist
 node scripts/notes-test.mjs <score> chromium   # dev server
 ```

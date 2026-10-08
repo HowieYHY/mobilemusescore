@@ -8,3 +8,5 @@ app/public/engine/
 app/public/sound/
 app/dist/
 .vscode/
+# older name of the test scores folder (copied by hand, never committed)
+real test musescore files/

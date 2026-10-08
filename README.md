@@ -53,7 +53,8 @@ Files straight away. If music is playing, it stops when you open another score.
 | Jump anywhere | Drag the position slider |
 | Play from a particular note | Tap the note or rest in the score |
 | Hear a note | While stopped, tap it: it sounds, and Play starts from there |
-| Zoom | Pinch, or use **−** and **+** |
+| Zoom | Pinch (the spot between your fingers stays put), or use **−** and **+** |
+| Scroll | Drag with one finger, or with two fingers (also while writing notes) |
 | Change the layout | Use the menu at the top right: *Page view*, *Continuous (vertical)* or *Continuous (horizontal)* |
 | Close a panel | Tap **Done**, or use your phone's **Back** button or gesture |
 
@@ -67,7 +68,8 @@ lock the screen), so it never keeps playing where you can't see it. Tap Play whe
 Tap the **pencil** button at the top:
 - **Pen** and **Highlight**: write or mark with a stylus (Apple Pencil, S Pen) or your finger.
 - **Draw with finger**: when it's on, one finger draws and two fingers scroll. Turn it off to scroll
-  with one finger and draw only with a stylus. It starts on, and turns off by itself the first time
+  with one finger and draw only with a stylus; then tapping a note with your finger plays it, as
+  outside notes mode. It starts on, and turns off by itself the first time
   you use a stylus (you can turn it back on).
 - **Text**: **double-tap** the score to add a text box, then type. Tap once outside the box when
   you're done. Tap a box to change it, drag the arrows on its left to move it, drag its bottom
@@ -93,7 +95,8 @@ Tap **Mixer**:
   click on every beat.
 - **S** (solo): plays only that part; you can solo several. The other parts are dimmed.
 - **The sound under a part's name** (for example *Grand Piano*): tap it to play that part with a
-  different instrument sound. The sounds are grouped as in MuseScore's mixer; *In score* marks the
+  different instrument sound. To change several parts at once, tap **Several parts** at the top of
+  the list and choose them (or **All parts**); *Each part's sound in the score* puts them back. The sounds are grouped as in MuseScore's mixer; *In score* marks the
   one the score uses.
 - **Reverb**: tap **Reverb** at the top to show how much room echo each part has.
 - **Master**: the overall volume.
@@ -154,7 +157,9 @@ MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
 - **No sound on iPhone or iPad:** check the volume buttons, and that Bluetooth isn't sending sound to another device.
 - **"Audio could not start":** close PocketScore completely, reopen it, and tap Play again.
 - **Drawing scrolls the page instead (or the page won't scroll):** check **Draw with finger** in the notes bar.
-- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen). If it still happens, send a screen recording and your phone model.
+- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen).
+  PocketScore checks itself while playing: if the sound stutters it prepares more of it ahead and
+  tells you once. If it keeps happening, send a screen recording and your phone model.
 - **A score won't open:** make sure it is a `.mscz` file saved by MuseScore.
 
 To report a problem, [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or send the

@@ -32,6 +32,10 @@ build, tests, status) before working here.
   says so; nothing plays on unseen.
 - No on-screen playback diagnostics (removed once Android was smooth); use `app.engine.stats`.
 - On phones the score's name sits on its own row above the top buttons.
+- **Don't clutter the UI, especially on mobile.** New controls that most people won't need every time
+  go behind a small button or link (e.g. the sound list's *Several parts*), not as permanent rows.
+- **Issues live on GitHub** (`gh issue list`). One commit per issue, `Fixes #N` when it is verified,
+  `Refs #N` when it still needs checking on the user's device (e.g. Android playback, picker filters).
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 
@@ -97,3 +101,16 @@ build, tests, status) before working here.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.
+- **A control that rounds must not change what it shows.** Volume sliders count whole percent; touching
+  one re-sent the rounded value (and cut +12 dB parts to the slider's +10 dB), so Save lit up with no
+  change (issue #5). Rule: until the control moves to another mark, keep the exact stored value; cover
+  every source unit's range (desktop saves up to +12 dB).
+- **Tests must not trust state left from before the step.** Waiting for `app.state.playbackReady`
+  after opening a score passed at once on the previous score's `true`; tapping a fixed screen point
+  after the view had followed the playback hit the gap between pages; the status bar coming and going
+  above the score moved it mid-gesture. Rule: reset or wait for the new state, compute screen points
+  just before using them, and measure layout once the status bar has settled.
+- **Every long frame during playback was a page drawing.** Drawing a page at once (100+ ms on a phone)
+  froze the playback line at each page turn. Rule: long main-thread work while music plays goes in
+  pieces (`pageDrawer`), and `build/jank`-style measurement (long frames vs `performance.measure`)
+  finds the cause before guessing.

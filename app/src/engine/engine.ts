@@ -2,7 +2,7 @@
 // worklet, connects them with a MessageChannel (MuseScore's audio RPC), and
 // exposes a small promise-based API to the UI.
 
-import type { CursorInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
+import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
 
 type Listener = (data: any) => void;
 
@@ -353,4 +353,16 @@ export class Engine {
     /** The master volume in dB (the score's saved setting until changed). */
     masterVolume(): Promise<number> { return this.request({ cmd: "getMasterVolume" }); }
     setMasterVolume(db: number) { return this.request({ cmd: "masterVolume", db }); }
+
+    // Practice (desktop's Speed and Loop playback), at the play position the
+    // reader sees (`at`, seconds). Changing the speed jumps the engine to the
+    // same place in the music, so the queued audio is dropped.
+    async setSpeed(multiplier: number, at: number): Promise<PracticeInfo> {
+        const r: PracticeInfo = await this.request({ cmd: "speed", multiplier, at });
+        this.flush();
+        return r;
+    }
+    setLoopMarker(right: boolean, at: number): Promise<PracticeInfo> { return this.request({ cmd: "loopMarker", right, at }); }
+    setLoop(on: boolean): Promise<PracticeInfo> { return this.request({ cmd: "loop", on }); }
+    practice(): Promise<PracticeInfo> { return this.request({ cmd: "practice" }); }
 }

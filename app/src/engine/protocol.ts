@@ -23,7 +23,11 @@ export type WorkerRequest =
     | Req<{ cmd: "getMasterVolume" }>
     | Req<{ cmd: "masterVolume"; db: number }>
     | Req<{ cmd: "latency"; secs: number }>
-    | Req<{ cmd: "metronome"; on: boolean }>;
+    | Req<{ cmd: "metronome"; on: boolean }>
+    | Req<{ cmd: "speed"; multiplier: number; at: number }>
+    | Req<{ cmd: "loopMarker"; right: boolean; at: number }>
+    | Req<{ cmd: "loop"; on: boolean }>
+    | Req<{ cmd: "practice" }>;
 
 export type WorkerReply =
     | { type: "reply"; id: number; result?: unknown; error?: string }
@@ -67,6 +71,17 @@ export interface ScoreInfo {
     pages: PageInfo[];
     hasAudioSettings: boolean;
     tracks: TrackInfo[];
+}
+
+/** Practice settings: speed (tempo multiplier) and the loop, in played seconds and printed bars. */
+export interface PracticeInfo {
+    speed: number;
+    duration: number;
+    loop: boolean;
+    from?: number;
+    to?: number;
+    fromBar?: number;
+    toBar?: number;
 }
 
 export interface CursorInfo {

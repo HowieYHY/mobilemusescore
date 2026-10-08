@@ -406,6 +406,12 @@ std::string Session::load(const std::string& path)
     m_hasAudioSettings = false;
     m_audioSettings = AudioSettings();
     ++m_loadKey;
+    // practice settings belong to a score: the new one plays at 100%, no loop
+    m_loopOn = false;
+    m_loopIn = m_loopOut = -1;
+    if (m_audio && m_audioReady) {
+        m_audio->resetLoop();
+    }
 
     std::string suffix = io::suffix(io::path_t(path));
 
@@ -903,6 +909,18 @@ void Session::play()
         return;
     }
 
+    // as PlaybackController::play: outside the loop, start at its beginning
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (m_loopOn && m_loopIn >= 0 && score) {
+        const double from = uticksToSecs(score, m_loopIn);
+        const double to = uticksToSecs(score, m_loopOut);
+        const double pos = m_audio->position();
+        if (pos < from - 0.001 || pos >= to - 0.001) {
+            m_audio->seek(from, true);
+            emit("position", cursorJson(from));
+        }
+    }
+
     if (st == PlaybackStatus::Paused) {
         if (m_audio->position() + 0.001 >= m_totalPlayTime) {
             m_audio->seek(0, true);
@@ -1012,6 +1030,154 @@ std::string Session::seekAt(int pageIndex, double x, double y, double radius, bo
         json += ",\"note\":true}";
     }
     return json;
+}
+
+// ---------------------------------------------------------------------------
+// Practice: speed and loop
+
+// As PlaybackController::setTempoMultiplier and NotationPlayback::setTempoMultiplier
+std::string Session::setTempoMultiplier(double multiplier, double at)
+{
+    MasterScore* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score || !m_playbackModel) {
+        return "null";
+    }
+    multiplier = std::clamp(multiplier, 0.1, 3.0);
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+    const int utick = secsToUticks(score, std::max(0.0, at));
+    if (playing) {
+        m_audio->pause();
+    }
+    if (score->tempomap()->setTempoMultiplier(multiplier)) {
+        score->updateRepeatListTempo();
+        m_playbackModel->reload();
+        // as in NotationPlayback::updateTotalPlayTime
+        m_totalPlayTime = uticksToSecs(score, score->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    }
+    if (m_audio && m_audioReady) {
+        const double secs = uticksToSecs(score, utick);
+        m_audio->seek(secs, true);
+        applyLoop();
+        emit("position", cursorJson(secs));
+        if (playing) {
+            m_audio->prepareToPlay([this]() { m_audio->resume(); });
+        }
+    }
+    return practiceJson();
+}
+
+// The note or rest at a played tick: where it starts and ends (played ticks)
+static std::pair<int, int> chordRestAt(const Score* score, int utick)
+{
+    for (const RepeatSegment* rs : playedRepeats(score)) {
+        if (utick < rs->utick || utick >= rs->utick + rs->len()) {
+            continue;
+        }
+        const int offset = rs->utick - rs->tick;
+        const int raw = utick - offset;
+        const Measure* m = score->tick2measure(Fraction::fromTicks(raw));
+        if (!m) {
+            break;
+        }
+        int start = m->tick().ticks();
+        int end = m->endTick().ticks();
+        for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+            if (s->tick().ticks() <= raw) {
+                start = s->tick().ticks();
+            } else {
+                end = s->tick().ticks();
+                break;
+            }
+        }
+        return { start + offset, end + offset };
+    }
+    return { utick, utick };
+}
+
+// As NotationPlayback::addLoopIn / addLoopOut, at the play position
+std::string Session::setLoopMarker(bool right, double at)
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score || !m_audio) {
+        return "null";
+    }
+    const int last = score->repeatList(true).ticks();
+    const std::pair<int, int> cr = chordRestAt(score, secsToUticks(score, std::max(0.0, at)));
+    if (!right) {
+        m_loopIn = cr.first;
+        if (m_loopOut < 0 || m_loopIn >= m_loopOut) { // In past Out: Out goes to the end
+            m_loopOut = last;
+        }
+    } else {
+        m_loopOut = std::min(cr.second, last);
+        if (m_loopIn < 0 || m_loopOut <= m_loopIn) { // Out before In: In goes to the start
+            m_loopIn = 0;
+        }
+    }
+    m_loopOn = true; // as addLoopBoundaryToTick
+    applyLoop();
+    return practiceJson();
+}
+
+// As PlaybackController::toggleLoopPlayback: with no markers, the whole score
+std::string Session::setLoopEnabled(bool on)
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "null";
+    }
+    if (on && m_loopIn < 0) {
+        m_loopIn = 0;
+        m_loopOut = score->repeatList(true).ticks();
+    }
+    m_loopOn = on;
+    applyLoop();
+    return practiceJson();
+}
+
+void Session::applyLoop()
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!m_audio || !m_audioReady || !score) {
+        return;
+    }
+    if (!m_loopOn || m_loopIn < 0 || m_loopOut <= m_loopIn) {
+        m_audio->resetLoop();
+        return;
+    }
+    m_audio->setLoop(uticksToSecs(score, m_loopIn), uticksToSecs(score, m_loopOut));
+}
+
+std::string Session::practiceJson() const
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "null";
+    }
+    // bars as the reader counts them (the measure numbers printed), 1-based
+    auto barAt = [&](int utick, bool end) {
+        for (const RepeatSegment* rs : playedRepeats(score)) {
+            const int u = end ? utick - 1 : utick;
+            if (u >= rs->utick && u < rs->utick + rs->len()) {
+                const Measure* m = score->tick2measure(Fraction::fromTicks(u - (rs->utick - rs->tick)));
+                return m ? m->no() + 1 : 0;
+            }
+        }
+        return 0;
+    };
+    std::string s = "{\"speed\":" + std::to_string(score->tempomap()->tempoMultiplier().val)
+                    + ",\"duration\":" + std::to_string(m_totalPlayTime)
+                    + ",\"loop\":" + (m_loopOn ? "true" : "false");
+    if (m_loopIn >= 0) {
+        s += ",\"from\":" + std::to_string(uticksToSecs(score, m_loopIn))
+             + ",\"to\":" + std::to_string(uticksToSecs(score, m_loopOut))
+             + ",\"fromBar\":" + std::to_string(barAt(m_loopIn, false))
+             + ",\"toBar\":" + std::to_string(barAt(m_loopOut, true));
+    }
+    return s + "}";
 }
 
 // ---------------------------------------------------------------------------

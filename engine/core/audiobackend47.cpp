@@ -165,6 +165,11 @@ public:
     void stop() override { m_player->stop(); }
     void seek(double secs, bool flush) override { m_player->seek(secs, flush); }
     void setDuration(double secs) override { m_player->setDuration(static_cast<msecs_t>(secs * 1000.0)); }
+    void setLoop(double from, double to) override
+    {
+        m_player->setLoop(static_cast<msecs_t>(from * 1000.0), static_cast<msecs_t>(to * 1000.0));
+    }
+    void resetLoop() override { m_player->resetLoop(); }
     PlaybackStatus status() const override { return m_player ? m_player->playbackStatus() : PlaybackStatus::Stopped; }
     double position() const override { return m_player ? double(m_player->playbackPosition()) : 0.0; }
     async::Channel<double> positionChanged() const override { return m_position; }

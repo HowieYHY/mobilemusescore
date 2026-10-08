@@ -95,6 +95,33 @@
     </div>
   </section>
 
+  <section class="practice" id="practice" hidden aria-labelledby="practice-title">
+    <div class="mixer-head">
+      <strong id="practice-title">Speed and loop</strong>
+      <button class="btn small" id="practice-close">Done</button>
+    </div>
+    <div class="practice-body">
+      <div class="practice-row">
+        <span class="practice-label" id="speed-label">Speed</span>
+        <div class="stepper">
+          <button class="btn round plain" id="speed-down" aria-label="Slower">−</button>
+          <output id="speed-value" for="speed">100%</output>
+          <button class="btn round plain" id="speed-up" aria-label="Faster">+</button>
+        </div>
+      </div>
+      <input type="range" id="speed" min="10" max="300" step="5" value="100" aria-labelledby="speed-label">
+      <div class="practice-row loop-row">
+        <button class="chip light" id="loop-toggle" aria-pressed="false">Loop playback</button>
+        <span class="loop-range" id="loop-range">Whole score</span>
+      </div>
+      <div class="loop-markers">
+        <button class="btn plain" id="loop-left">Set loop marker left</button>
+        <button class="btn plain" id="loop-right">Set loop marker right</button>
+      </div>
+      <p class="practice-hint">The markers go at the play position: tap a note first to move it there.</p>
+    </div>
+  </section>
+
   <dialog class="ask" id="ask">
     <h2></h2>
     <p></p>
@@ -105,9 +132,13 @@
     <button class="btn round" id="rewind" aria-label="Back to start" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor"/></svg></button>
     <button class="btn round big" id="play" aria-label="Play" disabled><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button>
     <div class="timeline">
-      <input type="range" id="seek" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
+      <div class="seek-wrap">
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
+        <div class="loop-band" id="loop-band" hidden></div>
+      </div>
       <div class="times"><span id="time">0:00</span><span id="bar"></span><span id="duration">0:00</span></div>
     </div>
+    <button class="btn round" id="practice-toggle" aria-label="Speed and loop" aria-expanded="false" aria-pressed="false" disabled><span class="icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M17 3l3 3-3 3M20 6H8.5A4.5 4.5 0 0 0 4 10.5V11M7 21l-3-3 3-3M4 18h11.5a4.5 4.5 0 0 0 4.5-4.5V13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="speed-badge" id="speed-badge" hidden></span></button>
     <button class="btn" id="mixer-toggle" disabled>Mixer</button>
   </footer>
 

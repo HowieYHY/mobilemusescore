@@ -112,4 +112,8 @@ EMSCRIPTEN_KEEPALIVE double mss_master_volume() { return Session::instance()->ma
 EMSCRIPTEN_KEEPALIVE void mss_set_master_volume(double db) { Session::instance()->setMasterVolume(db); }
 EMSCRIPTEN_KEEPALIVE void mss_set_metronome(int on) { Session::instance()->setMetronome(on != 0); }
 EMSCRIPTEN_KEEPALIVE void mss_set_output_latency(double secs) { Session::instance()->setOutputLatency(secs); }
+EMSCRIPTEN_KEEPALIVE const char* mss_set_speed(double multiplier, double at) { return ret(Session::instance()->setTempoMultiplier(multiplier, at)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_set_loop_marker(int right, double at) { return ret(Session::instance()->setLoopMarker(right != 0, at)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_set_loop(int on) { return ret(Session::instance()->setLoopEnabled(on != 0)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_practice() { return ret(Session::instance()->practiceJson()); }
 }

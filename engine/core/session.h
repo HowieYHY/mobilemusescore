@@ -82,6 +82,19 @@ public:
     // shifted back by this much.
     void setOutputLatency(double secs) { m_outputLatency = std::max(0.0, secs); }
 
+    // Practice, as desktop's playback toolbar. Speed: the tempo multiplier
+    // (desktop's Speed, 10-300%), keeping the place in the music. Loop: markers
+    // at the play position (Set loop marker left / right: the start, or the
+    // end, of the note or rest there) and Loop playback on/off; with no
+    // markers the whole score loops. Each returns practiceJson(). A new score
+    // starts at 100% with no loop.
+    // `at`: the play position the reader sees, in seconds (the engine's own
+    // position lags a seek)
+    std::string setTempoMultiplier(double multiplier, double at);
+    std::string setLoopMarker(bool right, double at);
+    std::string setLoopEnabled(bool on);
+    std::string practiceJson() const;
+
     std::string tracksJson() const;
     std::string scoreInfoJson() const;
 
@@ -150,5 +163,10 @@ private:
     double m_totalPlayTime = 0;
     bool m_metronome = false;
     double m_outputLatency = 0.0;
+    // loop markers in played (unrolled) ticks, -1 while not set
+    bool m_loopOn = false;
+    int m_loopIn = -1;
+    int m_loopOut = -1;
+    void applyLoop();
 };
 }

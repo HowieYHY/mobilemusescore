@@ -60,6 +60,9 @@ public:
     virtual void stop() = 0;
     virtual void seek(double secs, bool flushSound) = 0;
     virtual void setDuration(double secs) = 0;
+    // The player jumps from `to` back to `from` (IPlayer::setLoop)
+    virtual void setLoop(double fromSecs, double toSecs) = 0;
+    virtual void resetLoop() = 0;
     virtual muse::audio::PlaybackStatus status() const = 0;
     virtual double position() const = 0;
 

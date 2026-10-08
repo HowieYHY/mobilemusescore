@@ -1,5 +1,5 @@
 import { Engine } from "./engine/engine";
-import type { CursorInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
+import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
@@ -48,6 +48,19 @@ const ui = {
     palette: $("palette"),
     paletteGrid: $("palette-grid"),
     paletteCustom: $<HTMLInputElement>("palette-custom"),
+    practice: $("practice"),
+    practiceToggle: $<HTMLButtonElement>("practice-toggle"),
+    practiceClose: $<HTMLButtonElement>("practice-close"),
+    speed: $<HTMLInputElement>("speed"),
+    speedValue: $("speed-value"),
+    speedDown: $<HTMLButtonElement>("speed-down"),
+    speedUp: $<HTMLButtonElement>("speed-up"),
+    speedBadge: $("speed-badge"),
+    loopToggle: $<HTMLButtonElement>("loop-toggle"),
+    loopRange: $("loop-range"),
+    loopLeft: $<HTMLButtonElement>("loop-left"),
+    loopRight: $<HTMLButtonElement>("loop-right"),
+    loopBand: $("loop-band"),
     installRow: $("install-row"),
     install: $<HTMLButtonElement>("install"),
 };
@@ -655,7 +668,10 @@ function cursorFromTimeline(secs: number): CursorInfo | null {
 }
 
 engine.on("position", (c: CursorInfo) => {
-    state.duration = c.duration || state.duration;
+    if (c.duration && c.duration !== state.duration) { // changes with the speed
+        state.duration = c.duration;
+        ui.duration.textContent = fmt(state.duration);
+    }
     ui.bar.textContent = c.measure ? `Bar ${c.measure}` : "";
     const clock = engine.audioTime;
     if (state.playing && clock > 0) {
@@ -1195,6 +1211,83 @@ window.addEventListener("popstate", () => {
     layers.pop()?.();
 });
 
+// ---------------------------------------------------------------- speed and loop
+
+// As desktop's playback toolbar: Speed (10-300%, steps of 5) and Loop playback
+// with its left and right markers, set at the play position. Kept per score
+// for the session only (a new score starts at 100% with no loop).
+let practice: PracticeInfo = { speed: 1, duration: 0, loop: false };
+
+function showPractice(p: PracticeInfo | null) {
+    if (!p) {
+        return;
+    }
+    const speedChanged = Math.abs(p.speed - practice.speed) > 1e-6;
+    practice = p;
+    const pct = Math.round(p.speed * 100);
+    ui.speed.value = String(pct);
+    ui.speedValue.textContent = pct + "%";
+    ui.speedDown.disabled = pct <= 10;
+    ui.speedUp.disabled = pct >= 300;
+    ui.speedBadge.textContent = pct + "%";
+    ui.speedBadge.hidden = pct === 100;
+    ui.practiceToggle.classList.toggle("changed", pct !== 100);
+    ui.practiceToggle.setAttribute("aria-pressed", String(p.loop));
+    ui.practiceToggle.setAttribute("aria-label", `Speed and loop (speed ${pct}%${p.loop ? ", looping" : ""})`);
+    ui.loopToggle.setAttribute("aria-pressed", String(p.loop));
+    const bars = p.fromBar && p.toBar ? (p.fromBar === p.toBar ? `Bar ${p.fromBar}` : `Bars ${p.fromBar}–${p.toBar}`) : "Whole score";
+    ui.loopRange.textContent = p.loop ? bars : (p.fromBar ? bars + " (off)" : "Whole score");
+    if (p.duration) {
+        state.duration = p.duration;
+        ui.duration.textContent = fmt(state.duration);
+    }
+    // the loop on the position slider
+    const d = Math.max(1, state.duration);
+    ui.loopBand.hidden = !(p.loop && p.from !== undefined && p.to !== undefined);
+    if (!ui.loopBand.hidden) {
+        const f = p.from! / d;
+        const t = p.to! / d;
+        ui.loopBand.style.left = `calc(8px + (100% - 16px) * ${f})`;
+        ui.loopBand.style.width = `calc((100% - 16px) * ${Math.max(0.004, t - f)})`;
+    }
+    if (speedChanged) {
+        void loadTimeline().then(() => showPosition(state.position)); // the cursor's times follow the speed
+    }
+}
+
+async function setSpeed(pct: number) {
+    pct = Math.min(300, Math.max(10, Math.round(pct / 5) * 5));
+    ui.speedValue.textContent = pct + "%";
+    showPractice(await engine.setSpeed(pct / 100, state.position));
+}
+
+ui.speed.oninput = () => (ui.speedValue.textContent = ui.speed.value + "%");
+ui.speed.onchange = () => void setSpeed(Number(ui.speed.value));
+ui.speedDown.onclick = () => void setSpeed(Math.round(practice.speed * 100) - 5);
+ui.speedUp.onclick = () => void setSpeed(Math.round(practice.speed * 100) + 5);
+ui.loopToggle.onclick = async () => showPractice(await engine.setLoop(!practice.loop));
+ui.loopLeft.onclick = async () => showPractice(await engine.setLoopMarker(false, state.position));
+ui.loopRight.onclick = async () => showPractice(await engine.setLoopMarker(true, state.position));
+
+function closePractice() {
+    ui.practice.hidden = true;
+    ui.practiceToggle.setAttribute("aria-expanded", "false");
+}
+
+ui.practiceToggle.onclick = () => {
+    if (!ui.practice.hidden) {
+        closeLayer(closePractice);
+        return;
+    }
+    if (!ui.mixer.hidden) {
+        closeLayer(closeMixer);
+    }
+    ui.practice.hidden = false;
+    ui.practiceToggle.setAttribute("aria-expanded", "true");
+    openLayer(closePractice);
+};
+ui.practiceClose.onclick = () => closeLayer(closePractice);
+
 // ---------------------------------------------------------------- mixer panel
 
 function closeMixer() {
@@ -1209,6 +1302,9 @@ ui.mixerToggle.onclick = () => {
     if (!ui.mixer.hidden) {
         closeLayer(closeMixer);
         return;
+    }
+    if (!ui.practice.hidden) {
+        closeLayer(closePractice);
     }
     ui.mixer.hidden = false;
     ui.mixerToggle.setAttribute("aria-expanded", "true");
@@ -1524,6 +1620,8 @@ async function openScore(name: string, data: ArrayBuffer) {
     ui.viewMode.disabled = false;
     ui.viewMode.value = "page";
     ui.play.disabled = false;
+    ui.practiceToggle.disabled = false;
+    showPractice({ speed: 1, duration: state.duration, loop: false }); // the engine starts each score so
     ui.rewind.disabled = false;
     ui.seek.disabled = false;
     ui.duration.textContent = fmt(state.duration);

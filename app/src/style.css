@@ -229,6 +229,55 @@ body {
 
 [hidden] { display: none !important; }
 
+/* Loop region on the position slider (in the slider's track inset) */
+.seek-wrap { position: relative; }
+.loop-band {
+  position: absolute;
+  bottom: 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent-bright);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Speed and loop button: shows the speed when it isn't 100%, filled while a loop is on */
+#practice-toggle { position: relative; }
+#practice-toggle .speed-badge { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+#practice-toggle.changed .icon { display: none; }
+#practice-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+
+/* ---------------------------------------------------------------- speed and loop */
+
+.practice {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(66px + var(--bar-b));
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 -6px 18px rgba(16, 24, 36, 0.18);
+  z-index: 7;
+}
+.practice-body { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+.practice-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.practice-label { flex: 1; font-size: 15px; font-weight: 600; }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.stepper .btn.round { width: 40px; min-width: 40px; min-height: 40px; height: 40px; font-size: 20px; }
+.stepper output { min-width: 56px; text-align: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#speed { width: 100%; margin: 0; accent-color: var(--accent); height: 32px; }
+.loop-row { margin-top: 6px; border-top: 1px solid var(--panel-line); padding-top: 8px; }
+.chip.light { color: var(--ink); border-color: #c4c9cf; background: #fff; min-height: 36px; font-size: 14px; font-weight: 600; }
+.chip.light[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.loop-range { flex: 1; text-align: right; font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.loop-markers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.loop-markers .btn { font-size: 14px; padding: 6px 8px; line-height: 1.2; }
+.practice-hint { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
+
+@media (min-width: 760px) {
+  .practice { left: auto; width: 400px; right: 12px; border-radius: 10px 10px 0 0; overflow: hidden; }
+}
+
 /* ---------------------------------------------------------------- mixer */
 
 .mixer {

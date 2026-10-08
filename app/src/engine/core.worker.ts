@@ -158,6 +158,21 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "masterVolume": callVoid("mss_set_master_volume", req.db); break;
         case "latency": callVoid("mss_set_output_latency", req.secs); break;
         case "metronome": callVoid("mss_set_metronome", req.on ? 1 : 0); break;
+        case "speed":
+            result = JSON.parse(callStr("mss_set_speed", req.multiplier, req.at));
+            core._mss_process();
+            break;
+        case "loopMarker":
+            result = JSON.parse(callStr("mss_set_loop_marker", req.right ? 1 : 0, req.at));
+            core._mss_process();
+            break;
+        case "loop":
+            result = JSON.parse(callStr("mss_set_loop", req.on ? 1 : 0));
+            core._mss_process();
+            break;
+        case "practice":
+            result = JSON.parse(callStr("mss_practice"));
+            break;
         }
         post({ type: "reply", id: req.id, result });
     } catch (err: any) {

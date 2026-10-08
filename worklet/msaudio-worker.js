@@ -29,8 +29,10 @@ let out = null;
 let bufPtr = 0;
 let inFlight = 0; // frames sent to the worklet and not yet played
 // Audio queued ahead while playing. Deep enough to ride out a busy moment on
-// a phone (~340 ms); seek, pause and stop flush it, so it adds no delay there.
-let playTarget = 16 * BLOCK;
+// a phone (~340 ms; Android ~510 ms, whose audio timing is the least even);
+// seek, pause and stop flush it, so it adds no delay there.
+const ANDROID = /Android/i.test(self.navigator?.userAgent || "");
+let playTarget = (ANDROID ? 24 : 16) * BLOCK;
 // While stopped (~85 ms); grows if the device takes audio in bigger bursts
 let idleTarget = 4 * BLOCK;
 const MAX_IDLE_TARGET = 12 * BLOCK;
@@ -147,6 +149,13 @@ let sampleRate = 48000;
 
 self.onmessage = async (e) => {
     const msg = e.data;
+    if (msg.type === "testStall") { // tests: freeze the engine, as a busy phone might
+        const until = performance.now() + msg.ms;
+        while (performance.now() < until) {
+            // busy
+        }
+        return;
+    }
     if (msg.type === "playing") {
         playing = msg.on;
         pump();
@@ -181,7 +190,8 @@ self.onmessage = async (e) => {
                 // the device fell behind: keep more audio queued from now on
                 if (playing) {
                     underruns++;
-                    playTarget = Math.min(MAX_TARGET, playTarget + 4 * BLOCK);
+                    // self-correcting: each gap keeps ~170 ms more ready, up to ~1 s
+                    playTarget = Math.min(MAX_TARGET, playTarget + 8 * BLOCK);
                     self.postMessage({ type: "underrun", count: underruns });
                     self.postMessage({ type: "log", text: `audio underrun; queue now ${playTarget} frames` });
                 } else {

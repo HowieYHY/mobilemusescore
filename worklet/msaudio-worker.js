@@ -100,7 +100,7 @@ function renderBlock() {
     }
     // copy out of wasm memory; the copy is transferred to the worklet
     const data = new Float32Array(mod.HEAPF32.buffer, bufPtr, BLOCK * 2).slice();
-    out.postMessage({ type: "audio", data, gen }, [data.buffer]);
+    out.postMessage({ type: "audio", data, gen, playing }, [data.buffer]);
     inFlight += BLOCK;
 }
 

@@ -9,6 +9,13 @@
 //                            carries the old generation and is dropped too
 // To the page: {type:"queued", frames, underruns} about every 100 ms.
 
+// Audio wanted before the music resumes after a flush (a jump while playing):
+// six of the worker's blocks (~128 ms). The first blocks after a jump take
+// longest to render (every note at the new place starts); two still ran dry on
+// a Pixel 9a. Only while playing (the playing queue is 16-48 blocks): stopped,
+// a tapped note sounds at once and a gap there is not heard as a stutter.
+const PRIME_FRAMES = 6 * 1024;
+
 class MsAudioPlayer extends AudioWorkletProcessor {
     constructor() {
         super();
@@ -18,6 +25,8 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         this.consumed = 0; // frames played since the last report to the worker
         this.underruns = 0;
         this.starved = false;
+        this.priming = false;
+        this.enginePlaying = false;
         this.sinceReport = 0;
         this.gen = 0;
         this.in = null;
@@ -29,6 +38,7 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             this.in = msg.inPort;
             this.in.onmessage = (e) => {
                 if (e.data.type === "audio" && e.data.gen === this.gen) {
+                    this.enginePlaying = e.data.playing;
                     this.queue.push(e.data.data);
                     this.queuedFrames += e.data.data.length / 2;
                 }
@@ -39,6 +49,7 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             this.queuedFrames = 0;
             this.consumed = 0;
             this.gen++;
+            this.priming = true;
             if (this.in) {
                 this.in.postMessage({ type: "flush", gen: this.gen });
             }
@@ -51,8 +62,15 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         const right = out[1] || out[0];
         const frames = left.length;
 
+        // After a flush (a jump while playing), wait for a little audio before
+        // playing again: playing the first fresh chunk at once ran dry a moment
+        // later (heard as a hiccup, and counted as the device falling behind)
+        if (this.priming && (this.queuedFrames >= PRIME_FRAMES || !this.enginePlaying)) {
+            this.priming = false;
+        }
+
         let i = 0;
-        while (i < frames && this.queue.length) {
+        while (i < frames && this.queue.length && !this.priming) {
             const chunk = this.queue[0];
             const chunkFrames = chunk.length / 2;
             const n = Math.min(frames - i, chunkFrames - this.readPos);
@@ -72,13 +90,13 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             right[i] = 0;
         }
 
-        const played = Math.min(frames, this.queuedFrames);
+        const played = this.priming ? 0 : Math.min(frames, this.queuedFrames);
         this.queuedFrames -= played;
         this.consumed += played;
 
         if (this.in) {
             // an empty queue while the engine is running means the device fell behind
-            const empty = this.queuedFrames === 0;
+            const empty = this.queuedFrames === 0 && !this.priming;
             if (empty && !this.starved && this.consumed > 0) {
                 this.underruns++;
                 this.in.postMessage({ type: "underrun" });

@@ -43,7 +43,8 @@ the yellow bar. This is the same on every device. The version number is on the s
 ### Open a score
 Tap **Open score** and choose a `.mscz` file. On iPad and iPhone, first save your scores to the
 **Files** app (AirDrop them, or save them from email or a cloud drive); **Open score** opens
-Files straight away. If music is playing, it stops when you open another score.
+Files straight away. On Android the file list shows all your files, not just scores: MuseScore
+scores are the ones ending in `.mscz`. If music is playing, it stops when you open another score.
 
 ### Play
 | To… | Do this |
@@ -63,6 +64,18 @@ If you scroll away, it waits a moment before following again.
 
 **The music pauses when you leave PocketScore** (switch to another app, go to the home screen or
 lock the screen), so it never keeps playing where you can't see it. Tap Play when you come back.
+
+### Practise slower, or loop a passage
+Tap the round **loop** button next to **Mixer**:
+- **Speed**: **−** and **+** change it in steps of 5%, or drag the slider (10% to 300%). The music
+  keeps its place when you change it, even while it plays.
+- **Loop playback**: plays the same passage over and over. With no markers it loops the whole score.
+- **Set loop marker left** / **Set loop marker right**: tap the first note of the passage, then
+  **Set loop marker left**; tap its last note, then **Set loop marker right**. The bars show next to
+  *Loop playback* (for example *Bars 6–10*), and a blue band under the position slider marks them.
+
+The button shows the speed when it isn't 100%, and turns blue while a loop is on. Speed and loop are
+for this score only, while it is open: the next score you open plays at 100% with no loop.
 
 ### Write on the score
 Tap the **pencil** button at the top:

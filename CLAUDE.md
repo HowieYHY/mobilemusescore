@@ -98,6 +98,25 @@ build, tests, status) before working here.
   checks, so Paper Hearts' first page (which uses it) was blank on Android, and one failed font
   blocked the whole page. Rule: `scripts/fix-fonts.py` repairs fonts at build time, page drawing
   never waits on a font that fails, and every shipped font is loaded in Chrome when fonts change.
+- **A self-check can be fooled by the app's own actions.** On the Pixel the only "sound gaps" were
+  jumps while playing: the queue is emptied on purpose and the first fresh block played at once ran
+  dry, so the self-check grew the delay for good and told the reader the phone stuttered. Rule: after
+  a deliberate flush, refill before playing (`PRIME_FRAMES`) and don't count that refill; test jumps
+  as well as steady playback (`android-test.mjs`).
+- **Test the phone over USB in the reader's own setting, and leave it as found.** Use the phone's
+  Chrome socket (not Playwright's `launchBrowser`, which leaves a file in `/data/local/tmp`), a local
+  build on its own origin so the reader's saved data is never touched, the page under test in front,
+  and close only your own tabs. Ask the user not to use the phone meanwhile and tell them when it's
+  free.
+- **An event can be lost when its target is removed.** Pinch zoom rebuilt the pages when the first
+  finger lifted; the other finger's touchend went to a removed element, the app counted a finger
+  down for good, and page drawing (which waits for fingers) never ran again: blank pages after a
+  zoom, "sometimes" (issue #9). Rule: never remove the element under a pointer mid-gesture (finish
+  on the last finger), and never let a wait depend on one event arriving.
+- **The engine's load path must make every call desktop makes.** Swing markings did nothing
+  because our `Session::load` skipped `Score::updateSwing()` (desktop calls it in
+  `MasterNotation::setMasterScore`). Rule: when something plays differently from desktop, compare
+  our load and playback set-up with desktop's call by call before looking elsewhere.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.

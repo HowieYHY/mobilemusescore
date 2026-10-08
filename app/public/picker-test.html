@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Picker test</title>
+<style>
+  :root { --bg: #f4f6f8; --fg: #1e2a3a; --card: #fff; --line: #d6dbe1; --accent: #2f7de1; --ok: #2a9d4b; --bad: #c0392b; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #12181f; --fg: #e8edf2; --card: #1c242d; --line: #2c3743; --accent: #5b9bf0; --ok: #4cc16e; --bad: #e0675a; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 4px 0 8px; }
+  p { margin: 0 0 12px; }
+  .row { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .row b { display: block; margin-bottom: 4px; }
+  .row code { font-size: 12px; opacity: 0.75; word-break: break-all; display: block; margin-bottom: 8px; }
+  label.btn { display: inline-block; background: var(--accent); color: #fff; padding: 9px 14px; border-radius: 8px; cursor: pointer; position: relative; overflow: hidden; }
+  label.btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .result { margin-top: 8px; font-size: 14px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Open score: picker test</h1>
+  <p>Tap each <b>Choose</b> button and look at what the file picker lets you pick. For each one, note whether
+     <b>(1)</b> your <code style="display:inline">.mscz</code> scores can be picked and <b>(2)</b> other files (photos, PDFs, zips)
+     are hidden or greyed out. Pick a score to confirm it works. Then send the letters that worked best, and say which device.</p>
+  <div id="list"></div>
+</main>
+<script>
+const variants = [
+  ["A", "As now", ".mscz,.mscx,application/x-musescore,application/zip,application/octet-stream"],
+  ["B", "Extensions only", ".mscz,.mscx"],
+  ["C", ".mscz only", ".mscz"],
+  ["D", "MuseScore type + extensions", "application/x-musescore,application/x-musescore+xml,.mscz,.mscx"],
+  ["E", "Extensions + zip", ".mscz,.mscx,application/zip"],
+  ["F", "Extensions + generic data", ".mscz,.mscx,application/octet-stream"],
+];
+const list = document.getElementById("list");
+for (const [letter, name, accept] of variants) {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `<b>${letter}. ${name}</b><code></code><label class="btn">Choose<input type="file"></label><div class="result"></div>`;
+  row.querySelector("code").textContent = accept;
+  const input = row.querySelector("input");
+  input.accept = accept;
+  input.setAttribute("aria-label", "Choose with filter " + letter);
+  input.onchange = () => {
+    const f = input.files && input.files[0];
+    const out = row.querySelector(".result");
+    if (!f) { out.textContent = "Nothing picked."; out.className = "result"; return; }
+    const good = /\.(mscz|mscx)$/i.test(f.name);
+    out.textContent = `${good ? "✓ MuseScore file" : "✗ Not a MuseScore file"}: ${f.name} (type "${f.type || "none"}", ${Math.round(f.size / 1024)} KB)`;
+    out.className = "result " + (good ? "ok" : "bad");
+    input.value = "";
+  };
+  list.appendChild(row);
+}
+</script>
+</body>
+</html>

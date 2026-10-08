@@ -33,6 +33,7 @@ const ui = {
     sizes: $("sizes"),
     sounds: $("sounds"),
     soundsTitle: $("sounds-title"),
+    soundsMany: $<HTMLButtonElement>("sounds-many"),
     soundsBody: $("sounds-body"),
     soundsBack: $<HTMLButtonElement>("sounds-back"),
     notesToggle: $<HTMLButtonElement>("notes-toggle"),
@@ -779,63 +780,154 @@ function soundsContain(node: SoundNode, id: string): boolean {
     return "id" in node ? node.id === id : node.c.some((c) => soundsContain(c, id));
 }
 
+// The sound list is for the part it was opened from. "Several parts" (a small
+// button by the title, so the list stays uncluttered) shows a row of parts to
+// add; a sound picked then goes to all of them.
 async function openSounds(t: TrackInfo) {
     soundList ||= await engine.sounds();
     const list = soundList;
-    ui.soundsTitle.innerHTML = "Sound for <b></b>";
-    ui.soundsTitle.querySelector("b")!.textContent = t.title;
+    const parts = state.tracks.filter((p) => !p.metronome);
+    const chosen = new Set<number>([t.key]);
+    const selected = () => state.tracks.filter((p) => chosen.has(p.key));
     ui.soundsBody.innerHTML = "";
 
+    // ---- which parts
+    const applyTo = document.createElement("div");
+    applyTo.className = "apply-to";
+    applyTo.innerHTML = `<span class="label">Parts:</span>`;
+    const chips: [HTMLButtonElement, number | null][] = [];
+    const chip = (label: string, key: number | null) => {
+        const b = document.createElement("button");
+        b.className = "part-chip" + (key === null ? " all" : "");
+        b.textContent = label;
+        b.onclick = () => {
+            if (key === null) {
+                const all = parts.every((p) => chosen.has(p.key));
+                chosen.clear();
+                (all ? [t] : parts).forEach((p) => chosen.add(p.key));
+            } else if (chosen.has(key)) {
+                if (chosen.size > 1) {
+                    chosen.delete(key);
+                }
+            } else {
+                chosen.add(key);
+            }
+            update();
+        };
+        chips.push([b, key]);
+        applyTo.appendChild(b);
+    };
+    ui.soundsMany.hidden = parts.length < 2;
+    ui.soundsMany.setAttribute("aria-expanded", "false");
+    if (parts.length > 1) {
+        chip("All parts", null);
+        parts.forEach((p) => chip(p.title, p.key));
+        applyTo.hidden = true;
+        ui.soundsBody.appendChild(applyTo);
+        ui.soundsMany.onclick = () => {
+            applyTo.hidden = !applyTo.hidden;
+            ui.soundsMany.setAttribute("aria-expanded", String(!applyTo.hidden));
+            if (applyTo.hidden) { // back to just the part it was opened for
+                chosen.clear();
+                chosen.add(t.key);
+                update();
+            }
+            ui.soundsBody.scrollTop = 0;
+        };
+    }
+
+    // ---- sounds
+    const apply = async (soundFor: (p: TrackInfo) => string) => {
+        for (const p of selected()) {
+            const id = soundFor(p);
+            if (id && id !== p.soundId) {
+                await engine.setSound(p.key, id);
+            }
+        }
+        closeLayer(closeSounds);
+        await refreshTracks();
+        mixChanged();
+    };
+
+    const picks: HTMLButtonElement[] = [];
     const pick = (id: string, name: string, top = false) => {
         const b = document.createElement("button");
         b.className = "pick" + (top ? " top" : "");
+        b.dataset.id = id;
         b.setAttribute("role", "menuitemradio");
-        b.setAttribute("aria-checked", String(id === t.soundId));
-        b.innerHTML = `<span class="check">${id === t.soundId ? ICON_CHECK : ""}</span><span></span>`;
-        b.querySelector("span:last-child")!.textContent = name;
-        if (id === t.scoreSoundId) {
-            const tag = document.createElement("span");
-            tag.className = "tag";
-            tag.textContent = "In score";
-            b.appendChild(tag);
-        }
-        b.onclick = async () => {
-            await engine.setSound(t.key, id);
-            closeLayer(closeSounds);
-            await refreshTracks();
-            mixChanged();
-        };
+        b.innerHTML = `<span class="check"></span><span></span><span class="tag">In score</span>`;
+        b.querySelector("span:nth-child(2)")!.textContent = name;
+        b.onclick = () => apply(() => id);
+        picks.push(b);
         return b;
     };
 
+    const groups: [HTMLDetailsElement, SoundNode][] = [];
     const group = (node: SoundNode): HTMLElement => {
         if ("id" in node) {
             return pick(node.id, node.n);
         }
         const d = document.createElement("details");
-        const s = document.createElement("summary");
-        s.textContent = node.t;
-        if (soundsContain(node, t.soundId)) {
-            d.open = true;
-            const dot = document.createElement("span");
-            dot.className = "here";
-            dot.setAttribute("aria-label", "current sound");
-            s.appendChild(dot);
-        }
-        d.appendChild(s);
+        const sum = document.createElement("summary");
+        sum.textContent = node.t;
+        const dot = document.createElement("span");
+        dot.className = "here";
+        dot.setAttribute("aria-label", "current sound");
+        sum.appendChild(dot);
+        d.appendChild(sum);
         node.c.forEach((c) => d.appendChild(group(c)));
+        groups.push([d, node]);
         return d;
     };
+
+    // back to the score: each part's own sound
+    const own = document.createElement("button");
+    own.className = "pick top own";
+    own.innerHTML = `<span class="check"></span><span>Each part's sound in the score</span>`;
+    own.onclick = () => apply((p) => p.scoreSoundId);
+    ui.soundsBody.appendChild(own);
 
     if (list.auto) {
         ui.soundsBody.appendChild(pick(list.auto, "Choose automatically", true));
     }
     list.tree.forEach((n) => ui.soundsBody.appendChild(group(n)));
 
+    // title, chips and marks for the parts chosen now
+    function update() {
+        const sel = selected();
+        ui.soundsTitle.innerHTML = "Sound for <b></b>";
+        ui.soundsTitle.querySelector("b")!.textContent = sel.length === 1 ? sel[0].title : `${sel.length} parts`;
+        for (const [b, key] of chips) {
+            const on = key === null ? parts.every((p) => chosen.has(p.key)) : chosen.has(key);
+            b.setAttribute("aria-pressed", String(on));
+        }
+        // a sound is marked when every chosen part has it
+        const common = sel.every((p) => p.soundId === sel[0].soundId) ? sel[0].soundId : "";
+        const scoreIds = new Set(sel.map((p) => p.scoreSoundId));
+        for (const b of picks) {
+            const on = b.dataset.id === common;
+            b.setAttribute("aria-checked", String(on));
+            b.querySelector(".check")!.innerHTML = on ? ICON_CHECK : "";
+            b.querySelector<HTMLElement>(".tag")!.hidden = !(sel.length === 1 && scoreIds.has(b.dataset.id!));
+        }
+        const allOwn = sel.every((p) => p.soundId === p.scoreSoundId);
+        own.hidden = sel.length === 1; // one part: its score sound is tagged "In score"
+        own.setAttribute("aria-checked", String(allOwn));
+        own.querySelector(".check")!.innerHTML = allOwn ? ICON_CHECK : "";
+        for (const [d, node] of groups) {
+            const here = !!common && soundsContain(node, common);
+            d.querySelector<HTMLElement>(":scope > summary > .here")!.hidden = !here;
+            if (here) {
+                d.open = true;
+            }
+        }
+    }
+    update();
+
     ui.mixer.classList.add("picking");
     ui.sounds.hidden = false;
     openLayer(closeSounds);
-    ui.soundsBody.querySelector<HTMLElement>('[aria-checked="true"]')?.scrollIntoView({ block: "center" });
+    ui.soundsBody.querySelector<HTMLElement>('.pick[aria-checked="true"]')?.scrollIntoView({ block: "center" });
 }
 
 function closeSounds() {

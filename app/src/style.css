@@ -664,3 +664,39 @@ body {
 
 
 
+
+/* sound list: which parts a sound is for */
+.sounds .apply-to { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--panel-line); }
+.sounds .apply-to .label { font-size: 12px; color: var(--ink-2); margin-right: 2px; }
+.part-chip {
+  appearance: none;
+  border: 1px solid #c4c9cf;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 5px 11px;
+  font-size: 13px;
+  min-height: 32px;
+  touch-action: manipulation;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.part-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.part-chip.all { font-weight: 600; }
+.sounds .pick.own { font-weight: 600; }
+.sounds-many {
+  appearance: none;
+  margin-left: auto;
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 2px;
+  min-height: 32px;
+  touch-action: manipulation;
+}
+.sounds-many[aria-expanded="true"] { color: var(--ink-2); }

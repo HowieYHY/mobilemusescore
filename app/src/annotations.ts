@@ -149,6 +149,16 @@ export class Annotations {
         return this.tool === "pen" || this.tool === "highlighter" || this.tool === "eraser";
     }
 
+    /**
+     * In notes mode, whether a finger's tap is free for the score (hearing a
+     * note, moving the playback): "Draw with finger" is off and the tool is
+     * not Text (whose taps make text boxes).
+     */
+    fingerTapIsFree(e: PointerEvent): boolean {
+        return e.pointerType === "touch" && !this.fingerDraws && this.tool !== "text"
+            && !(e.target as Element).closest?.(".tnote") && !this.editingText;
+    }
+
     /** Whether one finger draws (true) or scrolls (false). */
     get fingerDraws(): boolean {
         return this.fingerChoice ?? !this.sawStylus;
@@ -652,6 +662,11 @@ export class Annotations {
             return;
         }
         if (e.pointerType === "touch") {
+            if (e.isPrimary) {
+                // a new touch: forget fingers whose lifting was never seen (their
+                // page was redrawn under them), or one finger would count as two
+                this.touches.clear();
+            }
             this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (this.touches.size > 1) {
                 this.cancelStroke(); // two fingers: scroll and zoom instead
@@ -710,12 +725,6 @@ export class Annotations {
 
     private onMove(e: PointerEvent) {
         if (e.pointerType === "touch" && this.touches.has(e.pointerId)) {
-            const prev = this.touches.get(e.pointerId)!;
-            if (this.active && this.touches.size === 2 && !this.drawing && this.pagesEl.classList.contains("finger-draw")) {
-                // two-finger scroll while fingers draw (the page can't scroll by itself then)
-                this.viewer.scrollLeft -= (e.clientX - prev.x) / 2;
-                this.viewer.scrollTop -= (e.clientY - prev.y) / 2;
-            }
             this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         }
         const d = this.drawing;

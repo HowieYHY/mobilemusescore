@@ -204,8 +204,14 @@ async function renderPage(i: number) {
             if (gen !== renderGeneration) {
                 return;
             }
+            // fingers on the screen: wait, so the page answers them at once (when
+            // it is busy, Chrome stops waiting for it and scrolls by itself)
+            if (fingersDown > 0) {
+                await new Promise((r) => requestAnimationFrame(r));
+                continue;
+            }
             const t1 = performance.now();
-            const done = draw(state.playing ? 6 : 40);
+            const done = draw(state.playing ? 6 : 12);
             performance.measure("page-draw", { start: t1 });
             if (done) {
                 break;
@@ -218,6 +224,10 @@ async function renderPage(i: number) {
 }
 
 let drawQueue: Promise<void> = Promise.resolve();
+let fingersDown = 0;
+for (const t of ["touchstart", "touchend", "touchcancel"]) {
+    ui.viewer.addEventListener(t, (e) => (fingersDown = (e as TouchEvent).touches.length), { passive: true });
+}
 
 function rerenderAll(keepOps: boolean) {
     renderGeneration++;
@@ -286,11 +296,14 @@ function setZoom(z: number) {
 ui.zoomIn.onclick = () => setZoom(state.zoom * 1.25);
 ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
 
-// Pinch to zoom around the point between the fingers, which stays under them
-// (moving both fingers also moves the score). The score is scaled with CSS
-// during the gesture and redrawn at the new size when the fingers lift.
+// Two fingers: they scroll the score, and spreading or pinching them zooms
+// around the point between them, which stays under them. Until the fingers'
+// distance changes clearly it is a plain scroll (no zoom, no redraw); once it
+// is a pinch the score is scaled with CSS and redrawn at the new size when the
+// fingers lift. The only two-finger handling, in and out of notes mode.
+const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
 {
-    let pinch: { dist: number; zoom: number; midX: number; midY: number; sx: number; sy: number; px: number; py: number } | null = null;
+    let pinch: { dist: number; zoom: number; midX: number; midY: number; sx: number; sy: number; px: number; py: number; zooming: boolean } | null = null;
     let last = { f: 1, x: 0, y: 0 };
     const mid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
     const dist = (t: TouchList) => Math.max(1, Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY));
@@ -302,20 +315,27 @@ ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
                 dist: dist(e.touches), zoom: state.zoom, midX: m.x, midY: m.y,
                 sx: ui.viewer.scrollLeft, sy: ui.viewer.scrollTop,
                 px: m.x - r.left, py: m.y - r.top, // the score point between the fingers (unscaled)
+                zooming: false,
             };
             last = { f: 1, x: m.x, y: m.y };
         }
     }, { passive: true });
-    ui.viewer.addEventListener("touchmove", (e) => {
-        if (!pinch || e.touches.length !== 2) {
+    let lastTouch = { m: { x: 0, y: 0 }, ratio: 1 };
+    const follow = (m: { x: number; y: number }, ratio: number) => {
+        if (!pinch) {
             return;
         }
-        if (e.cancelable) {
-            e.preventDefault();
+        lastTouch = { m, ratio };
+        if (!pinch.zooming && Math.abs(ratio - 1) < PINCH_START) {
+            // scrolling: the score follows the fingers
+            ui.viewer.scrollLeft = pinch.sx - (m.x - pinch.midX);
+            ui.viewer.scrollTop = pinch.sy - (m.y - pinch.midY);
+            last = { f: 1, x: m.x, y: m.y };
+            return;
         }
-        const m = mid(e.touches);
+        pinch.zooming = true;
         // keep within the zoom limits
-        const f = clampZoom(pinch.zoom * dist(e.touches) / pinch.dist) / pinch.zoom;
+        const f = clampZoom(pinch.zoom * ratio) / pinch.zoom;
         // where the unscaled score would be now (the browser may have scrolled it)
         const left0 = pinch.midX - pinch.px - (ui.viewer.scrollLeft - pinch.sx);
         const top0 = pinch.midY - pinch.py - (ui.viewer.scrollTop - pinch.sy);
@@ -323,7 +343,22 @@ ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
         const ty = m.y - top0 - pinch.py * f;
         ui.pages.style.transform = `translate(${tx}px, ${ty}px) scale(${f})`;
         last = { f, x: m.x, y: m.y };
+    };
+    ui.viewer.addEventListener("touchmove", (e) => {
+        if (!pinch || e.touches.length !== 2) {
+            return;
+        }
+        if (e.cancelable) {
+            e.preventDefault();
+        }
+        follow(mid(e.touches), dist(e.touches) / pinch.dist);
     }, { passive: false });
+    // if the browser scrolls anyway, keep the zoomed score under the fingers
+    ui.viewer.addEventListener("scroll", () => {
+        if (pinch?.zooming) {
+            follow(lastTouch.m, lastTouch.ratio);
+        }
+    }, { passive: true });
     const end = (e: TouchEvent) => {
         if (!pinch || e.touches.length >= 2) {
             return;
@@ -334,8 +369,12 @@ ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
         const left0 = p.midX - p.px - (ui.viewer.scrollLeft - p.sx);
         const top0 = p.midY - p.py - (ui.viewer.scrollTop - p.sy);
         ui.pages.style.transform = "";
-        if (last.f === 1 && last.x === p.midX && last.y === p.midY) {
-            return;
+        if (!p.zooming || last.f === 1) {
+            if (p.zooming) { // pinched and back: where the fingers left it
+                ui.viewer.scrollLeft -= last.x - (left0 + p.px);
+                ui.viewer.scrollTop -= last.y - (top0 + p.py);
+            }
+            return; // a scroll: already in place
         }
         zoomAround(p.zoom * last.f, left0 + p.px, top0 + p.py, last.x, last.y);
     };
@@ -355,7 +394,8 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
     ui.pages.addEventListener("pointerup", async (e) => {
         const d = down;
         down = null;
-        if (!d || d.id !== e.pointerId || !state.score || notes.active) {
+        // in notes mode a tap draws, except a finger's when it doesn't draw
+        if (!d || d.id !== e.pointerId || !state.score || (notes.active && !notes.fingerTapIsFree(e))) {
             return;
         }
         if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10 || performance.now() - d.t > 500) {
@@ -678,19 +718,21 @@ ui.seek.addEventListener("change", () => {
 // Volume is shown as loudness compared with the score's own setting: 100% is
 // as written, 200% sounds about twice as loud (+10 dB), 50% about half (-10 dB).
 // The engine works in dB like desktop's mixer (-60 to +12).
+// `base` is the score's own setting in dB (100%); a part saved silent counts from 0 dB.
 const MIN_DB = -60;
 const MAX_DB = 12; // desktop's mixer goes to +12 dB, and scores are saved with it
-const MAX_PCT = 230; // +12 dB
-const pctFromDb = (db: number) => (db <= MIN_DB ? 0 : Math.min(MAX_PCT, Math.round(100 * Math.pow(2, db / 10))));
-const dbFromPct = (pct: number) => (pct <= 0 ? MIN_DB : Math.min(MAX_DB, Math.max(MIN_DB, 10 * Math.log2(pct / 100))));
+const baseDb = (base: number) => (base <= -40 ? 0 : base);
+const pctFromDb = (db: number, base: number) => (db <= MIN_DB ? 0 : Math.min(200, Math.round(100 * Math.pow(2, (db - baseDb(base)) / 10))));
+const dbFromPct = (pct: number, base: number) => (pct <= 0 ? MIN_DB : Math.min(MAX_DB, Math.max(MIN_DB, baseDb(base) + 10 * Math.log2(pct / 100))));
 const fmtDb = (db: number) => (db <= MIN_DB ? "silent" : (db > 0 ? "+" : "") + db.toFixed(1) + " dB");
 
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const ICON_WARN = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3L2 21h20zM12 10v5M12 17.5v.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-// A volume slider in percent, snapping to 100% (as written) near the middle mark
-function volumeControl(row: HTMLElement, label: string, db: number, onChange: (db: number) => void) {
+// A volume slider in percent of the score's own setting (`base`, in dB), snapping
+// to 100% (as the score was saved) near the middle mark
+function volumeControl(row: HTMLElement, label: string, db: number, base: number, onChange: (db: number) => void) {
     const vol = row.querySelector<HTMLInputElement>(".vol")!;
     const out = row.querySelector<HTMLElement>(".db")!;
     vol.setAttribute("aria-label", label);
@@ -699,7 +741,7 @@ function volumeControl(row: HTMLElement, label: string, db: number, onChange: (d
         vol.setAttribute("aria-valuetext", `${pct} percent`);
         vol.title = fmtDb(dbNow);
     };
-    const pct0 = pctFromDb(db);
+    const pct0 = pctFromDb(db, base);
     vol.value = String(pct0);
     show(pct0, db);
     let last = db;
@@ -710,9 +752,10 @@ function volumeControl(row: HTMLElement, label: string, db: number, onChange: (d
             vol.value = "100";
         }
         // the slider counts whole percent; where it still shows the starting
-        // value, keep the exact setting (touching it changes nothing)
-        const d = pct === pct0 ? db : dbFromPct(pct);
-        show(pct, d);
+        // value, keep the exact setting (touching it changes nothing), and
+        // 100% is exactly the score's setting
+        const d = pct === pct0 ? db : pct === 100 ? baseDb(base) : dbFromPct(pct, base);
+        show(pctFromDb(d, base), d); // above +12 dB it stops: say what it is
         if (d !== last) {
             last = d;
             onChange(d);
@@ -726,7 +769,7 @@ function buildMixer() {
         <div class="who"><div class="name"></div></div>
         <button class="toggle m" aria-label="Mute">M</button>
         <button class="toggle s" aria-label="Solo">S</button>
-        <div class="level"><input class="vol" type="range" min="0" max="230" step="1"></div>
+        <div class="level"><input class="vol" type="range" min="0" max="200" step="1"></div>
         <output class="db"></output>
         <div class="note"></div>`;
 
@@ -734,7 +777,7 @@ function buildMixer() {
     master.className = "strip master";
     master.innerHTML = stripHtml;
     master.querySelector<HTMLElement>(".name")!.textContent = "Master";
-    volumeControl(master, "Master volume", state.masterDb, (db) => {
+    volumeControl(master, "Master volume", state.masterDb, mix.score?.master ?? state.masterDb, (db) => {
         state.masterDb = db;
         void engine.setMasterVolume(db);
         mixChanged();
@@ -771,7 +814,7 @@ function buildMixer() {
         s.setAttribute("aria-pressed", String(t.solo));
         m.setAttribute("aria-label", `Mute ${t.title}`);
         s.setAttribute("aria-label", `Solo ${t.title}`);
-        volumeControl(row, `Volume of ${t.title}`, t.volume, (db) => {
+        volumeControl(row, `Volume of ${t.title}`, t.volume, mix.score?.parts[slot(t)]?.volume ?? t.volume, (db) => {
             t.volume = db;
             void engine.setVolume(t.key, db);
             mixChanged();

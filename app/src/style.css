@@ -150,6 +150,9 @@ body {
 
 .viewer {
   flex: 1;
+  /* the app keeps the reader's place itself; the browser's scroll anchoring
+     moved the score when a page's drawing was put in (random small jumps) */
+  overflow-anchor: none;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   position: relative;
@@ -309,10 +312,10 @@ body {
 .strip .s { grid-area: s; }
 .strip .level { grid-area: vol; position: relative; display: flex; align-items: center; }
 .strip .level::before {
-  /* where 100% is on the 0-230% slider */
+  /* where "as the score was saved" (100%) is */
   content: "";
   position: absolute;
-  left: 43.48%;
+  left: 50%;
   top: 50%;
   width: 2px;
   height: 14px;

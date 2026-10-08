@@ -32,6 +32,9 @@ await page.goto(url);
 await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
 await page.setInputFiles("#file-input", scorePath);
 await page.waitForSelector(".page canvas", { timeout: 180000 });
+// the status bar above the score comes and goes while the sounds load, moving
+// the score; measure once it has settled
+await page.waitForFunction(() => app.state.playbackReady && document.getElementById("status").hidden, null, { timeout: 180000 });
 await page.waitForTimeout(500);
 
 // the score point (page, fraction across, fraction down) under a screen point
@@ -98,6 +101,28 @@ await page.tap("#zoom-in");
 await page.waitForTimeout(300);
 const s = await screenOf(mid);
 check(Math.hypot(s.x - v.x, s.y - v.y) < 4, `+ keeps the middle of the view in place (off by ${Math.hypot(s.x - v.x, s.y - v.y).toFixed(1)} px)`);
+
+// two-finger scroll: the score follows the fingers, no zoom, nothing drawn
+async function twoFingerScroll(label) {
+    const before = await page.evaluate(() => ({ top: document.getElementById("viewer").scrollTop, zoom: app.state.zoom, ink: document.querySelectorAll(".ink path").length }));
+    const p0 = await pointAt(206, 600);
+    await pinch(206, 600, 120, 124, 0, -250, 15); // fingers 4 px wider: still a scroll
+    const after = await page.evaluate(() => ({ top: document.getElementById("viewer").scrollTop, zoom: app.state.zoom, ink: document.querySelectorAll(".ink path").length }));
+    const s = await screenOf(p0);
+    check(after.zoom === before.zoom && after.ink === before.ink && Math.abs(s.y - 350) < 3,
+        `${label}: two fingers scroll the score ${(after.top - before.top).toFixed(0)} px, it stays under them (off by ${Math.abs(s.y - 350).toFixed(1)} px), zoom and notes unchanged`);
+}
+await page.evaluate(() => { document.getElementById("viewer").scrollTop = 100; });
+await twoFingerScroll("reading");
+await page.tap("#notes-toggle");
+if (!(await page.evaluate(() => app.notes.fingerDraws))) {
+    await page.tap("#notes-finger");
+}
+await page.evaluate(() => { document.getElementById("viewer").scrollTop = 100; });
+await twoFingerScroll("notes, Draw with finger on");
+await page.tap("#notes-finger");
+await page.evaluate(() => { document.getElementById("viewer").scrollTop = 100; });
+await twoFingerScroll("notes, Draw with finger off");
 
 await browser.close();
 console.log(failures ? `${failures} failure(s)` : "pinch checks passed");

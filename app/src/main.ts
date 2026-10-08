@@ -223,44 +223,103 @@ function fitWidthZoom() {
     return Math.min(1, Math.max(0.3, (ui.viewer.clientWidth - 16) / pageCss));
 }
 
-function setZoom(z: number) {
-    state.zoom = Math.min(4, Math.max(0.3, z));
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 4;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+
+// Where a screen point falls on the score: a page and the fraction across and
+// down it (the nearest page when the point is in a gap)
+function anchorAt(x: number, y: number): { page: number; fx: number; fy: number } | null {
+    let best: { page: number; fx: number; fy: number } | null = null;
+    let bestDist = Infinity;
+    state.pageEls.forEach((el, i) => {
+        const r = el.getBoundingClientRect();
+        const d = Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+        if (d < bestDist) {
+            bestDist = d;
+            best = { page: i, fx: (x - r.left) / r.width, fy: (y - r.top) / r.height };
+        }
+    });
+    return best;
+}
+
+// Zoom so that the point of the score under (x, y) stays under (toX, toY)
+function zoomAround(z: number, x: number, y: number, toX = x, toY = y) {
+    const a = anchorAt(x, y);
+    state.zoom = clampZoom(z);
     rerenderAll(true);
+    const el = a && state.pageEls[a.page];
+    if (el) {
+        const r = el.getBoundingClientRect();
+        ui.viewer.scrollLeft += r.left + a.fx * r.width - toX;
+        ui.viewer.scrollTop += r.top + a.fy * r.height - toY;
+    }
+}
+
+function setZoom(z: number) {
+    // around the middle of the view
+    const v = ui.viewer.getBoundingClientRect();
+    zoomAround(z, v.left + v.width / 2, v.top + v.height / 2);
 }
 
 ui.zoomIn.onclick = () => setZoom(state.zoom * 1.25);
 ui.zoomOut.onclick = () => setZoom(state.zoom / 1.25);
 
-// pinch to zoom: scale with CSS during the gesture, redraw at the end
+// Pinch to zoom around the point between the fingers, which stays under them
+// (moving both fingers also moves the score). The score is scaled with CSS
+// during the gesture and redrawn at the new size when the fingers lift.
 {
-    let startDist = 0;
-    let startZoom = 1;
-    let pinching = false;
-    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    let pinch: { dist: number; zoom: number; midX: number; midY: number; sx: number; sy: number; px: number; py: number } | null = null;
+    let last = { f: 1, x: 0, y: 0 };
+    const mid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    const dist = (t: TouchList) => Math.max(1, Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY));
     ui.viewer.addEventListener("touchstart", (e) => {
-        if (e.touches.length === 2) {
-            pinching = true;
-            startDist = dist(e.touches);
-            startZoom = state.zoom;
+        if (e.touches.length === 2 && state.score) {
+            const m = mid(e.touches);
+            const r = ui.pages.getBoundingClientRect();
+            pinch = {
+                dist: dist(e.touches), zoom: state.zoom, midX: m.x, midY: m.y,
+                sx: ui.viewer.scrollLeft, sy: ui.viewer.scrollTop,
+                px: m.x - r.left, py: m.y - r.top, // the score point between the fingers (unscaled)
+            };
+            last = { f: 1, x: m.x, y: m.y };
         }
     }, { passive: true });
     ui.viewer.addEventListener("touchmove", (e) => {
-        if (pinching && e.touches.length === 2) {
+        if (!pinch || e.touches.length !== 2) {
+            return;
+        }
+        if (e.cancelable) {
             e.preventDefault();
-            const f = dist(e.touches) / startDist;
-            ui.pages.style.transform = `scale(${f})`;
         }
+        const m = mid(e.touches);
+        // keep within the zoom limits
+        const f = clampZoom(pinch.zoom * dist(e.touches) / pinch.dist) / pinch.zoom;
+        // where the unscaled score would be now (the browser may have scrolled it)
+        const left0 = pinch.midX - pinch.px - (ui.viewer.scrollLeft - pinch.sx);
+        const top0 = pinch.midY - pinch.py - (ui.viewer.scrollTop - pinch.sy);
+        const tx = m.x - left0 - pinch.px * f;
+        const ty = m.y - top0 - pinch.py * f;
+        ui.pages.style.transform = `translate(${tx}px, ${ty}px) scale(${f})`;
+        last = { f, x: m.x, y: m.y };
     }, { passive: false });
-    ui.viewer.addEventListener("touchend", (e) => {
-        if (pinching && e.touches.length < 2) {
-            pinching = false;
-            const m = /scale\(([\d.]+)\)/.exec(ui.pages.style.transform);
-            ui.pages.style.transform = "";
-            if (m) {
-                setZoom(startZoom * Number(m[1]));
-            }
+    const end = (e: TouchEvent) => {
+        if (!pinch || e.touches.length >= 2) {
+            return;
         }
-    });
+        const p = pinch;
+        pinch = null;
+        // the score point that started between the fingers, on screen now
+        const left0 = p.midX - p.px - (ui.viewer.scrollLeft - p.sx);
+        const top0 = p.midY - p.py - (ui.viewer.scrollTop - p.sy);
+        ui.pages.style.transform = "";
+        if (last.f === 1 && last.x === p.midX && last.y === p.midY) {
+            return;
+        }
+        zoomAround(p.zoom * last.f, left0 + p.px, top0 + p.py, last.x, last.y);
+    };
+    ui.viewer.addEventListener("touchend", end);
+    ui.viewer.addEventListener("touchcancel", end);
 }
 
 // Tap a note or rest to play from there (a tap, not a scroll or pinch).

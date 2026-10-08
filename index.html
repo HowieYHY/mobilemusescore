@@ -10,8 +10,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-BHvHyn0m.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-D2jNMnaG.css">
+  <script type="module" crossorigin src="./assets/index-Dh4Fz8jK.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CTzIv_W6.css">
 </head>
 <body>
   <header class="topbar">
@@ -102,13 +102,15 @@
       <button class="btn small" id="speed-close">Done</button>
     </div>
     <div class="practice-body">
-      <div class="practice-row">
-        <button class="btn round plain" id="speed-down" aria-label="Slower">−</button>
-        <input type="range" id="speed" min="10" max="300" step="5" value="100" aria-labelledby="speed-title">
-        <button class="btn round plain" id="speed-up" aria-label="Faster">+</button>
+      <div class="practice-row tempo-row">
+        <label class="tempo" for="tempo-input"><svg class="crotchet" viewBox="0 0 14 24" width="12" height="21" aria-hidden="true"><ellipse cx="5.2" cy="19.5" rx="4.6" ry="3.4" transform="rotate(-22 5.2 19.5)" fill="currentColor"/><rect x="8.6" y="1" width="1.6" height="18" fill="currentColor"/></svg><span class="eq">=</span><input id="tempo-input" type="number" inputmode="numeric" min="1" max="999" step="1" value="120" aria-label="Tempo, quarter notes per minute"></label>
         <output id="speed-value" for="speed">100%</output>
       </div>
-      <p class="practice-hint">The music keeps its place when you change the speed, even while it plays.</p>
+      <div class="practice-row">
+        <button class="btn round plain" id="speed-down" aria-label="Slower">−</button>
+        <input type="range" id="speed" min="10" max="300" step="1" value="100" aria-labelledby="speed-title">
+        <button class="btn round plain" id="speed-up" aria-label="Faster">+</button>
+      </div>
     </div>
   </section>
 
@@ -127,7 +129,7 @@
         <button class="btn plain" id="loop-right">Set loop marker right</button>
       </div>
       <button class="btn plain loop-clear" id="loop-clear" disabled>Clear loop markers</button>
-      <p class="practice-hint">The markers go at the play position: tap a note first to move it there.</p>
+      <p class="practice-hint" id="loop-hint">Tap a marker button, then tap the note where the loop should start or end.</p>
     </div>
   </section>
 

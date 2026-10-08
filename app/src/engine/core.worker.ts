@@ -170,6 +170,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             result = JSON.parse(callStr("mss_set_loop", req.on ? 1 : 0));
             core._mss_process();
             break;
+        case "clearLoop":
+            result = JSON.parse(callStr("mss_clear_loop"));
+            core._mss_process();
+            break;
         case "practice":
             result = JSON.parse(callStr("mss_practice"));
             break;

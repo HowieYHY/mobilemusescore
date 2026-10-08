@@ -93,6 +93,8 @@ public:
     std::string setTempoMultiplier(double multiplier, double at);
     std::string setLoopMarker(bool right, double at);
     std::string setLoopEnabled(bool on);
+    // Removes both markers and turns the loop off
+    std::string clearLoop();
     std::string practiceJson() const;
 
     std::string tracksJson() const;

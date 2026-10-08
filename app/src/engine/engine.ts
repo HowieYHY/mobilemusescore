@@ -364,5 +364,6 @@ export class Engine {
     }
     setLoopMarker(right: boolean, at: number): Promise<PracticeInfo> { return this.request({ cmd: "loopMarker", right, at }); }
     setLoop(on: boolean): Promise<PracticeInfo> { return this.request({ cmd: "loop", on }); }
+    clearLoop(): Promise<PracticeInfo> { return this.request({ cmd: "clearLoop" }); }
     practice(): Promise<PracticeInfo> { return this.request({ cmd: "practice" }); }
 }

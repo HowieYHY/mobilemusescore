@@ -27,7 +27,7 @@ export type WorkerRequest =
     | Req<{ cmd: "speed"; multiplier: number; at: number }>
     | Req<{ cmd: "loopMarker"; right: boolean; at: number }>
     | Req<{ cmd: "loop"; on: boolean }>
-    | Req<{ cmd: "practice" }>;
+    | Req<{ cmd: "practice" | "clearLoop" }>;
 
 export type WorkerReply =
     | { type: "reply"; id: number; result?: unknown; error?: string }

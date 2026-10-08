@@ -115,5 +115,6 @@ EMSCRIPTEN_KEEPALIVE void mss_set_output_latency(double secs) { Session::instanc
 EMSCRIPTEN_KEEPALIVE const char* mss_set_speed(double multiplier, double at) { return ret(Session::instance()->setTempoMultiplier(multiplier, at)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_set_loop_marker(int right, double at) { return ret(Session::instance()->setLoopMarker(right != 0, at)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_set_loop(int on) { return ret(Session::instance()->setLoopEnabled(on != 0)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_clear_loop() { return ret(Session::instance()->clearLoop()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_practice() { return ret(Session::instance()->practiceJson()); }
 }

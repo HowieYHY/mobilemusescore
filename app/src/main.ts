@@ -48,9 +48,13 @@ const ui = {
     palette: $("palette"),
     paletteGrid: $("palette-grid"),
     paletteCustom: $<HTMLInputElement>("palette-custom"),
-    practice: $("practice"),
-    practiceToggle: $<HTMLButtonElement>("practice-toggle"),
-    practiceClose: $<HTMLButtonElement>("practice-close"),
+    speedPanel: $("speed-panel"),
+    speedOpen: $<HTMLButtonElement>("speed-open"),
+    speedClose: $<HTMLButtonElement>("speed-close"),
+    loopPanel: $("loop-panel"),
+    loopOpen: $<HTMLButtonElement>("loop-open"),
+    loopClose: $<HTMLButtonElement>("loop-close"),
+    loopClear: $<HTMLButtonElement>("loop-clear"),
     speed: $<HTMLInputElement>("speed"),
     speedValue: $("speed-value"),
     speedDown: $<HTMLButtonElement>("speed-down"),
@@ -388,6 +392,7 @@ function rerenderAll(keepOps: boolean) {
     v.scrollLeft = fx * v.scrollWidth;
     v.scrollTop = fy * v.scrollHeight;
     showCursor(lastCursor);
+    showLoopMarks();
 }
 
 // Zoom at which the first page fills the screen width (capped at 100%)
@@ -1213,9 +1218,10 @@ window.addEventListener("popstate", () => {
 
 // ---------------------------------------------------------------- speed and loop
 
-// As desktop's playback toolbar: Speed (10-300%, steps of 5) and Loop playback
-// with its left and right markers, set at the play position. Kept per score
-// for the session only (a new score starts at 100% with no loop).
+// As desktop's playback toolbar, as two controls: Speed (10-300%, steps of 5)
+// and Loop playback with its left and right markers, set at the play
+// position and drawn on the score. Kept per score for the session only (a new
+// score starts at 100% with no loop).
 let practice: PracticeInfo = { speed: 1, duration: 0, loop: false };
 
 function showPractice(p: PracticeInfo | null) {
@@ -1231,12 +1237,17 @@ function showPractice(p: PracticeInfo | null) {
     ui.speedUp.disabled = pct >= 300;
     ui.speedBadge.textContent = pct + "%";
     ui.speedBadge.hidden = pct === 100;
-    ui.practiceToggle.classList.toggle("changed", pct !== 100);
-    ui.practiceToggle.setAttribute("aria-pressed", String(p.loop));
-    ui.practiceToggle.setAttribute("aria-label", `Speed and loop (speed ${pct}%${p.loop ? ", looping" : ""})`);
+    ui.speedOpen.classList.toggle("changed", pct !== 100);
+    ui.speedOpen.setAttribute("aria-label", `Speed (${pct}%)`);
+
+    const marked = p.fromBar !== undefined && p.toBar !== undefined;
+    const bars = marked ? (p.fromBar === p.toBar ? `Bar ${p.fromBar}` : `Bars ${p.fromBar}–${p.toBar}`) : "Whole score";
+    ui.loopOpen.setAttribute("aria-pressed", String(p.loop));
+    ui.loopOpen.setAttribute("aria-label", p.loop ? `Loop (on: ${bars})` : "Loop (off)");
     ui.loopToggle.setAttribute("aria-pressed", String(p.loop));
-    const bars = p.fromBar && p.toBar ? (p.fromBar === p.toBar ? `Bar ${p.fromBar}` : `Bars ${p.fromBar}–${p.toBar}`) : "Whole score";
-    ui.loopRange.textContent = p.loop ? bars : (p.fromBar ? bars + " (off)" : "Whole score");
+    ui.loopRange.textContent = p.loop ? bars : marked ? bars + " (off)" : "Whole score";
+    ui.loopClear.disabled = !marked;
+
     if (p.duration) {
         state.duration = p.duration;
         ui.duration.textContent = fmt(state.duration);
@@ -1251,8 +1262,45 @@ function showPractice(p: PracticeInfo | null) {
         ui.loopBand.style.width = `calc((100% - 16px) * ${Math.max(0.004, t - f)})`;
     }
     if (speedChanged) {
-        void loadTimeline().then(() => showPosition(state.position)); // the cursor's times follow the speed
+        // the cursor's and markers' times follow the speed
+        void loadTimeline().then(() => {
+            showPosition(state.position);
+            showLoopMarks();
+        });
+    } else {
+        showLoopMarks();
     }
+}
+
+// The markers on the score: the playback line's place at the loop's start and
+// just before its end (so the end stays on its own system, as desktop does)
+const loopMarks = { in: null as HTMLDivElement | null, out: null as HTMLDivElement | null };
+function showLoopMarks() {
+    const p = practice;
+    const place = (which: "in" | "out", secs: number | undefined) => {
+        const c = secs === undefined ? null : cursorFromTimeline(which === "in" ? secs : Math.max(0, secs - 0.005));
+        const pageEl = c && c.page !== undefined ? state.pageEls[c.page] : null;
+        let el = loopMarks[which];
+        if (!c || !pageEl || p.fromBar === undefined) {
+            el?.remove();
+            return;
+        }
+        if (!el) {
+            el = loopMarks[which] = document.createElement("div");
+            el.className = "loop-mark " + which;
+            el.setAttribute("aria-hidden", "true");
+        }
+        if (el.parentElement !== pageEl) {
+            pageEl.appendChild(el);
+        }
+        // the cursor's x is its left edge; the end marker goes to its right edge
+        const x = unitsToCss(c.x! + (which === "out" ? c.w! : 0));
+        el.style.transform = `translate(${x}px, ${unitsToCss(c.y!)}px)`;
+        el.style.height = unitsToCss(c.h!) + "px";
+        el.style.opacity = p.loop ? "1" : "0.45";
+    };
+    place("in", p.from);
+    place("out", p.to);
 }
 
 async function setSpeed(pct: number) {
@@ -1268,25 +1316,58 @@ ui.speedUp.onclick = () => void setSpeed(Math.round(practice.speed * 100) + 5);
 ui.loopToggle.onclick = async () => showPractice(await engine.setLoop(!practice.loop));
 ui.loopLeft.onclick = async () => showPractice(await engine.setLoopMarker(false, state.position));
 ui.loopRight.onclick = async () => showPractice(await engine.setLoopMarker(true, state.position));
+ui.loopClear.onclick = async () => showPractice(await engine.clearLoop());
 
-function closePractice() {
-    ui.practice.hidden = true;
-    ui.practiceToggle.setAttribute("aria-expanded", "false");
+// Bottom-sheet panels: the mixer, speed and loop; one open at a time
+const sheets = [
+    { panel: ui.speedPanel, open: ui.speedOpen, close: closeSpeed },
+    { panel: ui.loopPanel, open: ui.loopOpen, close: closeLoop },
+];
+function closeSpeed() {
+    ui.speedPanel.hidden = true;
+    ui.speedOpen.setAttribute("aria-expanded", "false");
 }
+function closeLoop() {
+    ui.loopPanel.hidden = true;
+    ui.loopOpen.setAttribute("aria-expanded", "false");
+}
+// Opening one while another is open takes over its Back entry: closing the
+// other through history first happened later and closed the new one instead
+function openSheet(close: () => void) {
+    const others = [closeSounds, closeMixer, closeSpeed, closeLoop].filter((c) => c !== close);
+    let reuse = false;
+    for (let i = layers.length - 1; i >= 0; i--) {
+        if (others.includes(layers[i])) {
+            const c = layers.splice(i, 1)[0];
+            c();
+            reuse = true;
+        }
+    }
+    if (reuse) {
+        layers.push(close);
+    } else {
+        openLayer(close);
+    }
+}
+for (const s of sheets) {
+    s.open.onclick = () => {
+        if (!s.panel.hidden) {
+            closeLayer(s.close);
+            return;
+        }
+        s.panel.hidden = false;
+        s.open.setAttribute("aria-expanded", "true");
+        openSheet(s.close);
+    };
+}
+ui.speedClose.onclick = () => closeLayer(closeSpeed);
+ui.loopClose.onclick = () => closeLayer(closeLoop);
 
-ui.practiceToggle.onclick = () => {
-    if (!ui.practice.hidden) {
-        closeLayer(closePractice);
-        return;
-    }
-    if (!ui.mixer.hidden) {
-        closeLayer(closeMixer);
-    }
-    ui.practice.hidden = false;
-    ui.practiceToggle.setAttribute("aria-expanded", "true");
-    openLayer(closePractice);
-};
-ui.practiceClose.onclick = () => closeLayer(closePractice);
+// Panels and the zoom buttons sit on the bottom bar, whose height changes
+// (two rows on phones, the home indicator)
+new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--transport-h", $("transport").offsetHeight + "px");
+}).observe($("transport"));
 
 // ---------------------------------------------------------------- mixer panel
 
@@ -1303,12 +1384,9 @@ ui.mixerToggle.onclick = () => {
         closeLayer(closeMixer);
         return;
     }
-    if (!ui.practice.hidden) {
-        closeLayer(closePractice);
-    }
     ui.mixer.hidden = false;
     ui.mixerToggle.setAttribute("aria-expanded", "true");
-    openLayer(closeMixer);
+    openSheet(closeMixer);
     void refreshTracks();
 };
 ui.mixerClose.onclick = () => closeLayer(closeMixer);
@@ -1620,7 +1698,8 @@ async function openScore(name: string, data: ArrayBuffer) {
     ui.viewMode.disabled = false;
     ui.viewMode.value = "page";
     ui.play.disabled = false;
-    ui.practiceToggle.disabled = false;
+    ui.speedOpen.disabled = false;
+    ui.loopOpen.disabled = false;
     showPractice({ speed: 1, duration: state.duration, loop: false }); // the engine starts each score so
     ui.rewind.disabled = false;
     ui.seek.disabled = false;

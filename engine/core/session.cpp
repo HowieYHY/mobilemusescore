@@ -1138,6 +1138,14 @@ std::string Session::setLoopEnabled(bool on)
     return practiceJson();
 }
 
+std::string Session::clearLoop()
+{
+    m_loopOn = false;
+    m_loopIn = m_loopOut = -1;
+    applyLoop();
+    return practiceJson();
+}
+
 void Session::applyLoop()
 {
     const Score* score = m_project ? m_project->masterScore() : nullptr;

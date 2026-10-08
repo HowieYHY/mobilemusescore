@@ -199,7 +199,7 @@ body {
 .zoom {
   position: fixed;
   right: 12px;
-  bottom: calc(86px + var(--bar-b));
+  bottom: calc(var(--transport-h, calc(66px + var(--bar-b))) + 20px);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -224,6 +224,16 @@ body {
   z-index: 6;
 }
 .timeline { flex: 1; min-width: 0; }
+/* Phones: the position slider gets its own row above the buttons, so it stays wide enough to use */
+@media (max-width: 520px) {
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto auto auto; grid-template-areas: "time time time time time time" "rew play . speed loop mixer"; row-gap: 4px; column-gap: 8px; padding-top: 6px; }
+  .transport .timeline { grid-area: time; }
+  #rewind { grid-area: rew; }
+  #play { grid-area: play; }
+  #speed-open { grid-area: speed; }
+  #loop-open { grid-area: loop; }
+  #mixer-toggle { grid-area: mixer; }
+}
 .timeline input[type=range] { width: 100%; accent-color: var(--accent-bright); height: 28px; }
 .times { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.85; font-variant-numeric: tabular-nums; }
 
@@ -241,11 +251,33 @@ body {
   pointer-events: none;
 }
 
-/* Speed and loop button: shows the speed when it isn't 100%, filled while a loop is on */
-#practice-toggle { position: relative; }
-#practice-toggle .speed-badge { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-#practice-toggle.changed .icon { display: none; }
-#practice-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+/* Speed shows its value when it isn't 100%; Loop is filled while looping */
+#speed-open .badge { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+#speed-open.changed .icon { display: none; }
+#speed-open.changed { border-color: var(--accent-bright); }
+#loop-open[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+
+/* Loop markers on the score, as desktop draws them: a line through the
+   system with a flag at the top (pointing into the loop) */
+.loop-mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  border-left: 2px solid #2456aa;
+  pointer-events: none;
+  z-index: 2;
+}
+.loop-mark::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  background: #2456aa;
+}
+.loop-mark.in::before { left: -1px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.loop-mark.out::before { right: 1px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
 
 /* ---------------------------------------------------------------- speed and loop */
 
@@ -253,7 +285,7 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(66px + var(--bar-b));
+  bottom: var(--transport-h, calc(66px + var(--bar-b)));
   background: var(--panel);
   color: var(--ink);
   box-shadow: 0 -6px 18px rgba(16, 24, 36, 0.18);
@@ -261,17 +293,15 @@ body {
 }
 .practice-body { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
 .practice-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
-.practice-label { flex: 1; font-size: 15px; font-weight: 600; }
-.stepper { display: flex; align-items: center; gap: 4px; }
-.stepper .btn.round { width: 40px; min-width: 40px; min-height: 40px; height: 40px; font-size: 20px; }
-.stepper output { min-width: 56px; text-align: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
-#speed { width: 100%; margin: 0; accent-color: var(--accent); height: 32px; }
-.loop-row { margin-top: 6px; border-top: 1px solid var(--panel-line); padding-top: 8px; }
+.practice-row .btn.round { width: 40px; min-width: 40px; min-height: 40px; height: 40px; font-size: 20px; }
+.practice-row output { min-width: 52px; text-align: right; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#speed { flex: 1; min-width: 0; margin: 0; accent-color: var(--accent); height: 32px; }
 .chip.light { color: var(--ink); border-color: #c4c9cf; background: #fff; min-height: 36px; font-size: 14px; font-weight: 600; }
 .chip.light[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .loop-range { flex: 1; text-align: right; font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .loop-markers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .loop-markers .btn { font-size: 14px; padding: 6px 8px; line-height: 1.2; }
+.loop-clear { align-self: flex-start; font-size: 14px; min-height: 36px; }
 .practice-hint { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
 
 @media (min-width: 760px) {
@@ -284,7 +314,7 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(66px + var(--bar-b));
+  bottom: var(--transport-h, calc(66px + var(--bar-b)));
   max-height: min(48vh, 420px);
   display: flex;
   flex-direction: column;

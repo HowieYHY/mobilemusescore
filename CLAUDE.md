@@ -38,6 +38,9 @@ build, tests, status) before working here.
   (no real name or personal email). The history was rewritten to this on 9 Oct 2026; a clone made
   before then must be reset to `origin/main` (and `build/ghpages` to `origin/gh-pages`) before
   any push, or it brings the old identities back.
+- **Tips go through Stripe** (a Payment Link, opened from the start screen and the README). Call them
+  tips, never donations (Stripe's rules), and keep payment code, keys and servers out of the app.
+  The owner chose PayNow and cards only, and no minimum amount.
 - **Issues live on GitHub** (`gh issue list`). One commit per issue, `Fixes #N` when it is verified,
   `Refs #N` when it still needs checking on the user's device (e.g. Android playback, picker filters).
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s

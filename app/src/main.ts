@@ -641,8 +641,10 @@ ui.seek.addEventListener("change", () => {
 // as written, 200% sounds about twice as loud (+10 dB), 50% about half (-10 dB).
 // The engine works in dB like desktop's mixer (-60 to +12).
 const MIN_DB = -60;
-const pctFromDb = (db: number) => (db <= MIN_DB ? 0 : Math.min(200, Math.round(100 * Math.pow(2, db / 10))));
-const dbFromPct = (pct: number) => (pct <= 0 ? MIN_DB : Math.max(MIN_DB, 10 * Math.log2(pct / 100)));
+const MAX_DB = 12; // desktop's mixer goes to +12 dB, and scores are saved with it
+const MAX_PCT = 230; // +12 dB
+const pctFromDb = (db: number) => (db <= MIN_DB ? 0 : Math.min(MAX_PCT, Math.round(100 * Math.pow(2, db / 10))));
+const dbFromPct = (pct: number) => (pct <= 0 ? MIN_DB : Math.min(MAX_DB, Math.max(MIN_DB, 10 * Math.log2(pct / 100))));
 const fmtDb = (db: number) => (db <= MIN_DB ? "silent" : (db > 0 ? "+" : "") + db.toFixed(1) + " dB");
 
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -662,15 +664,21 @@ function volumeControl(row: HTMLElement, label: string, db: number, onChange: (d
     const pct0 = pctFromDb(db);
     vol.value = String(pct0);
     show(pct0, db);
+    let last = db;
     vol.oninput = () => {
         let pct = Number(vol.value);
         if (Math.abs(pct - 100) <= 4) {
             pct = 100;
             vol.value = "100";
         }
-        const d = dbFromPct(pct);
+        // the slider counts whole percent; where it still shows the starting
+        // value, keep the exact setting (touching it changes nothing)
+        const d = pct === pct0 ? db : dbFromPct(pct);
         show(pct, d);
-        onChange(d);
+        if (d !== last) {
+            last = d;
+            onChange(d);
+        }
     };
 }
 
@@ -680,7 +688,7 @@ function buildMixer() {
         <div class="who"><div class="name"></div></div>
         <button class="toggle m" aria-label="Mute">M</button>
         <button class="toggle s" aria-label="Solo">S</button>
-        <div class="level"><input class="vol" type="range" min="0" max="200" step="1"></div>
+        <div class="level"><input class="vol" type="range" min="0" max="230" step="1"></div>
         <output class="db"></output>
         <div class="note"></div>`;
 
@@ -753,11 +761,16 @@ function buildMixer() {
             await refreshTracks();
             mixChanged();
         };
+        const rev0 = { pct: rev.value, amount: t.reverb };
         rev.oninput = () => {
             revOut.textContent = rev.value + "%";
-            t.reverb = Number(rev.value) / 100;
-            void engine.setReverb(t.key, t.reverb);
-            mixChanged();
+            // as for volume: back at the starting mark, keep the exact setting
+            const amount = rev.value === rev0.pct ? rev0.amount : Number(rev.value) / 100;
+            if (amount !== t.reverb) {
+                t.reverb = amount;
+                void engine.setReverb(t.key, amount);
+                mixChanged();
+            }
         };
 
         ui.mixerBody.appendChild(row);
@@ -1562,4 +1575,4 @@ ui.notesClear.onclick = async () => {
 };
 
 // Let tests and the console drive the app
-(window as any).app = { engine, state, openScore, notes, mix };
+(window as any).app = { engine, state, openScore, notes, mix, currentMix };

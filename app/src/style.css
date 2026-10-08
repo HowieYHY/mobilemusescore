@@ -309,10 +309,10 @@ body {
 .strip .s { grid-area: s; }
 .strip .level { grid-area: vol; position: relative; display: flex; align-items: center; }
 .strip .level::before {
-  /* where "as written" (100%) is */
+  /* where 100% is on the 0-230% slider */
   content: "";
   position: absolute;
-  left: 50%;
+  left: 43.48%;
   top: 50%;
   width: 2px;
   height: 14px;

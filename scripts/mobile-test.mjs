@@ -166,8 +166,8 @@ await page.locator(".strip:not(.master):not(.metronome)").first().locator(".soun
 await page.waitForSelector("#sounds:not([hidden])");
 await page.waitForTimeout(200);
 await shot("07-sounds");
-check(await page.locator("#sounds .pick.top").textContent().then((t) => /Choose automatically/.test(t)), "the sound list starts with Choose automatically, as on desktop");
-check(await page.locator('#sounds .pick[aria-checked="true"]').count() === 1, "the current sound is ticked");
+check(await page.locator("#sounds .pick.top:not(.own)").textContent().then((t) => /Choose automatically/.test(t)), "the sound list starts with Choose automatically, as on desktop");
+check(await page.locator('#sounds .pick:not(.own)[aria-checked="true"]').count() === 1, "the current sound is ticked");
 // open a category and pick a sound from it
 const cat = page.locator("#sounds-body > details").filter({ hasText: "Strings" }).first();
 await cat.locator("> summary").tap();
@@ -228,6 +228,8 @@ await page.waitForTimeout(300);
 check((await soundOf()).mute === true && await page.isEnabled("#save"), "Cancel keeps the score and its unsaved change");
 await page.setInputFiles("#file-input", scorePath);
 await page.waitForSelector("#ask[open]");
+// the previous score's "ready" must not count for the one opening now
+await page.evaluate(() => { app.state.playbackReady = false; });
 await page.click('#ask button:has-text("Don\'t save")');
 await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
 await page.waitForTimeout(800);

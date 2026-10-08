@@ -1,191 +1,227 @@
 # PocketScore
 
-**Your MuseScore scores on your phone or tablet: read them, play them, practise your part.**
+**Your MuseScore scores on your phone or tablet. Read them, play them, practise your part.**
 
-PocketScore opens the `.mscz` files you make in MuseScore and plays them with the same
-MS Basic sounds you hear on your computer. Turn instruments or voices up, down, off or
-solo them to practise your own part. It works without an internet connection.
+### 👉 [Open PocketScore](https://howieyhy.github.io/mobilemusescore/)
 
-**Open PocketScore: https://howieyhy.github.io/mobilemusescore/**
+- Opens the `.mscz` files you make in MuseScore.
+- Plays them with the same sounds as MuseScore on your computer.
+- Turn any part up, down, off or solo it. Slow it down, or loop a passage.
+- Write on the score with your finger or a stylus.
+- Free, no account, no ads, and it works offline.
 
 ---
 
-## Install
+## Get it (2 minutes)
 
-You don't need an app store.
+No app store needed.
 
-### iPad and iPhone
-1. Open **https://howieyhy.github.io/mobilemusescore/** in **Safari**.
-2. Tap the **Share** button, then **Add to Home Screen**, then **Add**.
+**iPad / iPhone**
+1. Open the link above in **Safari**.
+2. Tap **Share** → **Add to Home Screen** → **Add**.
 3. Open **PocketScore** from your home screen.
 
-### Android
-1. Open **https://howieyhy.github.io/mobilemusescore/** in **Chrome**.
-2. Tap **Install PocketScore** on the start screen, then **Install**.
-   (If you don't see the button, tap Chrome's **⋮** menu, then **Add to Home screen**, then **Install**.)
-3. Open **PocketScore** from your home screen or app list. It opens in its own window, like any app.
+**Android**
+1. Open the link above in **Chrome**.
+2. Tap **Install PocketScore** → **Install**.
+   No button? Tap Chrome's **⋮** menu → **Add to Home screen** → **Install**.
+3. Open **PocketScore** from your home screen.
 
-### Computer
-Open the link in Chrome, Edge or Safari. Chrome and Edge also offer **Install PocketScore**.
+**Computer:** open the link in Chrome, Edge or Safari.
 
-**The first time you open a score**, PocketScore downloads its instrument sounds (about 50 MB),
-so use Wi-Fi. After that it works offline.
-
-### Updates
-When you open PocketScore with internet, it checks for a new version and downloads only what
-changed. When it's ready, PocketScore restarts by itself, or, if a score is open, asks you to tap
-the yellow bar. This is the same on every device. The version number is on the start screen.
+> The first score you open downloads the instrument sounds (about **50 MB**), so use Wi-Fi.
+> After that, PocketScore works without internet.
 
 ---
 
-## Using PocketScore
+## Good to know
 
-### Open a score
-Tap **Open score** and choose a `.mscz` file. On iPad and iPhone, first save your scores to the
-**Files** app (AirDrop them, or save them from email or a cloud drive); **Open score** opens
-Files straight away. On Android the file list shows all your files, not just scores: MuseScore
-scores are the ones ending in `.mscz`. If music is playing, it stops when you open another score.
+- **Your notes and saved settings stay on this device only.** They are not in the `.mscz` file.
+  People you share the score with won't see them, and you won't see them on your other devices.
+- **Removing PocketScore deletes them.** So does clearing Safari's or Chrome's website data.
+  There is no backup or export yet.
+- **Nothing is uploaded.** Your scores are opened on your device and never sent anywhere.
+  (The app itself is downloaded from GitHub's website hosting, which sees visits like any website.
+  PocketScore has no accounts, ads or tracking.)
+- **The music pauses when you leave the app** (another app, home screen, screen locked).
+  Tap Play when you're back.
+- **It updates itself.** With internet, it checks for a new version when you open it.
+  If a score is open, a yellow bar asks you to tap it to restart; then reopen your score.
+  Unsaved changes are kept. The version number is on the start screen.
 
-### Play
+---
+
+## How to…
+
+### Open and play
 | To… | Do this |
 | --- | --- |
-| Play or pause | Tap **▶** / **❚❚** |
-| Go back to the start | Tap **⏮** |
-| Jump anywhere | Drag the position slider |
-| Play from a particular note | Tap the note or rest in the score |
-| Hear a note | While stopped, tap it: it sounds, and Play starts from there |
-| Zoom | Pinch (the spot between your fingers stays put), or use **−** and **+** |
-| Scroll | Drag with one finger, or with two fingers (also while writing notes) |
-| Change the layout | Use the menu at the top right: *Page view*, *Continuous (vertical)* or *Continuous (horizontal)* |
-| Close a panel | Tap **Done**, or use your phone's **Back** button or gesture |
+| Open a score | Tap **Open score**, choose a `.mscz` file |
+| Play / pause | Tap **▶** / **❚❚** |
+| Start from a note | Tap the note |
+| Hear one note | While stopped, tap it |
+| Jump around | Drag the position slider |
+| Back to the start | Tap **⏮** |
+| Zoom | Pinch, or use **−** and **+** |
+| Scroll | Drag with one or two fingers |
+| Change the layout | Menu at the top right: *Page view* or *Continuous* |
+| Close a panel | Tap **Done**, or your phone's **Back** |
 
-A blue line shows where you are in the music, and the page follows it as it plays.
-If you scroll away, it waits a moment before following again.
+A blue line shows where you are, and the page follows it.
 
-**The music pauses when you leave PocketScore** (switch to another app, go to the home screen or
-lock the screen), so it never keeps playing where you can't see it. Tap Play when you come back.
+<details>
+<summary>More about opening scores</summary>
 
-### Practise slower, or loop a passage
-Tap the round **loop** button next to **Mixer**:
-- **Speed**: **−** and **+** change it in steps of 5%, or drag the slider (10% to 300%). The music
-  keeps its place when you change it, even while it plays.
-- **Loop playback**: plays the same passage over and over. With no markers it loops the whole score.
-- **Set loop marker left** / **Set loop marker right**: tap the first note of the passage, then
-  **Set loop marker left**; tap its last note, then **Set loop marker right**. The bars show next to
-  *Loop playback* (for example *Bars 6–10*), and a blue band under the position slider marks them.
+- **iPad and iPhone:** save your scores to the **Files** app first (AirDrop them, or save them
+  from email or a cloud drive). **Open score** goes straight to Files.
+- **Android:** the file list shows all your files, not only scores. Scores end in `.mscz`.
+- PocketScore opens `.mscz` and `.mscx` files. Not PDF, MusicXML or MIDI.
+- Opening another score stops the music.
+- If you scroll away while it plays, the page waits a moment before following the music again.
 
-The button shows the speed when it isn't 100%, and turns blue while a loop is on. Speed and loop are
-for this score only, while it is open: the next score you open plays at 100% with no loop.
+</details>
+
+### Practise: slower, or on repeat
+Two round buttons next to **Mixer**: **speed** (the dial) and **loop** (the arrows).
+
+| To… | Do this |
+| --- | --- |
+| Slow down / speed up | Tap the **speed** button, then **−** / **+** (5% steps) or the slider (10% to 300%) |
+| Loop a passage | Tap the **loop** button. Tap the passage's first note → **Set loop marker left**. Tap its last note → **Set loop marker right** |
+| Loop on / off | **Loop playback** (with no markers, the whole score loops) |
+| Remove the loop | **Clear loop markers** |
+
+- The markers show on the score as blue lines with a flag: **▶** where the loop starts, **◀** where it ends.
+  A blue band under the position slider marks the loop too.
+- The speed button shows the speed when it isn't 100%. The loop button turns blue while looping.
+- Speed and loop are **not saved**: the next score you open starts at 100%, with no loop.
+- On phones, the position slider sits on its own row above the buttons.
+
+### Mixer: hear your part
+Tap **Mixer**.
+
+| To… | Do this |
+| --- | --- |
+| Make a part louder or softer | Its slider. **100%** = as saved in the score |
+| Silence a part | **M** (mute) |
+| Hear only some parts | **S** (solo), on one or more parts |
+| Change a part's instrument | Tap the sound under its name (e.g. *Grand Piano*) |
+| Change several parts at once | In that list, tap **Several parts** |
+| Hear a click | Unmute **Metronome** at the bottom (it's muted every time a score opens) |
+| Room echo | Tap **Reverb** at the top |
+| Overall volume | **Master** |
+
+<details>
+<summary>More about the mixer</summary>
+
+- The mixer works as soon as the score is open; you don't need to press Play first.
+- It starts with the volume, mute and solo settings saved in your score, as MuseScore does.
+  If a score opens silent, its parts may have been saved muted.
+- **50%** sounds about half as loud, **200%** about twice as loud.
+- In the sound list, *In score* marks the sound the score uses, and *Each part's sound in the
+  score* puts every part back.
+- Mixer changes are kept when you tap **Save**.
+
+</details>
 
 ### Write on the score
-Tap the **pencil** button at the top:
-- **Pen** and **Highlight**: write or mark with a stylus (Apple Pencil, S Pen) or your finger.
-- **Draw with finger**: when it's on, one finger draws and two fingers scroll. Turn it off to scroll
-  with one finger and draw only with a stylus; then tapping a note with your finger plays it, as
-  outside notes mode. It starts on, and turns off by itself the first time
-  you use a stylus (you can turn it back on).
-- **Text**: **double-tap** the score to add a text box, then type. Tap once outside the box when
-  you're done. Tap a box to change it, drag the arrows on its left to move it, drag its bottom
-  corner to make it (and the text) bigger or smaller, and tap **×** to delete it.
-- **Erase**: tap or rub over a mark or text box.
-- **Colours**: black (the default), white, red, blue, green and yellow. Tap **+** for more colours,
-  or pick any colour. While you're typing in a text box, a new colour changes that box.
-- **Size** (the dots): how thick the pen, highlighter or eraser is.
-- **Undo** and **Clear** (everything on this score).
+Tap the **pencil** at the top, then tap **Done** when finished.
 
-Tap **Done** to go back to playing. To keep your notes, tap **Save** (see below).
+| Tool | What it does |
+| --- | --- |
+| **Pen** / **Highlight** | Write or mark with a stylus or finger |
+| **Text** | **Double-tap** the score to add a text box. Tap outside it when done |
+| **Erase** | Tap or rub over a mark or text box |
+| **Colours** | Black is the default. **+** for more |
+| **Size** (dots) | How thick the pen, highlighter or eraser is |
+| **Undo** / **Clear** | Clear removes everything on this score |
 
-> **Your notes stay on this device.** They are kept inside PocketScore, not in the `.mscz` file.
-> If you send the score to someone else, or open it on another phone, tablet or computer, the
-> notes are **not** there. Notes made in page view and in the continuous views are kept separately.
+<details>
+<summary>More about notes</summary>
 
-### Mixer: practise your part
-Tap **Mixer**:
-- **Slider**: how loud that part is, compared with the score. **100%** (the small mark in the
-  middle) is as the score was saved; **50%** sounds about half as loud, **200%** about twice as loud.
-- **M** (mute): silences that part. It shows **Muted**.
-- **Metronome** (at the bottom of the list): muted every time a score opens. Unmute it to hear a
-  click on every beat.
-- **S** (solo): plays only that part; you can solo several. The other parts are dimmed.
-- **The sound under a part's name** (for example *Grand Piano*): tap it to play that part with a
-  different instrument sound. To change several parts at once, tap **Several parts** at the top of
-  the list and choose them (or **All parts**); *Each part's sound in the score* puts them back. The sounds are grouped as in MuseScore's mixer; *In score* marks the
-  one the score uses.
-- **Reverb**: tap **Reverb** at the top to show how much room echo each part has.
-- **Master**: the overall volume.
+- **Draw with finger:** when on, one finger draws and two fingers scroll. Turn it off to scroll with
+  one finger and draw only with a stylus (then tapping a note with your finger plays it).
+  It turns off by itself the first time you use a stylus; you can turn it back on.
+- **Text boxes:** tap a box to change it, drag the arrows on its left to move it, drag its bottom
+  corner to resize it (the text grows with it), tap **×** to delete it. While you're typing, a new
+  colour changes that box.
+- Notes made in page view and in the continuous views are kept separately.
 
-The mixer works as soon as the score is open; you don't need to press Play first.
-PocketScore starts with the volume, mute and solo settings saved in your score, as MuseScore does.
-If a score opens with no sound, check whether its parts were saved muted.
+</details>
 
 ### Save
-**Save** at the top keeps everything you changed on this score, your notes and your mixer
-settings, for the next time you open it.
-- Save turns blue when there is something to save.
-- If you open another score with changes that aren't saved, PocketScore asks: **Save**,
-  **Don't save** (forget the changes) or **Cancel** (stay on this score).
-- If the app closes before you save, nothing is lost: next time you open the score your changes are
-  back, still unsaved, so you can save them then.
-- Your score file is never changed, and what you save stays on this device (see above). The score
-  is recognised by its contents, so a renamed copy of the same file shows your notes too; a version
-  you edited and re-saved in MuseScore counts as a different score.
+**Save** (top bar) keeps your notes and mixer changes for this score, on this device.
+
+- It turns blue when there's something to save.
+- Opening another score with unsaved changes asks: **Save**, **Don't save** or **Cancel**.
+- If the app closes before you save, nothing is lost: the changes come back next time, still unsaved.
+- Your `.mscz` file is never changed.
+
+<details>
+<summary>More about saving</summary>
+
+- The score is recognised by its contents: a renamed copy shows your notes too, but a version you
+  edited and re-saved in MuseScore counts as a different score.
 - On a keyboard, **Ctrl+S** (or **⌘S**) saves.
+- If the device's storage is full, PocketScore tells you the changes could not be saved.
+
+</details>
 
 ---
 
 ## Questions
 
-**Does it sound like MuseScore on my computer?**
-Yes, if your scores use MuseScore's standard **MS Basic** sounds. PocketScore uses the same sound
-engine and sounds as MuseScore 4.7.5. In side-by-side tests the volume, timing and tone matched
-desktop MuseScore.
+<details>
+<summary><b>Does it sound like MuseScore on my computer?</b></summary>
 
-**What about Muse Sounds or other sound libraries?**
-Muse Sounds, VST plugins and extra sound fonts only work in desktop MuseScore. Parts that use
-them play with the nearest MS Basic sound instead, and the mixer tells you which ones.
+Yes, with MuseScore's standard **MS Basic** sounds: PocketScore uses the same sound engine and sounds
+as MuseScore 4.7.5. In side-by-side tests the volume, timing and tone matched desktop MuseScore.
 
-**Does the page look exactly like MuseScore?**
-Very nearly. PocketScore lays scores out with MuseScore's own code, so the pages, systems and
-page breaks match. Spacing can differ very slightly, because computers and phones measure text
-a little differently.
+</details>
 
-**Can I edit scores?**
-No. PocketScore is for reading and playing. Make changes in MuseScore.
+<details>
+<summary><b>What about Muse Sounds or other sound libraries?</b></summary>
 
-**Are my scores uploaded anywhere?**
-No. Everything happens on your device. Your scores are never sent anywhere.
+Those only work in desktop MuseScore. Parts that use them play with the nearest MS Basic sound,
+and the mixer tells you which ones.
 
-**If I share a score, will others see my notes?**
-No. Notes and saved mixer settings stay in PocketScore on the device where you made them. The
-`.mscz` file is unchanged, so anyone you send it to (or you, on another device) sees the score
-without them.
+</details>
 
-**Which files does it open?**
-MuseScore files: `.mscz` (and uncompressed `.mscx`). Not PDF, MusicXML or MIDI.
+<details>
+<summary><b>Does the page look exactly like MuseScore?</b></summary>
+
+Very nearly. PocketScore lays scores out with MuseScore's own code, so pages and page breaks
+match. Spacing can differ very slightly, because phones measure text a little differently.
+
+</details>
+
+<details>
+<summary><b>Can I edit scores?</b></summary>
+
+No. PocketScore is for reading, playing and practising. Make changes in MuseScore.
+
+</details>
 
 ---
 
 ## Something not working?
 
-- **No sound on iPhone or iPad:** check the volume buttons, and that Bluetooth isn't sending sound to another device.
-- **"Audio could not start":** close PocketScore completely, reopen it, and tap Play again.
-- **Drawing scrolls the page instead (or the page won't scroll):** check **Draw with finger** in the notes bar.
-- **Choppy sound or jumpy scrolling:** make sure you have the latest version (shown on the start screen).
-  PocketScore checks itself while playing: if the sound stutters it prepares more of it ahead and
-  tells you once. If it keeps happening, send a screen recording and your phone model.
-- **A score won't open:** make sure it is a `.mscz` file saved by MuseScore.
+| Problem | Try this |
+| --- | --- |
+| No sound on iPhone / iPad | Check the volume buttons, and that Bluetooth isn't playing the sound elsewhere |
+| "Audio could not start" | Close PocketScore completely, reopen it, tap Play |
+| Drawing scrolls the page (or it won't scroll) | Check **Draw with finger** in the notes bar |
+| Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once |
+| A score won't open | It must be a `.mscz` file saved by MuseScore |
 
-To report a problem, [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or send the
-developer a message. Please include:
-- your device and its system version (for example "iPad, iPadOS 26.6");
-- which score you used;
-- what you did, and what happened instead;
-- a screenshot or screen recording, if you can.
+**Report a problem:** [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or message
+the developer. Say which device and system version, which score, what you did and what happened.
+A screenshot or screen recording helps a lot.
 
 ---
 
-PocketScore is free and open source (GPL-3.0). It is built with code from MuseScore Studio and uses
-the MS Basic sound font; see [credits and licences](THIRD_PARTY_NOTICES.md).
-PocketScore is not affiliated with or endorsed by MuseScore Ltd. "MuseScore" is a trademark of MuseScore Ltd.
+PocketScore is free and open source (GPL-3.0). It uses code from MuseScore Studio and the MS Basic
+sound font: see [credits and licences](THIRD_PARTY_NOTICES.md). PocketScore is not affiliated
+with or endorsed by MuseScore Ltd. "MuseScore" is a trademark of MuseScore Ltd.
 
 Developers: see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

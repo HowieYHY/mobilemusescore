@@ -93,6 +93,19 @@ body {
   font-weight: 600;
 }
 #save { gap: 6px; }
+/* Tip PocketScore: a quiet heart, there while a score is open too */
+.tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #ee8a83;
+  -webkit-tap-highlight-color: transparent;
+}
+.tip-icon:hover, .tip-icon:active { background: var(--chrome-2); color: #f4a29c; }
 #open-label { position: relative; overflow: hidden; }
 #file-input {
   position: absolute;
@@ -109,13 +122,14 @@ body {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "title title title title title"
+      "title title title title tip"
       "open save . notes view";
     row-gap: 4px;
     column-gap: 8px;
     padding-top: calc(6px + var(--safe-t));
   }
   .topbar .title { grid-area: title; font-size: 16px; line-height: 1.3; padding: 0 2px; }
+  .topbar .tip-icon { grid-area: tip; justify-self: end; width: 36px; height: 30px; margin: -4px -4px -4px 0; border-radius: 15px; }
   .topbar #open-label { grid-area: open; }
   .topbar #save { grid-area: save; }
   .topbar #notes-toggle { grid-area: notes; }

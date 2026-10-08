@@ -55,6 +55,8 @@ const ui = {
     loopOpen: $<HTMLButtonElement>("loop-open"),
     loopClose: $<HTMLButtonElement>("loop-close"),
     loopClear: $<HTMLButtonElement>("loop-clear"),
+    loopHint: $("loop-hint"),
+    tempoInput: $<HTMLInputElement>("tempo-input"),
     speed: $<HTMLInputElement>("speed"),
     speedValue: $("speed-value"),
     speedDown: $<HTMLButtonElement>("speed-down"),
@@ -566,6 +568,10 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         const sp = state.score.spatium;
         const radius = Math.max(0.75 * sp, Math.min(toUnits(18), 3 * sp));
         const tap = { page: Number(pageEl.dataset.index), x: toUnits(e.clientX - r.left), y: toUnits(e.clientY - r.top), radius };
+        if (armedMarker) {
+            void placeMarker(tap);
+            return;
+        }
         const audioReady = engine.audioRunning && state.playbackReady;
         if (!audioReady && !state.playing) {
             // the first tap starts audio (it must start from a tap on iOS); the note sounds once it's ready
@@ -771,6 +777,7 @@ engine.on("audioState", (st: string) => {
 
 function showPosition(secs: number, fallback?: CursorInfo) {
     state.position = secs;
+    showTempo();
     if (!state.seeking) {
         ui.seek.value = String(Math.round(secs / Math.max(1, state.duration) * 1000));
     }
@@ -1248,6 +1255,7 @@ function showPractice(p: PracticeInfo | null) {
     ui.loopRange.textContent = p.loop ? bars : marked ? bars + " (off)" : "Whole score";
     ui.loopClear.disabled = !marked;
 
+    showTempo();
     if (p.duration) {
         state.duration = p.duration;
         ui.duration.textContent = fmt(state.duration);
@@ -1263,7 +1271,7 @@ function showPractice(p: PracticeInfo | null) {
     }
     if (speedChanged) {
         // the cursor's and markers' times follow the speed
-        void loadTimeline().then(() => {
+        void Promise.all([loadTimeline(), loadTempos()]).then(() => {
             showPosition(state.position);
             showLoopMarks();
         });
@@ -1303,19 +1311,89 @@ function showLoopMarks() {
     place("out", p.to);
 }
 
+// The tempo at the play position, as desktop's toolbar shows it: quarter notes
+// per minute, with the speed applied. Typing one sets the speed to match.
+let tempos: [number, number][] = [];
+async function loadTempos() {
+    tempos = await engine.tempos();
+    showTempo();
+}
+function baseTempoAt(secs: number) {
+    let bpm = tempos.length ? tempos[0][1] : 120;
+    for (const [t, b] of tempos) {
+        if (t > secs + 1e-6) {
+            break;
+        }
+        bpm = b;
+    }
+    return bpm;
+}
+function showTempo() {
+    if (document.activeElement === ui.tempoInput) {
+        return; // being typed
+    }
+    const v = String(Math.round(baseTempoAt(state.position) * practice.speed));
+    if (ui.tempoInput.value !== v) {
+        ui.tempoInput.value = v;
+    }
+}
+ui.tempoInput.onchange = async () => {
+    const want = Number(ui.tempoInput.value);
+    const base = baseTempoAt(state.position);
+    if (!(want > 0) || !base) {
+        showTempo();
+        return;
+    }
+    const m = Math.min(3, Math.max(0.1, want / base));
+    showPractice(await engine.setSpeed(m, state.position));
+    showTempo(); // shows the clamped tempo if the typed one was out of range
+};
+ui.tempoInput.onkeydown = (e) => {
+    if (e.key === "Enter") {
+        ui.tempoInput.blur(); // commits (change), and closes the phone's keyboard
+    }
+};
+ui.tempoInput.onblur = () => setTimeout(showTempo, 0);
+
+// Buttons and the slider move in 5% steps, as desktop's Speed control
 async function setSpeed(pct: number) {
     pct = Math.min(300, Math.max(10, Math.round(pct / 5) * 5));
     ui.speedValue.textContent = pct + "%";
     showPractice(await engine.setSpeed(pct / 100, state.position));
 }
 
-ui.speed.oninput = () => (ui.speedValue.textContent = ui.speed.value + "%");
+ui.speed.oninput = () => {
+    const pct = Math.round(Number(ui.speed.value) / 5) * 5;
+    ui.speedValue.textContent = pct + "%";
+    ui.tempoInput.value = String(Math.round(baseTempoAt(state.position) * pct / 100));
+};
 ui.speed.onchange = () => void setSpeed(Number(ui.speed.value));
 ui.speedDown.onclick = () => void setSpeed(Math.round(practice.speed * 100) - 5);
 ui.speedUp.onclick = () => void setSpeed(Math.round(practice.speed * 100) + 5);
 ui.loopToggle.onclick = async () => showPractice(await engine.setLoop(!practice.loop));
-ui.loopLeft.onclick = async () => showPractice(await engine.setLoopMarker(false, state.position));
-ui.loopRight.onclick = async () => showPractice(await engine.setLoopMarker(true, state.position));
+// A marker button waits for a tap on the score, then puts its marker on the
+// note tapped (without moving the playback or sounding the note). Tapping the
+// button again, or closing the panel, cancels.
+let armedMarker: "left" | "right" | null = null;
+const LOOP_HINT = "Tap a marker button, then tap the note where the loop should start or end.";
+function armMarker(which: "left" | "right" | null) {
+    armedMarker = which;
+    ui.loopLeft.setAttribute("aria-pressed", String(which === "left"));
+    ui.loopRight.setAttribute("aria-pressed", String(which === "right"));
+    ui.loopHint.textContent = which === "left" ? "Now tap the note where the loop starts."
+        : which === "right" ? "Now tap the note where the loop ends." : LOOP_HINT;
+    ui.loopHint.classList.toggle("armed", !!which);
+}
+async function placeMarker(tap: { page: number; x: number; y: number; radius: number }) {
+    const right = armedMarker === "right";
+    armMarker(null);
+    const c = await engine.locate(tap.page, tap.x, tap.y, tap.radius);
+    if (c) {
+        showPractice(await engine.setLoopMarker(right, c.secs));
+    }
+}
+ui.loopLeft.onclick = () => armMarker(armedMarker === "left" ? null : "left");
+ui.loopRight.onclick = () => armMarker(armedMarker === "right" ? null : "right");
 ui.loopClear.onclick = async () => showPractice(await engine.clearLoop());
 
 // Bottom-sheet panels: the mixer, speed and loop; one open at a time
@@ -1328,6 +1406,7 @@ function closeSpeed() {
     ui.speedOpen.setAttribute("aria-expanded", "false");
 }
 function closeLoop() {
+    armMarker(null);
     ui.loopPanel.hidden = true;
     ui.loopOpen.setAttribute("aria-expanded", "false");
 }
@@ -1713,6 +1792,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     ui.notesToggle.disabled = false;
     buildPages();
     void loadTimeline();
+    void loadTempos();
     ui.viewer.scrollTop = 0;
     ui.viewer.scrollLeft = 0;
 

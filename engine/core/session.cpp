@@ -965,17 +965,17 @@ void Session::seek(double secs)
 // Like clicking the score during playback on desktop: the chord or rest under
 // the finger becomes the play position (PlaybackController::seekElement, with
 // NotationPlayback::playPositionTickByRawTick for repeats).
-std::string Session::seekAt(int pageIndex, double x, double y, double radius, bool playNote)
+bool Session::locate(int pageIndex, double x, double y, double radius, double& secs, const Note*& note) const
 {
     const Score* score = m_project ? m_project->masterScore() : nullptr;
     if (!score || pageIndex < 0 || pageIndex >= int(score->pages().size())) {
-        return "null";
+        return false;
     }
     Page* page = score->pages()[pageIndex];
     const PointF p = PointF(x, y) + page->pos();
 
     // The note nearest the tap, within `radius` (a fingertip is bigger than a notehead)
-    const Note* note = nullptr;
+    note = nullptr;
     double best = radius;
     const PointF onPage(x, y);
     for (EngravingItem* item : page->items(RectF(x - radius, y - radius, 2 * radius, 2 * radius))) {
@@ -998,7 +998,7 @@ std::string Session::seekAt(int pageIndex, double x, double y, double radius, bo
     } else {
         const Measure* m = score->searchMeasure(p);
         if (!m) {
-            return "null";
+            return false;
         }
         chosen = m->first(SegmentType::ChordRest);
         for (const Segment* s = chosen; s; s = s->next(SegmentType::ChordRest)) {
@@ -1014,7 +1014,27 @@ std::string Session::seekAt(int pageIndex, double x, double y, double radius, bo
     }
     const int rawTick = chosen->tick().ticks();
     const int utick = score->repeatList(true).tick2utick(rawTick);
-    const double secs = uticksToSecs(score, utick);
+    secs = uticksToSecs(score, utick);
+    return true;
+}
+
+std::string Session::locateJson(int pageIndex, double x, double y, double radius) const
+{
+    double secs = 0.0;
+    const Note* note = nullptr;
+    if (!locate(pageIndex, x, y, radius, secs, note)) {
+        return "null";
+    }
+    return cursorJson(secs);
+}
+
+std::string Session::seekAt(int pageIndex, double x, double y, double radius, bool playNote)
+{
+    double secs = 0.0;
+    const Note* note = nullptr;
+    if (!locate(pageIndex, x, y, radius, secs, note)) {
+        return "null";
+    }
 
     // As desktop MuseScore does when a note is selected: sound it, for the
     // default 500 ms. Only while stopped; during playback a tap just moves.
@@ -1136,6 +1156,31 @@ std::string Session::setLoopEnabled(bool on)
     m_loopOn = on;
     applyLoop();
     return practiceJson();
+}
+
+std::string Session::temposJson() const
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "[]";
+    }
+    const TempoMap* tm = score->tempomap();
+    std::string s = "[";
+    auto add = [&](int utick, double bpm) {
+        if (s.size() > 1) {
+            s += ",";
+        }
+        s += "[" + std::to_string(uticksToSecs(score, utick)) + "," + std::to_string(bpm) + "]";
+    };
+    for (const RepeatSegment* rs : playedRepeats(score)) {
+        const int offset = rs->utick - rs->tick;
+        const int end = rs->tick + rs->len();
+        add(rs->utick, tm->tempo(rs->tick).toBPM().val); // the tempo in force where this pass starts
+        for (auto it = tm->upper_bound(rs->tick); it != tm->end() && it->first < end; ++it) {
+            add(it->first + offset, it->second.tempo.toBPM().val);
+        }
+    }
+    return s + "]";
 }
 
 std::string Session::clearLoop()

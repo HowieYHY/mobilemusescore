@@ -301,6 +301,27 @@ body {
 .loop-range { flex: 1; text-align: right; font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .loop-markers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .loop-markers .btn { font-size: 14px; padding: 6px 8px; line-height: 1.2; }
+.tempo-row { justify-content: space-between; }
+.tempo { display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 600; color: var(--ink); }
+.tempo .crotchet { flex: none; }
+.tempo .eq { color: var(--ink-2); font-weight: 500; }
+#tempo-input {
+  width: 4.2ch;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  text-align: center;
+  padding: 4px 2px;
+  border: 1px solid #c4c9cf;
+  border-radius: 8px;
+  background: #fff;
+  -moz-appearance: textfield;
+}
+#tempo-input::-webkit-inner-spin-button, #tempo-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#tempo-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.tempo-row output { font-size: 15px; font-weight: 500; color: var(--ink-2); }
+.loop-markers .btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.practice-hint.armed { color: var(--accent); font-weight: 600; }
 .loop-clear { align-self: flex-start; font-size: 14px; min-height: 36px; }
 .practice-hint { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
 

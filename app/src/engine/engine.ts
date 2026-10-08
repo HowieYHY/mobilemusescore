@@ -366,4 +366,8 @@ export class Engine {
     setLoop(on: boolean): Promise<PracticeInfo> { return this.request({ cmd: "loop", on }); }
     clearLoop(): Promise<PracticeInfo> { return this.request({ cmd: "clearLoop" }); }
     practice(): Promise<PracticeInfo> { return this.request({ cmd: "practice" }); }
+    /** Where a tap on a page falls in the music, without moving playback or sounding a note. */
+    locate(page: number, x: number, y: number, radius: number): Promise<CursorInfo | null> { return this.request({ cmd: "locate", page, x, y, radius }); }
+    /** Tempo changes, repeats unrolled: [secs, quarter-note BPM before the speed]. */
+    tempos(): Promise<[number, number][]> { return this.request({ cmd: "tempos" }); }
 }

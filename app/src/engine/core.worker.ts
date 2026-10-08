@@ -174,6 +174,12 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             result = JSON.parse(callStr("mss_clear_loop"));
             core._mss_process();
             break;
+        case "locate":
+            result = JSON.parse(callStr("mss_locate", req.page, req.x, req.y, req.radius));
+            break;
+        case "tempos":
+            result = JSON.parse(callStr("mss_tempos"));
+            break;
         case "practice":
             result = JSON.parse(callStr("mss_practice"));
             break;

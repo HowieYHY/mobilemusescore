@@ -55,6 +55,12 @@ public:
     // Moves playback to the note or rest nearest a point on a page (page
     // coordinates). Returns the new cursor JSON, or "null" if nothing is there.
     std::string seekAt(int pageIndex, double x, double y, double radius, bool playNote);
+    // Where a tap on the page falls in the music, as seekAt but without moving
+    // the play position or sounding anything (for placing loop markers)
+    std::string locateJson(int pageIndex, double x, double y, double radius) const;
+    // Every tempo change, repeats unrolled: [[secs, quarter-note BPM before the
+    // speed], ...], so the page can show the tempo at any position
+    std::string temposJson() const;
 
     // Mixer. trackKey identifies an instrument track (see tracksJson()).
     void setTrackVolume(int trackKey, double db);
@@ -110,6 +116,9 @@ public:
     std::string timelineJson() const;
 
 private:
+    // The note (if any) and played seconds under a tap; false if off the music
+    bool locate(int pageIndex, double x, double y, double radius, double& secs, const mu::engraving::Note*& note) const;
+
     struct Track {
         int key = 0;
         mu::engraving::InstrumentTrackId id;

@@ -87,12 +87,17 @@ Two round buttons next to **Mixer**: **speed** (the dial) and **loop** (the arro
 | To… | Do this |
 | --- | --- |
 | Slow down / speed up | Tap the **speed** button, then **−** / **+** (5% steps) or the slider (10% to 300%) |
-| Loop a passage | Tap the **loop** button. Tap the passage's first note → **Set loop marker left**. Tap its last note → **Set loop marker right** |
+| Play at an exact tempo | In the same panel, type a number next to **♩ =** |
+| Loop a passage | Tap the **loop** button. Tap **Set loop marker left**, then tap the passage's first note. Tap **Set loop marker right**, then tap its last note |
 | Loop on / off | **Loop playback** (with no markers, the whole score loops) |
 | Remove the loop | **Clear loop markers** |
 
 - The markers show on the score as blue lines with a flag: **▶** where the loop starts, **◀** where it ends.
   A blue band under the position slider marks the loop too.
+- **♩ =** shows the tempo where the music is now (in quarter notes per minute, as MuseScore shows it),
+  with your speed applied. It follows tempo changes in the score as it plays.
+- A marker button turns blue while it waits for your tap; tap it again to cancel. Tapping a note for
+  a marker doesn't move the music or play the note.
 - The speed button shows the speed when it isn't 100%. The loop button turns blue while looping.
 - Speed and loop are **not saved**: the next score you open starts at 100%, with no loop.
 - On phones, the position slider sits on its own row above the buttons.

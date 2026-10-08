@@ -1,7 +1,7 @@
 {
   "name": "pocketscore",
   "private": true,
-  "version": "0.3.10",
+  "version": "1.0.0",
   "description": "Plays and displays .mscz scores with MuseScore's own engine compiled to WebAssembly",
   "license": "GPL-3.0-only",
   "type": "module",

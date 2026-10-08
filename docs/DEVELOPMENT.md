@@ -19,13 +19,13 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (9 Oct 2026, version 0.3.10)
+## Current status (9 Oct 2026, version 1.0.0)
 
-**Working prototype.** It runs in browsers (Chromium and WebKit) and, as the
-installable web app, on an iPad (A16, iPadOS 26.6.2) and an Android phone
-(Pixel 9a, installed from Chrome). The user confirmed 0.2.1's smooth cursor on
-the Pixel 9a; the iPad still showed the same choppiness, which 0.3.2 addresses
-(see *Moving the cursor*) and still needs checking there.
+**Version 1.0: the first release for everyone.** It runs in browsers (Chromium
+and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
+and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
+was measured over USB (see *Tests*). All issues up to #12 are closed except
+#2 (the RESO website) and #3 (design, open to contributors).
 
 ### What works
 

@@ -82,6 +82,14 @@ function cssColor(hex: string): string {
 
 // Draws one page. `scale` maps engraving units to canvas pixels.
 export function drawPage(ctx: CanvasRenderingContext2D, ops: Op[], scale: number) {
+    pageDrawer(ctx, ops, scale)(Infinity);
+}
+
+// Draws one page a piece at a time: each call draws for about `budgetMs` and
+// returns true once the page is finished. A whole page can take 100 ms or more
+// on a phone, which would stop the playback line; in pieces it never does.
+// The canvas keeps its drawing state between calls.
+export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: number): (budgetMs: number) => boolean {
     let st: DrawState = { pen: { color: "#000", width: 0, cap: "butt", join: "miter", dash: [] }, brush: null, font: "10px serif" };
     const stack: DrawState[] = [];
     let tf = [1, 0, 0, 1, 0, 0];
@@ -117,8 +125,12 @@ export function drawPage(ctx: CanvasRenderingContext2D, ops: Op[], scale: number
 
     ctx.save();
     applyTransform();
+    let next = 0;
 
-    for (const op of ops) {
+    return (budgetMs: number) => {
+    const until = performance.now() + budgetMs;
+    while (next < ops.length) {
+        const op = ops[next++];
         switch (op[0]) {
         case "T":
             tf = [op[1] / 1000, op[2] / 1000, op[3] / 1000, op[4] / 1000, op[5], op[6]];
@@ -234,7 +246,13 @@ export function drawPage(ctx: CanvasRenderingContext2D, ops: Op[], scale: number
             break;
         }
         }
+        // check the time every few operations (reading it costs a little)
+        if ((next & 15) === 0 && performance.now() >= until) {
+            return false;
+        }
     }
 
     ctx.restore();
+    return true;
+    };
 }

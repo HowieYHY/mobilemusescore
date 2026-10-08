@@ -25,6 +25,19 @@ export class Engine {
     private clock = { t: 0, perf: 0, raw: 0, set: false };
     /** Gaps in the sound while playing (the device fell behind). */
     underruns = 0;
+    /**
+     * Playback self-check: recent problems (gaps in the sound, frames where the
+     * page froze), newest last, for diagnosing a device (`app.engine.health`
+     * in the console, e.g. over USB debugging). Not shown on screen.
+     */
+    health: { at: string; kind: string; detail: string }[] = [];
+
+    note(kind: string, detail: string) {
+        this.health.push({ at: new Date().toISOString().slice(11, 23), kind, detail });
+        if (this.health.length > 100) {
+            this.health.shift();
+        }
+    }
     /** For the playback check: how the audio engine is keeping up. */
     // load: share of the time the audio engine spends rendering while music
     // plays (null until measured); loadUnder: an upper bound instead, on
@@ -146,6 +159,8 @@ export class Engine {
                         this.stats.targetSecs = m.target / ctx.sampleRate;
                     } else if (m.type === "underrun") {
                         this.underruns = m.count;
+                        this.note("gap", `sound gap ${m.count}; queue now ${(this.stats.targetSecs * 1000).toFixed(0)} ms, engine load ${this.stats.load === null ? "?" : (this.stats.load * 100).toFixed(0) + "%"}`);
+                        this.emit("stutter", { count: m.count });
                     } else if (m.type === "error") {
                         reject(new Error(m.text));
                     } else if (m.type === "log" && /ERROR|WARN|underrun/.test(m.text)) {
@@ -265,6 +280,11 @@ export class Engine {
         t = Math.max(t, c.t);
         Object.assign(c, { t, perf: now, raw });
         return t;
+    }
+
+    /** Tests: freeze the audio engine for `ms`, as a busy phone might. */
+    testStall(ms: number) {
+        this.audioWorker?.postMessage({ type: "testStall", ms });
     }
 
     // Tell the audio engine whether music is playing: while stopped it keeps

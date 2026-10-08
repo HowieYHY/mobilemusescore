@@ -1,6 +1,6 @@
 import { Engine } from "./engine/engine";
 import type { CursorInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
-import { CSS_PX_PER_INCH, UNITS_PER_INCH, drawPage, ensureFonts, ensureImages } from "./render/pagerenderer";
+import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 
@@ -156,7 +156,7 @@ const observer = new IntersectionObserver((entries) => {
             void renderPage(i);
         }
     }
-}, { root: ui.viewer, rootMargin: "600px" });
+}, { root: ui.viewer, rootMargin: "1500px" }); // well ahead, so pages are drawn before the music reaches them
 
 let renderGeneration = 0;
 
@@ -168,7 +168,10 @@ async function renderPage(i: number) {
     const gen = renderGeneration;
     let ops = state.pageOps.get(i);
     if (!ops) {
-        ops = JSON.parse(await engine.page(i)) as any[];
+        const json = await engine.page(i);
+        const t0 = performance.now();
+        ops = JSON.parse(json) as any[];
+        performance.measure("page-parse", { start: t0 }); // see app.state / perf tests
         if (gen !== renderGeneration) {
             return;
         }
@@ -194,10 +197,27 @@ async function renderPage(i: number) {
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawPage(ctx, ops, scale);
-    el.querySelector("canvas")?.remove();
-    el.prepend(canvas);
+    const draw = pageDrawer(ctx, ops, scale);
+    // in pieces, one page at a time, so the playback line keeps moving
+    drawQueue = drawQueue.then(async () => {
+        for (;;) {
+            if (gen !== renderGeneration) {
+                return;
+            }
+            const t1 = performance.now();
+            const done = draw(state.playing ? 6 : 40);
+            performance.measure("page-draw", { start: t1 });
+            if (done) {
+                break;
+            }
+            await new Promise((r) => requestAnimationFrame(r));
+        }
+        el.querySelector("canvas")?.remove();
+        el.prepend(canvas);
+    });
 }
+
+let drawQueue: Promise<void> = Promise.resolve();
 
 function rerenderAll(keepOps: boolean) {
     renderGeneration++;
@@ -535,6 +555,16 @@ document.addEventListener("visibilitychange", () => {
 
 // The device can stop the sound by itself (a call, Siri, a system dialog, another
 // app taking the audio). Pause then, so the cursor stops with the sound.
+// A gap in the sound: the audio engine already keeps more ready from now on;
+// say so once per score, so a stutter isn't a mystery
+let stutterTold = false;
+engine.on("stutter", () => {
+    if (!stutterTold && state.playing) {
+        stutterTold = true;
+        setStatus("The sound stuttered, so PocketScore now prepares more of it ahead to keep it smooth.", "info", 6000);
+    }
+});
+
 engine.on("audioState", (st: string) => {
     if (st !== "running" && state.playing) {
         void engine.pause();
@@ -551,7 +581,15 @@ function showPosition(secs: number, fallback?: CursorInfo) {
     showCursor(cursorFromTimeline(secs) || fallback || null);
 }
 
+// Playback self-check, on screen: a frame that took far too long (the line
+// would jump) is logged for diagnosis (app.engine.health)
+let lastFrame = 0;
 function animate() {
+    const now = performance.now();
+    if (state.playing && lastFrame && now - lastFrame > 120 && document.visibilityState === "visible") {
+        engine.note("slow frame", `${Math.round(now - lastFrame)} ms`);
+    }
+    lastFrame = now;
     if (state.playing) {
         // before the sound reaches the speaker the cursor waits where it is
         const secs = Math.min(state.duration, Math.max(0, anchor.secs + Math.max(0, engine.audioTime - anchor.clock)));
@@ -1280,6 +1318,7 @@ async function openScore(name: string, data: ArrayBuffer) {
         closeLayer(closeSounds); // it lists the previous score's parts
     }
     state.playbackReady = false;
+    stutterTold = false;
     clearTimeout(draftTimer);
     Object.assign(mix, { store: null, score: null, saved: null, dirty: false, pendingSounds: {} });
     // the sounds may report ready at any point from here on: they wait for the restore below

@@ -168,6 +168,10 @@ body {
 .empty .hint { color: #5a6068; font-size: 14px; }
 .empty .install { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 20px 0; }
 .empty .install[hidden] { display: none; }
+.empty .tip-row { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 22px 0 14px; }
+.tip-link { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-weight: 600; }
+.tip-link svg { color: #c2413b; }
+.tip-link:hover { border-color: #9aa1a9; }
 
 .pages {
   display: flex;

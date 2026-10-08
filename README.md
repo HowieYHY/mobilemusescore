@@ -175,6 +175,19 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 
 ---
 
+## Support PocketScore
+
+PocketScore is free. If it helps you, you can **[leave a tip](https://buy.stripe.com/3cI00jg1L7X3f1c8Zgd7q00)**: by PayNow, card,
+Apple Pay or Google Pay. The button is also on the app's start screen.
+
+- It's optional, and nothing in the app is locked.
+- Tips go through **Stripe**, a payment company. The page is on `buy.stripe.com` and says
+  **PocketScore**; only use the link here or in the app.
+- **PayNow on the same phone:** take a screenshot of the QR code, then open it from your banking
+  app's "scan from photos" option.
+
+---
+
 ## Questions
 
 <details>

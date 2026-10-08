@@ -124,11 +124,15 @@ function unitsToCss(u: number) {
     return u / UNITS_PER_INCH * CSS_PX_PER_INCH * state.zoom;
 }
 
-function buildPages() {
+// standIns: the pages' current drawings, shown stretched while each page is
+// redrawn at a new size (zoom), so no page goes blank meanwhile
+function buildPages(standIns?: Map<number, HTMLCanvasElement>) {
+    observer.disconnect(); // the old pages would report "out of view" as they go
     ui.pages.innerHTML = "";
     notes.detachAll();
     state.pageEls = [];
     state.rendered.clear();
+    jobs.clear();
     const score = state.score;
     if (!score) {
         return;
@@ -141,6 +145,11 @@ function buildPages() {
         el.dataset.index = String(i);
         el.style.width = unitsToCss(p.w) + "px";
         el.style.height = unitsToCss(p.h) + "px";
+        const old = standIns?.get(i);
+        if (old) {
+            old.classList.add("stale");
+            el.prepend(old);
+        }
         ui.pages.appendChild(el);
         state.pageEls.push(el);
         notes.attach(el, i, p.w, p.h);
@@ -152,11 +161,43 @@ function buildPages() {
 const observer = new IntersectionObserver((entries) => {
     for (const e of entries) {
         const i = Number((e.target as HTMLElement).dataset.index);
+        if (e.target !== state.pageEls[i]) {
+            continue; // a page from before a rebuild
+        }
         if (e.isIntersecting) {
             void renderPage(i);
+        } else {
+            releasePage(i);
         }
     }
 }, { root: ui.viewer, rootMargin: "1500px" }); // well ahead, so pages are drawn before the music reaches them
+
+// A canvas's pixels are freed at once by sizing it to nothing (Safari counts a
+// removed canvas until it is collected)
+function freeCanvas(c: HTMLCanvasElement | null | undefined) {
+    if (c) {
+        c.width = 0;
+        c.height = 0;
+        c.remove();
+    }
+}
+
+// A page far out of view gives back its drawing (iPad Safari refuses new
+// canvases past a memory limit, leaving pages blank); it is drawn again when
+// it comes near
+function releasePage(i: number) {
+    const el = state.pageEls[i];
+    if (!el) {
+        return;
+    }
+    state.rendered.delete(i);
+    const job = jobs.get(i);
+    if (job) {
+        jobs.delete(i);
+        freeCanvas(job.canvas);
+    }
+    freeCanvas(el.querySelector("canvas"));
+}
 
 let renderGeneration = 0;
 
@@ -166,6 +207,7 @@ async function renderPage(i: number) {
     }
     state.rendered.add(i);
     const gen = renderGeneration;
+    const still = () => gen === renderGeneration && state.rendered.has(i);
     let ops = state.pageOps.get(i);
     if (!ops) {
         const json = await engine.page(i);
@@ -178,11 +220,10 @@ async function renderPage(i: number) {
         state.pageOps.set(i, ops);
     }
     await Promise.all([ensureFonts(ops, engine.base), ensureImages(ops)]);
-    if (gen !== renderGeneration) {
+    if (!still()) {
         return;
     }
 
-    const el = state.pageEls[i];
     const page = state.score.pages[i];
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     // keep canvases within mobile limits (about 16 megapixels)
@@ -191,42 +232,121 @@ async function renderPage(i: number) {
     if (page.w * page.h * scale * scale > maxPixels) {
         scale = Math.sqrt(maxPixels / (page.w * page.h));
     }
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(page.w * scale);
-    canvas.height = Math.ceil(page.h * scale);
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const draw = pageDrawer(ctx, ops, scale);
-    // in pieces, one page at a time, so the playback line keeps moving
-    drawQueue = drawQueue.then(async () => {
-        for (;;) {
-            if (gen !== renderGeneration) {
-                return;
+    // A device short of canvas memory refuses the context (iPad Safari). Make
+    // room first: this page's own stand-in, then stand-ins out of view; then
+    // try smaller (a softer page beats a blank one), and else again in a while.
+    const roomMakers = [
+        () => freeCanvas(state.pageEls[i]?.querySelector<HTMLCanvasElement>("canvas.stale")),
+        () => state.pageEls.forEach((el, k) => {
+            if (distanceFromView(k) > 0) {
+                freeCanvas(el.querySelector<HTMLCanvasElement>("canvas.stale"));
             }
-            // fingers on the screen: wait, so the page answers them at once (when
-            // it is busy, Chrome stops waiting for it and scrolls by itself)
-            if (fingersDown > 0) {
-                await new Promise((r) => requestAnimationFrame(r));
-                continue;
-            }
-            const t1 = performance.now();
-            const done = draw(state.playing ? 6 : 12);
-            performance.measure("page-draw", { start: t1 });
-            if (done) {
-                break;
-            }
-            await new Promise((r) => requestAnimationFrame(r));
+        }),
+    ];
+    for (const s of [scale, scale, scale, scale / 2, scale / 4]) {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(page.w * s);
+        canvas.height = Math.ceil(page.h * s);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+            freeCanvas(canvas);
+            roomMakers.shift()?.();
+            continue;
         }
-        el.querySelector("canvas")?.remove();
-        el.prepend(canvas);
-    });
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        jobs.set(i, { gen, canvas, draw: pageDrawer(ctx, ops, s) });
+        void drawJobs();
+        return;
+    }
+    state.rendered.delete(i);
+    setTimeout(() => {
+        if (gen === renderGeneration && isNear(i)) {
+            void renderPage(i);
+        }
+    }, 1500);
 }
 
-let drawQueue: Promise<void> = Promise.resolve();
+// Pages waiting to be drawn. Drawn in pieces (about 6 ms a frame while playing,
+// 12 when stopped) so the playback line keeps moving, nearest the view first.
+const jobs = new Map<number, { gen: number; canvas: HTMLCanvasElement; draw: (ms: number) => boolean }>();
+let drawing = false;
+const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
+
+function distanceFromView(i: number) {
+    const v = ui.viewer.getBoundingClientRect();
+    const r = state.pageEls[i].getBoundingClientRect();
+    return Math.hypot(Math.max(r.left - v.right, 0, v.left - r.right), Math.max(r.top - v.bottom, 0, v.top - r.bottom));
+}
+const isNear = (i: number) => !!state.pageEls[i] && distanceFromView(i) < 1500;
+
+async function drawJobs() {
+    if (drawing) {
+        return;
+    }
+    drawing = true;
+    try {
+        while (jobs.size) {
+            // fingers on the screen: wait, so the page answers them at once (when
+            // it is busy, Chrome stops waiting for it and scrolls by itself)
+            if (fingersBusy()) {
+                await nextFrame();
+                continue;
+            }
+            let i = -1;
+            let best = Infinity;
+            for (const [k, job] of jobs) {
+                if (job.gen !== renderGeneration || !state.pageEls[k]) {
+                    jobs.delete(k);
+                    freeCanvas(job.canvas);
+                    continue;
+                }
+                const d = distanceFromView(k);
+                if (d < best) {
+                    best = d;
+                    i = k;
+                }
+            }
+            if (i < 0) {
+                break;
+            }
+            const job = jobs.get(i)!;
+            let done = false;
+            const t1 = performance.now();
+            try {
+                done = job.draw(state.playing ? 6 : 12);
+            } catch (err) {
+                // one page failing must not stop the others
+                console.warn("page", i, "could not be drawn:", err);
+                jobs.delete(i);
+                freeCanvas(job.canvas);
+                continue;
+            }
+            performance.measure("page-draw", { start: t1 });
+            if (done) {
+                jobs.delete(i);
+                const el = state.pageEls[i];
+                freeCanvas(el.querySelector("canvas")); // the stand-in, if any
+                el.prepend(job.canvas);
+            }
+            await nextFrame();
+        }
+    } finally {
+        drawing = false;
+    }
+}
+
+// Fingers down, from the touches' own count. A touch that ended on an element
+// since removed may never say so, so a count with no touch activity for 3 s
+// is not trusted (page drawing once waited for it for good: issue #9).
 let fingersDown = 0;
-for (const t of ["touchstart", "touchend", "touchcancel"]) {
-    ui.viewer.addEventListener(t, (e) => (fingersDown = (e as TouchEvent).touches.length), { passive: true });
+let lastTouch = 0;
+const fingersBusy = () => fingersDown > 0 && performance.now() - lastTouch < 3000;
+for (const t of ["touchstart", "touchmove", "touchend", "touchcancel"]) {
+    window.addEventListener(t, (e) => {
+        fingersDown = (e as TouchEvent).touches.length;
+        lastTouch = performance.now();
+    }, { passive: true, capture: true });
 }
 
 function rerenderAll(keepOps: boolean) {
@@ -234,11 +354,24 @@ function rerenderAll(keepOps: boolean) {
     if (!keepOps) {
         state.pageOps.clear();
     }
+    // same layout (zoom): the current drawings stand in until redrawn
+    const standIns = new Map<number, HTMLCanvasElement>();
+    state.pageEls.forEach((el, i) => {
+        const c = el.querySelector("canvas");
+        if (c && keepOps) {
+            standIns.set(i, c);
+        } else {
+            freeCanvas(c);
+        }
+    });
+    for (const job of jobs.values()) {
+        freeCanvas(job.canvas);
+    }
     // keep the reader's place: remember the fraction scrolled
     const v = ui.viewer;
     const fx = v.scrollLeft / Math.max(1, v.scrollWidth);
     const fy = v.scrollTop / Math.max(1, v.scrollHeight);
-    buildPages();
+    buildPages(standIns);
     v.scrollLeft = fx * v.scrollWidth;
     v.scrollTop = fy * v.scrollHeight;
     showCursor(lastCursor);
@@ -359,8 +492,11 @@ const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
             follow(lastTouch.m, lastTouch.ratio);
         }
     }, { passive: true });
+    // Finished when the last finger lifts: finishing at the first rebuilt the
+    // pages under the other finger, whose lifting then never reached the app,
+    // and page drawing waited for it (issue #9)
     const end = (e: TouchEvent) => {
-        if (!pinch || e.touches.length >= 2) {
+        if (!pinch || e.touches.length > 0) {
             return;
         }
         const p = pinch;
@@ -1657,4 +1793,6 @@ ui.notesClear.onclick = async () => {
 };
 
 // Let tests and the console drive the app
-(window as any).app = { engine, state, openScore, notes, mix, currentMix };
+// pages: what page drawing is waiting for (tests and USB debugging)
+const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
+(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo };

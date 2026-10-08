@@ -1025,7 +1025,12 @@ std::string Session::locateJson(int pageIndex, double x, double y, double radius
     if (!locate(pageIndex, x, y, radius, secs, note)) {
         return "null";
     }
-    return cursorJson(secs);
+    std::string json = cursorJson(secs);
+    if (note && json.size() > 1 && json.back() == '}') {
+        json.pop_back();
+        json += ",\"note\":true}";
+    }
+    return json;
 }
 
 std::string Session::seekAt(int pageIndex, double x, double y, double radius, bool playNote)

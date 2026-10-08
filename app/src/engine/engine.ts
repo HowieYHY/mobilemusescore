@@ -329,7 +329,7 @@ export class Engine {
     play() { this.setPlaying(true); return this.request({ cmd: "play" }); }
     async pause() { await this.request({ cmd: "pause" }); this.setPlaying(false); this.flush(); }
     async stop() { await this.request({ cmd: "stop" }); this.setPlaying(false); this.flush(); }
-    async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); this.emit("seeked", {}); }
+    async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); this.emit("seeked", { secs }); }
     // Move to the note or beat at a point on a page (page units); `radius` is
     // how far from the point a note may be. While stopped, that note sounds.
     async seekAt(page: number, x: number, y: number, radius = 0, playNote = false): Promise<CursorInfo | null> {
@@ -339,7 +339,7 @@ export class Engine {
             this.flush(); // only playing audio is queued far ahead
         }
         if (c) {
-            this.emit("seeked", {});
+            this.emit("seeked", { secs: c.secs });
         }
         return c;
     }

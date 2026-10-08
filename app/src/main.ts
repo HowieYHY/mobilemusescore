@@ -660,9 +660,14 @@ function cursorFromTimeline(secs: number): CursorInfo | null {
     if (secs < timeline[0][0]) {
         hi = 0;
     }
+    // Times come rounded (the timeline to 0.1 ms, positions to 1 µs), so a
+    // note's own time can read a hair before its point. Within half a
+    // millisecond counts as reached: otherwise a line's first note fell back to
+    // the previous line's closing barline, which has the same time (cursor and
+    // loop markers drawn at the end of the line before).
     while (lo < hi) {
         const mid = (lo + hi + 1) >> 1;
-        if (timeline[mid][0] <= secs) {
+        if (timeline[mid][0] <= secs + 0.0005) {
             lo = mid;
         } else {
             hi = mid - 1;
@@ -708,6 +713,16 @@ let ignoreReportsUntil = 0;
 
 function followReports(secs: number, clock: number) {
     const now = performance.now();
+    if (holdAt) {
+        // released by a report at the target: one from the old place (before or
+        // after it, for a jump either way) or not yet reaching it is ignored
+        const atTarget = secs >= holdAt.secs - 0.03 && secs <= holdAt.secs + 0.6;
+        if (!atTarget && now < holdAt.until) {
+            return;
+        }
+        holdAt = null;
+        resyncCursor = true;
+    }
     if (now < ignoreReportsUntil) {
         return; // just started: these still assume the short queue used while stopped
     }
@@ -739,7 +754,22 @@ function followReports(secs: number, clock: number) {
     lastCorrection = now;
 }
 
-engine.on("seeked", () => (resyncCursor = true));
+// A jump while playing (a tapped note, the slider) is heard only once the new
+// sound reaches the speaker; the reports until then still describe the old
+// place, so re-syncing to the first one put the line half a second before the
+// tapped note on Android. The line waits on the target instead, and moves on
+// once the reports show the sound has got there (at most 2 s).
+let holdAt: { secs: number; until: number } | null = null;
+engine.on("seeked", (e: { secs?: number }) => {
+    if (state.playing && e.secs !== undefined) {
+        holdAt = { secs: e.secs, until: performance.now() + 2000 };
+        reports.length = 0;
+        resyncCursor = true;
+        showPosition(e.secs);
+    } else {
+        resyncCursor = true;
+    }
+});
 
 // Leaving PocketScore (another app, the home screen, locking the screen) pauses
 // the music, so it doesn't play on unseen; coming back says so.
@@ -796,7 +826,8 @@ function animate() {
     lastFrame = now;
     if (state.playing) {
         // before the sound reaches the speaker the cursor waits where it is
-        const secs = Math.min(state.duration, Math.max(0, anchor.secs + Math.max(0, engine.audioTime - anchor.clock)));
+        const secs = holdAt ? holdAt.secs
+            : Math.min(state.duration, Math.max(0, anchor.secs + Math.max(0, engine.audioTime - anchor.clock)));
         showPosition(secs);
     }
     requestAnimationFrame(animate);
@@ -1242,10 +1273,9 @@ function showPractice(p: PracticeInfo | null) {
     ui.speedValue.textContent = pct + "%";
     ui.speedDown.disabled = pct <= 10;
     ui.speedUp.disabled = pct >= 300;
-    ui.speedBadge.textContent = pct + "%";
+    // once changed, the button shows the tempo now (BPM), set in showTempo
     ui.speedBadge.hidden = pct === 100;
     ui.speedOpen.classList.toggle("changed", pct !== 100);
-    ui.speedOpen.setAttribute("aria-label", `Speed (${pct}%)`);
 
     const marked = p.fromBar !== undefined && p.toBar !== undefined;
     const bars = marked ? (p.fromBar === p.toBar ? `Bar ${p.fromBar}` : `Bars ${p.fromBar}–${p.toBar}`) : "Whole score";
@@ -1329,10 +1359,15 @@ function baseTempoAt(secs: number) {
     return bpm;
 }
 function showTempo() {
+    const v = String(Math.round(baseTempoAt(state.position) * practice.speed));
+    if (ui.speedBadge.textContent !== v) {
+        ui.speedBadge.textContent = v;
+        const pct = Math.round(practice.speed * 100);
+        ui.speedOpen.setAttribute("aria-label", pct === 100 ? `Speed (tempo ${v})` : `Speed (${pct}%, tempo ${v})`);
+    }
     if (document.activeElement === ui.tempoInput) {
         return; // being typed
     }
-    const v = String(Math.round(baseTempoAt(state.position) * practice.speed));
     if (ui.tempoInput.value !== v) {
         ui.tempoInput.value = v;
     }
@@ -2052,4 +2087,4 @@ ui.notesClear.onclick = async () => {
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo };
+(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, cursorAt: (secs: number) => cursorFromTimeline(secs) };

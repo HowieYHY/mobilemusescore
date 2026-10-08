@@ -121,6 +121,17 @@ build, tests, status) before working here.
   because our `Session::load` skipped `Score::updateSwing()` (desktop calls it in
   `MasterNotation::setMasterScore`). Rule: when something plays differently from desktop, compare
   our load and playback set-up with desktop's call by call before looking elsewhere.
+- **Two roundings of the same time are not equal.** The timeline sent times to 0.1 ms and positions
+  to 1 µs, so a note's own time read a hair before its point, and at a line's first note the lookup
+  fell back to the previous line's closing barline (same time): markers and the line drawn at the
+  end of the line before. Rule: compare times with a tolerance, and test every note position
+  (`tap-precision-test.mjs`), not a few.
+- **A device test must prove which build it ran.** The phone kept the previous build for one more
+  reload (service worker), so a fix "made no difference". Rule: check a string unique to the new
+  build in the loaded script before measuring.
+- **After a jump, the newest report still describes the old place.** Re-syncing the line to the first
+  report after a seek put it half a second before the tapped note on Android. Rule: hold on the
+  target until a report reaches it.
 - **A nearly full system drive breaks browser caching silently** (the 49 MB sound font was not cached,
   so the update test reported a 60 MB download). Check free space before blaming the service worker;
   run browser tests with `TMP`/`TEMP` on a drive with space.

@@ -98,7 +98,8 @@ Two round buttons next to **Mixer**: **speed** (the dial) and **loop** (the arro
   with your speed applied. It follows tempo changes in the score as it plays.
 - A marker button turns blue while it waits for your tap; tap it again to cancel. Tapping a note for
   a marker doesn't move the music or play the note.
-- The speed button shows the speed when it isn't 100%. The loop button turns blue while looping.
+- Once you change the speed, the speed button shows the tempo (for example **103**). The loop button
+  turns blue while looping.
 - Speed and loop are **not saved**: the next score you open starts at 100%, with no loop.
 - On phones, the position slider sits on its own row above the buttons.
 

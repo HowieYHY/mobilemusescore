@@ -77,10 +77,11 @@ declare const __APP_VERSION__: string;
 // Only playing, speed, loop and the mixer; no opening other files, notes or saving, and nothing is
 // kept on the device.
 const embedded = new URLSearchParams(location.search).get("embed") === "reso" && window.parent !== window;
-// The only pages allowed to hand over a score (a local website while developing)
-const EMBED_ORIGINS = ((import.meta.env.VITE_EMBED_ORIGINS as string | undefined) || "https://www.nusresonance.com,https://nusresonance.com")
-    .split(",").map((o) => o.trim()).filter(Boolean)
-    .concat(import.meta.env.DEV ? ["http://localhost:3000"] : []);
+// The only pages allowed to hand over a score. A local copy of the website (localhost:3000) too, so
+// a branch of it can be tried with this live app. Safe: the page only gives PocketScore a score to
+// play and gets nothing back; who may fetch a score is decided by the website's own sign-in.
+const EMBED_ORIGINS = ((import.meta.env.VITE_EMBED_ORIGINS as string | undefined) || "https://www.nusresonance.com,https://nusresonance.com,http://localhost:3000")
+    .split(",").map((o) => o.trim()).filter(Boolean);
 if (embedded) {
     document.documentElement.classList.add("embedded");
 }

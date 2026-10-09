@@ -1928,6 +1928,11 @@ window.addEventListener("appinstalled", () => {
     ui.installRow.hidden = true;
     setStatus("PocketScore is installed. You can open it from your home screen or app list.", "info", 6000);
 });
+// iPhone and iPad (iPadOS also passes for a Mac, with touch) have no install prompt, so the start
+// screen says how, until PocketScore runs as the installed app (issue #13).
+const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+$("install-ios").hidden = !appleTouch || standalone || embedded;
+
 ui.install.onclick = async () => {
     const p = installPrompt;
     if (!p) {
@@ -2153,6 +2158,7 @@ function tourSteps(): TourStep[] {
         return [
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
+            ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: "Put it on your home screen with Share, then Add to Home Screen. It opens like an app and works offline." }]),
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
         ];
     }

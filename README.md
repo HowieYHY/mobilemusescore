@@ -53,6 +53,8 @@ No app store needed.
 
 ## How to…
 
+**Not sure what a button does?** Tap **?** at the top for a one-minute tour of the controls.
+
 ### Open and play
 | To… | Do this |
 | --- | --- |

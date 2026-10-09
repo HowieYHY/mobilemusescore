@@ -5,6 +5,7 @@ import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackIn
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
+import { Tour, type TourStep } from "./tour";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -1835,6 +1836,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     ui.title.textContent = res.score.title || name.replace(/\.(mscz|mscx)$/i, "");
     $("open-label").classList.remove("primary"); // only the start screen's main action
     ui.empty.hidden = true;
+    firstTime.markSeen("opened");
     ui.viewMode.disabled = false;
     ui.viewMode.value = "page";
     ui.play.disabled = false;
@@ -2136,3 +2138,49 @@ if (embedded) {
     // nothing secret in it: the website answers with the score only if it is the page around us
     window.parent.postMessage({ type: "pocketscore-ready" }, "*");
 }
+
+// ---------------------------------------------------------------- tour (issue #15)
+
+// What each control does, one at a time. The ? button starts it; first-time users (#16) are also
+// invited on the start screen until they take it or open a score. It never starts by itself.
+const tour = new Tour($("tour"), $("tour-ring"), $("tour-card"));
+const tourInvite = $("tour-invite");
+tourInvite.hidden = embedded || !firstTime.isNewcomer() || firstTime.hasSeen("tour") || firstTime.hasSeen("opened");
+
+function tourSteps(): TourStep[] {
+    const el = (id: string) => () => $(id);
+    if (!state.score) {
+        return [
+            { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },
+            ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
+            { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
+        ];
+    }
+    return [
+        { target: () => ui.viewer, title: "The score", text: "Tap any note to play from there. While stopped, a tap plays just that note. Pinch, or use − and +, to zoom." },
+        { target: el("play"), title: "Play and pause", text: "The blue line shows where you are, and the page follows it." },
+        { target: el("seek"), title: "Move through the score", text: "Drag the slider to jump anywhere. The button on the far left goes back to the start." },
+        { target: el("speed-open"), title: "Speed", text: "Practise slower or faster, or type the tempo you want." },
+        { target: el("loop-open"), title: "Loop", text: "Repeat a passage: put the loop markers on the notes where it starts and ends." },
+        { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
+        { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
+        { target: el("save"), title: "Save", text: "Keeps your notes and mixer changes for this score. If you forget, PocketScore asks before you open another score." },
+        { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
+    ];
+}
+
+const closeTour = () => tour.end();
+
+function startTour() {
+    if (tour.open || embedded) {
+        return;
+    }
+    firstTime.markSeen("tour");
+    tourInvite.hidden = true;
+    // the phone's Back button closes it, like the other panels
+    tour.start(tourSteps(), () => closeLayer(closeTour));
+    openLayer(closeTour);
+}
+
+$("help").onclick = startTour;
+$("tour-start").onclick = startTour;

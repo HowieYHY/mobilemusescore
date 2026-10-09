@@ -106,6 +106,24 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .tip-icon:hover, .tip-icon:active { background: var(--chrome-2); color: #f4a29c; }
+/* the ? (the tour) and the heart sit together */
+.bar-end { display: flex; align-items: center; gap: 2px; flex: none; }
+.bar-icon {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-on-chrome);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.bar-icon:hover, .bar-icon:active { background: var(--chrome-2); }
 #open-label { position: relative; overflow: hidden; }
 #file-input {
   position: absolute;
@@ -122,14 +140,15 @@ body {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "title title title title tip"
+      "title title title title end"
       "open save . notes view";
     row-gap: 4px;
     column-gap: 8px;
     padding-top: calc(6px + var(--safe-t));
   }
   .topbar .title { grid-area: title; font-size: 16px; line-height: 1.3; padding: 0 2px; }
-  .topbar .tip-icon { grid-area: tip; justify-self: end; width: 36px; height: 30px; margin: -4px -4px -4px 0; border-radius: 15px; }
+  .topbar .bar-end { grid-area: end; justify-self: end; margin: -4px -4px -4px 0; }
+  .topbar .tip-icon, .topbar .bar-icon { width: 36px; height: 30px; border-radius: 15px; }
   .topbar #open-label { grid-area: open; }
   .topbar #save { grid-area: save; }
   .topbar #notes-toggle { grid-area: notes; }
@@ -182,6 +201,9 @@ body {
 .empty .hint { color: #5a6068; font-size: 14px; }
 .empty .install { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 20px 0; }
 .empty .install[hidden] { display: none; }
+.empty .tour-invite { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 20px 0; }
+.empty .tour-invite[hidden] { display: none; }
+.empty .tour-invite b { font-weight: 700; color: var(--ink); }
 .empty .tip-row { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 22px 0 14px; }
 .tip-link { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-weight: 600; }
 .tip-link svg { color: #c2413b; }
@@ -830,3 +852,50 @@ body {
 .embedded #score-title, .embedded #empty { display: none; }
 .embedded .topbar { display: flex; justify-content: flex-end; padding: 6px 10px; }
 .embedded .topbar select { max-width: none; }
+
+/* ---------------------------------------------------------------- tour (tour.ts) */
+
+/* Over everything: the page is dimmed except a ring around one control, with a card beside it. */
+.tour { position: fixed; inset: 0; z-index: 20; }
+.tour-ring {
+  position: fixed;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--accent-bright), 0 0 0 9999px rgba(16, 24, 36, 0.62);
+  pointer-events: none;
+  transition: top 0.28s cubic-bezier(0.16, 1, 0.3, 1), left 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.28s cubic-bezier(0.16, 1, 0.3, 1), height 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tour-card {
+  position: fixed;
+  width: min(340px, calc(100vw - 24px));
+  padding: 14px 16px 14px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 16px 48px rgba(16, 24, 36, 0.32), 0 2px 6px rgba(16, 24, 36, 0.18);
+}
+.tour-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tour-count { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tour-skip {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 6px 2px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.tour-title { margin: 2px 0 4px; font-size: 17px; line-height: 1.3; }
+.tour-text { margin: 0 0 14px; font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.tour-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.tour-buttons .btn { min-width: 76px; }
+.tour-buttons .btn[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring { transition: none; }
+}
+
+/* the tour and its invitation are PocketScore's own help, not part of the website's preview */
+.embedded #help, .embedded #tour-invite { display: none; }

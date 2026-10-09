@@ -877,12 +877,23 @@ engine.on("status", (s) => {
 
 // ---------------------------------------------------------------- transport
 
+// When the sound can't start. A browser without AudioWorklet (an old one, or any page on a plain
+// http address, like a test copy on the Wi-Fi) can't play at all: say so plainly. Anything else keeps
+// its details, for diagnosing.
+function audioFailed(err: any) {
+    if (!window.isSecureContext || typeof AudioWorkletNode === "undefined") {
+        setStatus("This browser can't play sound here. Use a recent Safari, Chrome or Edge, with PocketScore's usual address (https://howieyhy.github.io/mobilemusescore/).", "error");
+        return;
+    }
+    setStatus("Audio could not start: " + (err && err.message || err), "error");
+}
+
 async function startAudioFromTap() {
     try {
         await engine.startAudio(); // also lets sound out (browsers need a tap for that)
         await engine.whenRunning();
     } catch (err: any) {
-        setStatus("Audio could not start: " + (err && err.message || err), "error");
+        audioFailed(err);
         return;
     }
     // sounds were already loaded: hear the tapped note now
@@ -902,7 +913,7 @@ ui.play.onclick = async () => {
         try {
             await engine.startAudio();
         } catch (err: any) {
-            setStatus("Audio could not start: " + (err && err.message || err), "error");
+            audioFailed(err);
             return;
         }
         if (!state.playbackReady) {
@@ -2154,12 +2165,15 @@ tourInvite.hidden = embedded || !firstTime.isNewcomer() || firstTime.hasSeen("to
 
 function tourSteps(): TourStep[] {
     const el = (id: string) => () => $(id);
+    // last in both: a tip, never called a donation (Stripe's rules)
+    const tipStep: TourStep = { target: el("tip-heart"), title: "Leave a tip", text: "PocketScore is free. If it helps you, tap the heart to leave a tip by PayNow or card." };
     if (!state.score) {
         return [
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: "In Safari: ••• at the bottom, then Share, then View More and Add to Home Screen near the bottom. It opens like an app and works offline." }]),
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
+            tipStep,
         ];
     }
     return [
@@ -2172,6 +2186,7 @@ function tourSteps(): TourStep[] {
         { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
         { target: el("save"), title: "Save", text: "Keeps your notes and mixer changes for this score. If you forget, PocketScore asks before you open another score." },
         { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
+        tipStep,
     ];
 }
 

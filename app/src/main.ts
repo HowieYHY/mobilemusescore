@@ -1,3 +1,5 @@
+// first: decides whether this is someone's first visit before anything else saves data
+import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
@@ -2111,7 +2113,7 @@ ui.notesClear.onclick = async () => {
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, cursorAt: (secs: number) => cursorFromTimeline(secs) };
+(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs) };
 
 // ---------------------------------------------------------------- preview in the Reso website
 

@@ -1945,13 +1945,16 @@ const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.
 $("install-ios").hidden = !appleTouch || standalone || embedded;
 // The steps differ by browser: Chrome (CriOS) and other iOS browsers (Firefox FxiOS, Edge EdgiOS…)
 // name themselves in the user agent; anything else is Safari.
-const iosBrowser = /CriOS\//.test(navigator.userAgent) ? "chrome" : /FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent) ? "other" : "safari";
+// iPad Safari has Share at the top right instead of under ••• at the bottom (checked on an iPad).
+const onIPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const iosBrowser = /CriOS\//.test(navigator.userAgent) ? "chrome" : /FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent) ? "other" : onIPad ? "safari-ipad" : "safari";
 for (const el of document.querySelectorAll<HTMLElement>("#install-ios [class^='for-']")) {
     el.hidden = !el.classList.contains("for-" + iosBrowser);
 }
 const installSteps = {
-    safari: "In Safari: ••• at the bottom, then Share, then View More and Add to Home Screen near the bottom.",
-    chrome: "In Chrome: Share beside the address, then View More and Add to Home Screen near the bottom.",
+    safari: "In Safari: ••• at the bottom, then Share, then View More and Add to Home Screen further down the list.",
+    "safari-ipad": "In Safari: Share at the top right, then View More and Add to Home Screen further down the list.",
+    chrome: "In Chrome: Share beside the address, then View More and Add to Home Screen further down the list.",
     other: "Choose Add to Home Screen from your browser's Share menu.",
 }[iosBrowser];
 

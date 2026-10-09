@@ -191,8 +191,10 @@ build, tests, status) before working here.
   •••, and Add to Home Screen is ••• > Share > View More, near the bottom of the list. Rule: wording
   about the phone's own buttons comes from the user's screenshots, never from memory. Browsers on the
   same iPhone differ too: Chrome's Share is beside the address (then View More, Add to Home Screen),
-  so the steps are chosen per browser (`CriOS` in the user agent), with a general line for browsers
-  nobody has checked.
+  and iPad Safari has Share at the top right, not under •••. So the steps are chosen per browser and
+  device (`CriOS` in the user agent; iPad = `iPad` or a Mac with touch), with a general line for
+  browsers nobody has checked, and the wording avoids positions that vary ("further down the list",
+  not "near the bottom": on the iPad, Add to Home Screen is mid-list).
 - **Look at the start screen at a real phone's height.** In Safari an iPhone shows only ~660 CSS px,
   and the zoom buttons (useless before a score is open) covered the Tip button. Rule: check the start
   screen at the visible height with the browser's bars, hide controls that do nothing yet, and keep

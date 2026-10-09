@@ -17,9 +17,10 @@
 No app store needed.
 
 **iPad / iPhone**
-1. Open the link above in **Safari**.
-2. Tap **Share** → **Add to Home Screen** → **Add**.
-3. Open **PocketScore** from your home screen.
+1. Open the link above in **Safari** or **Chrome**.
+2. Tap **Share**: in Safari it's under **•••** at the bottom (on iPad, at the top right); in Chrome it's beside the address.
+3. Tap **View More** → **Add to Home Screen** (further down the list) → **Add**.
+4. Open **PocketScore** from your home screen.
 
 **Android**
 1. Open the link above in **Chrome**.

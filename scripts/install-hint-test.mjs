@@ -53,10 +53,10 @@ async function startScreen({ userAgent, init = "", path: at = "", width = 412, h
 // each browser shows only its own steps
 const CHROME_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.0.0 Mobile/15E148 Safari/604.1";
 const FIREFOX_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/144.0 Mobile/15E148 Safari/605.1.15";
-for (const [what, userAgent, want] of [["Safari", IPHONE, "for-safari"], ["Chrome", CHROME_IOS, "for-chrome"], ["Firefox", FIREFOX_IOS, "for-other"]]) {
+for (const [what, userAgent, want] of [["Safari", IPHONE, "for-safari"], ["Chrome", CHROME_IOS, "for-chrome"], ["Firefox", FIREFOX_IOS, "for-other"], ["iPad Safari", IPAD, "for-safari-ipad"], ["iPad Chrome", CHROME_IOS.replace("iPhone; CPU iPhone OS", "iPad; CPU OS"), "for-chrome"]]) {
     const { context, page, shown } = await startScreen({ userAgent, init: touchPoints(5) });
     const visible = await page.evaluate(() => [...document.querySelectorAll("#install-ios [class^='for-']")].filter((el) => !el.hidden).map((el) => el.className));
-    check(await shown() && visible.length > 0 && visible.every((c) => c === want), `iPhone ${what}: only its own steps (${[...new Set(visible)].join(", ")})`);
+    check(await shown() && visible.length > 0 && visible.every((c) => c === want), `${what.startsWith("iPad") ? "" : "iPhone "}${what}: only its own steps (${[...new Set(visible)].join(", ")})`);
     if (what === "Chrome") await page.screenshot({ path: path.join(root, "build/install-hint-chrome.png") });
     await context.close();
 }

@@ -165,3 +165,32 @@ build, tests, status) before working here.
   (`127.0.0.1` vs `localhost`) and says so.
 - **Wait for the new result, not for any result.** Checks waited for "N scores" or for page canvases,
   which the previous search or score already showed. Rule: wait for something only the new state has.
+
+### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
+
+- **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's
+  inspector needs a Mac). Serve the dev server on the network (`npx vite --port 5180 --host`, iPhone
+  on the same Wi-Fi at `http://192.168.1.46:5180/`) and work from the user's screenshots. Over plain
+  http the audio engine (AudioWorklet) and the service worker don't run, so don't test playback that
+  way. The status bar style and the manifest are read only when the app is added to the home screen:
+  delete the test icon and add it again after changing them. A home-screen app has no reload; close
+  it fully (swipe it away) and reopen. Ask the user to set Auto-Lock to Never while testing.
+- **Measure on the device before fixing.** A light strip under the bottom bar of the home-screen app
+  took three wrong fixes (a taller page, the manifest's background colour, the page's background)
+  until a dev-only readout showed the numbers: screen 874, window 812, `100lvh` 874, safe area top 62.
+  With `black-translucent`, iOS 26 starts the page under the status bar but keeps it one status bar
+  short, and paints the rest itself, where no CSS reaches. Rule: on an iPhone, first add a dev-only
+  readout (screen, window, `vh`/`lvh`/`svh`/`dvh`, safe areas, the element's box; probes use
+  `box-sizing: content-box`, since the page is border-box) and decide from it. Undo a fix that makes
+  things worse at once (`100lvh` pushed the buttons off the screen). Fixed with
+  `apple-mobile-web-app-status-bar-style` `black`; keep it unless a device shows otherwise.
+- **Safari and the home-screen app are different heights.** A top gap fixed for Safari (short, with
+  its bars) left a big empty band in the taller home-screen app. Rule: check both, and prefer one rule
+  that works at every height (`clamp()`) to a breakpoint.
+- **Write device instructions from the device.** "Tap Share" was wrong on iOS 26: Safari's bar shows
+  •••, and Add to Home Screen is ••• > Share > View More, near the bottom of the list. Rule: wording
+  about the phone's own buttons comes from the user's screenshots, never from memory.
+- **Look at the start screen at a real phone's height.** In Safari an iPhone shows only ~660 CSS px,
+  and the zoom buttons (useless before a score is open) covered the Tip button. Rule: check the start
+  screen at the visible height with the browser's bars, hide controls that do nothing yet, and keep
+  the buttons above the explanatory text.

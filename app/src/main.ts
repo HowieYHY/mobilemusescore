@@ -72,6 +72,18 @@ const ui = {
 };
 
 declare const __APP_VERSION__: string;
+
+// A preview inside the NUS Resonance website's library: the website hands over one score to play.
+// Only playing, speed, loop and the mixer; no opening other files, notes or saving, and nothing is
+// kept on the device.
+const embedded = new URLSearchParams(location.search).get("embed") === "reso" && window.parent !== window;
+// The only pages allowed to hand over a score (a local website while developing)
+const EMBED_ORIGINS = ((import.meta.env.VITE_EMBED_ORIGINS as string | undefined) || "https://www.nusresonance.com,https://nusresonance.com")
+    .split(",").map((o) => o.trim()).filter(Boolean)
+    .concat(import.meta.env.DEV ? ["http://localhost:3000"] : []);
+if (embedded) {
+    document.documentElement.classList.add("embedded");
+}
 $("version").textContent = "PocketScore " + __APP_VERSION__;
 
 const engine = new Engine();
@@ -117,7 +129,15 @@ engine.on("resources", (p) => {
         setStatus(`Preparing MuseScore engine… ${Math.round(p.done / p.total * 100)}%`);
     }
 });
-engine.on("engineReady", () => setStatus("Ready. Open a score.", "info", 2500));
+// a score can only be loaded once the engine has started (a preview's score may arrive before)
+let engineStarted: () => void;
+const engineReady = new Promise<void>((resolve) => (engineStarted = resolve));
+engine.on("engineReady", () => {
+    engineStarted();
+    if (!embedded) {
+        setStatus("Ready. Open a score.", "info", 2500);
+    }
+});
 engine.on("audioStatus", (s) => {
     if (s.text) {
         setStatus(s.text);
@@ -1587,7 +1607,7 @@ async function applyMix(m: Mix) {
 async function loadMix(): Promise<boolean> {
     state.masterDb = await engine.masterVolume();
     mix.pendingSounds = {};
-    const store = new MixStore(state.scoreKey);
+    const store = new MixStore(state.scoreKey, !embedded); // a preview keeps nothing
     mix.store = store;
     mix.score = currentMix();
     mix.saved = store.saved(mix.score);
@@ -1640,6 +1660,9 @@ function updateSaveState() {
 }
 
 function saveAll(): boolean {
+    if (embedded) {
+        return true; // a preview keeps nothing (and has no Save)
+    }
     const ok = notes.commit() && saveMix();
     updateSaveState();
     if (!ok) {
@@ -2088,3 +2111,25 @@ ui.notesClear.onclick = async () => {
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
 (window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, cursorAt: (secs: number) => cursorFromTimeline(secs) };
+
+// ---------------------------------------------------------------- preview in the Reso website
+
+if (embedded) {
+    setStatus("Loading the score…");
+    window.addEventListener("message", async (e) => {
+        if (e.source !== window.parent || !EMBED_ORIGINS.includes(e.origin)) {
+            return; // only the Resonance website's own page may hand over a score
+        }
+        const m = e.data;
+        if (m?.type !== "pocketscore-open" || typeof m.name !== "string" || !(m.data instanceof ArrayBuffer)) {
+            return;
+        }
+        await engineReady;
+        if (state.playing) {
+            await engine.stop();
+        }
+        await openScore(m.name, m.data);
+    });
+    // nothing secret in it: the website answers with the score only if it is the page around us
+    window.parent.postMessage({ type: "pocketscore-ready" }, "*");
+}

@@ -43,6 +43,12 @@ build, tests, status) before working here.
   The owner chose PayNow and cards only, and no minimum amount.
 - **Issues live on GitHub** (`gh issue list`). One commit per issue, `Fixes #N` when it is verified,
   `Refs #N` when it still needs checking on the user's device (e.g. Android playback, picker filters).
+- **Preview inside the Reso website** (NUS Resonance, repo `../reso-website`): members see a Preview
+  button on the library's MuseScore files, which opens PocketScore embedded (`?embed=reso`) over the
+  library. Playing only: play, speed, loop, mixer and views; no Open, notes, Save, title or tips, and
+  nothing kept on the device. PocketScore takes a score only from the website's own page. The
+  connection does not go the other way (no searching the library from PocketScore): the user's
+  decision after a first version was built.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 
@@ -151,3 +157,11 @@ build, tests, status) before working here.
   froze the playback line at each page turn. Rule: long main-thread work while music plays goes in
   pieces (`pageDrawer`), and `build/jank`-style measurement (long frames vs `performance.measure`)
   finds the cause before guessing.
+- **Anything that opens a score by itself must wait for the engine.** A score opened automatically at
+  startup reached the worker before the engine had started ("reading 'FS'"). Rule: automatic opens
+  (the website preview's score) wait for `engineReady`.
+- **A device test shares storage with the reader's tab on the same address.** A phone test on
+  `localhost:5173` cleared the user's own test data there. Rule: a test runs on an address of its own
+  (`127.0.0.1` vs `localhost`) and says so.
+- **Wait for the new result, not for any result.** Checks waited for "N scores" or for page canvases,
+  which the previous search or score already showed. Rule: wait for something only the new state has.

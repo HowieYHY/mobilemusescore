@@ -66,10 +66,14 @@ function write(key: string, m: Mix | null): boolean {
 }
 
 export class MixStore {
-    constructor(private scoreKey: string) {}
+    /** `keep` false: nothing is read or written (a preview inside the Reso website). */
+    constructor(private scoreKey: string, private keep = true) {}
 
     /** The reader's saved settings; `score` is the score's own, to upgrade 0.2.0's sound choices. */
     saved(score: Mix): Mix | null {
+        if (!this.keep) {
+            return null;
+        }
         const m = read(SAVED + this.scoreKey);
         if (m) {
             return m;
@@ -94,14 +98,16 @@ export class MixStore {
     }
 
     save(m: Mix | null): boolean {
-        return write(SAVED + this.scoreKey, m) && write(DRAFT + this.scoreKey, null);
+        return !this.keep || (write(SAVED + this.scoreKey, m) && write(DRAFT + this.scoreKey, null));
     }
 
     draft(): Mix | null {
-        return read(DRAFT + this.scoreKey);
+        return this.keep ? read(DRAFT + this.scoreKey) : null;
     }
 
     setDraft(m: Mix | null) {
-        write(DRAFT + this.scoreKey, m);
+        if (this.keep) {
+            write(DRAFT + this.scoreKey, m);
+        }
     }
 }

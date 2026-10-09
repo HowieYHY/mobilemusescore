@@ -221,6 +221,7 @@ body {
   line-height: 1.45;
 }
 .empty .install-ios[hidden] { display: none; }
+.empty .install-ios span[hidden] { display: none; }
 .empty .install-ios .share { vertical-align: -3px; color: var(--accent); }
 .empty .tip-row { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 22px 0 14px; }
 .tip-link { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-weight: 600; }

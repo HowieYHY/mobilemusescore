@@ -1943,6 +1943,17 @@ window.addEventListener("appinstalled", () => {
 // screen says how, until PocketScore runs as the installed app (issue #13).
 const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 $("install-ios").hidden = !appleTouch || standalone || embedded;
+// The steps differ by browser: Chrome (CriOS) and other iOS browsers (Firefox FxiOS, Edge EdgiOS…)
+// name themselves in the user agent; anything else is Safari.
+const iosBrowser = /CriOS\//.test(navigator.userAgent) ? "chrome" : /FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent) ? "other" : "safari";
+for (const el of document.querySelectorAll<HTMLElement>("#install-ios [class^='for-']")) {
+    el.hidden = !el.classList.contains("for-" + iosBrowser);
+}
+const installSteps = {
+    safari: "In Safari: ••• at the bottom, then Share, then View More and Add to Home Screen near the bottom.",
+    chrome: "In Chrome: Share beside the address, then View More and Add to Home Screen near the bottom.",
+    other: "Choose Add to Home Screen from your browser's Share menu.",
+}[iosBrowser];
 
 ui.install.onclick = async () => {
     const p = installPrompt;
@@ -2171,7 +2182,7 @@ function tourSteps(): TourStep[] {
         return [
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
-            ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: "In Safari: ••• at the bottom, then Share, then View More and Add to Home Screen near the bottom. It opens like an app and works offline." }]),
+            ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
             tipStep,
         ];

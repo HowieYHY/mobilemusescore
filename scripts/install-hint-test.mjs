@@ -50,6 +50,16 @@ async function startScreen({ userAgent, init = "", path: at = "", width = 412, h
     check(titles.includes("Install PocketScore"), `iPhone: the start-screen tour includes installing (${titles.join(" / ")})`);
     await context.close();
 }
+// each browser shows only its own steps
+const CHROME_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.0.0 Mobile/15E148 Safari/604.1";
+const FIREFOX_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/144.0 Mobile/15E148 Safari/605.1.15";
+for (const [what, userAgent, want] of [["Safari", IPHONE, "for-safari"], ["Chrome", CHROME_IOS, "for-chrome"], ["Firefox", FIREFOX_IOS, "for-other"]]) {
+    const { context, page, shown } = await startScreen({ userAgent, init: touchPoints(5) });
+    const visible = await page.evaluate(() => [...document.querySelectorAll("#install-ios [class^='for-']")].filter((el) => !el.hidden).map((el) => el.className));
+    check(await shown() && visible.length > 0 && visible.every((c) => c === want), `iPhone ${what}: only its own steps (${[...new Set(visible)].join(", ")})`);
+    if (what === "Chrome") await page.screenshot({ path: path.join(root, "build/install-hint-chrome.png") });
+    await context.close();
+}
 for (const [what, opts, expected] of [
     ["iPad (passing for a Mac, with touch)", { userAgent: IPAD, init: touchPoints(5), width: 820, height: 1180 }, true],
     ["iPhone home-screen app", { userAgent: IPHONE, init: touchPoints(5) + ` Object.defineProperty(navigator, "standalone", { get: () => true });` }, false],

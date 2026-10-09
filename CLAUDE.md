@@ -189,7 +189,10 @@ build, tests, status) before working here.
   that works at every height (`clamp()`) to a breakpoint.
 - **Write device instructions from the device.** "Tap Share" was wrong on iOS 26: Safari's bar shows
   •••, and Add to Home Screen is ••• > Share > View More, near the bottom of the list. Rule: wording
-  about the phone's own buttons comes from the user's screenshots, never from memory.
+  about the phone's own buttons comes from the user's screenshots, never from memory. Browsers on the
+  same iPhone differ too: Chrome's Share is beside the address (then View More, Add to Home Screen),
+  so the steps are chosen per browser (`CriOS` in the user agent), with a general line for browsers
+  nobody has checked.
 - **Look at the start screen at a real phone's height.** In Safari an iPhone shows only ~660 CSS px,
   and the zoom buttons (useless before a score is open) covered the Tip button. Rule: check the start
   screen at the visible height with the browser's bars, hide controls that do nothing yet, and keep

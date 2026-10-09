@@ -66,11 +66,6 @@
   <main class="viewer" id="viewer">
     <div class="empty" id="empty">
       <p><strong>Open a MuseScore file (.mscz)</strong> to view and play it.</p>
-      <p class="hint">Scores are laid out and played by MuseScore's own engine with the MS Basic sounds. Everything runs on this device.</p>
-      <p class="tour-invite" id="tour-invite" hidden>
-        <button class="btn plain" id="tour-start">Take the tour</button>
-        <span class="hint">New to PocketScore? A one-minute look at what each control does. It's always there under the <b>?</b> at the top.</span>
-      </p>
       <p class="install" id="install-row" hidden>
         <button class="btn primary" id="install">Install PocketScore</button>
         <span class="hint">Adds PocketScore to your home screen and app list, so it opens like an app and works offline.</span>
@@ -78,12 +73,19 @@
       <!-- iPhone and iPad have no install prompt: say how, until it runs as the installed app (#13) -->
       <p class="install-ios" id="install-ios" hidden>
         <strong>Install PocketScore on this device</strong>
-        <span>Tap <b>Share</b> <svg class="share" viewBox="0 0 24 24" width="18" height="18" role="img" aria-label="(the square with an arrow)"><path d="M12 3.5v11M8 7.5l4-4 4 4M7 10.5H6a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5h-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>, then <b>Add to Home Screen</b>. It then opens like an app and works offline.</span>
+        <!-- the path as Safari shows it on iOS 26 (checked on an iPhone): ••• > Share > View More > Add to Home Screen; older iPhones and iPads show Share in the bar -->
+        <span>Tap <b>•••</b> at the bottom of Safari then <b>Share</b> <svg class="share" viewBox="0 0 24 24" width="18" height="18" role="img" aria-label="(the square with an arrow)"><path d="M12 3.5v11M8 7.5l4-4 4 4M7 10.5H6a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5h-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>.</span>
+        <span>Then tap <b>View More</b> and <b>Add to Home Screen</b>, near the bottom. It opens like an app and works offline.</span>
+      </p>
+      <p class="tour-invite" id="tour-invite" hidden>
+        <button class="btn plain" id="tour-start">Take the tour</button>
+        <span class="hint">New to PocketScore? A one-minute look at what each control does. It's always there under the <b>?</b> at the top.</span>
       </p>
       <p class="tip-row">
         <a class="btn plain tip-link" href="https://buy.stripe.com/3cI00jg1L7X3f1c8Zgd7q00" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.7 3.8 4.5 7.1 4.5c2 0 3.6 1.1 4.9 2.9 1.3-1.8 2.9-2.9 4.9-2.9 3.3 0 5.5 3.2 4.3 6.6-1.7 4.8-9.2 9.4-9.2 9.4z" fill="currentColor"/></svg>Tip PocketScore</a>
         <span class="hint">PocketScore is free. If it helps you, you can leave a tip by PayNow or card (through Stripe).</span>
       </p>
+      <p class="hint">Scores are laid out and played by MuseScore's own engine with the MS Basic sounds. Everything runs on this device.</p>
       <p class="hint" id="version"></p>
     </div>
     <div class="pages" id="pages"></div>

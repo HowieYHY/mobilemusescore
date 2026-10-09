@@ -2158,7 +2158,7 @@ function tourSteps(): TourStep[] {
         return [
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
-            ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: "Put it on your home screen with Share, then Add to Home Screen. It opens like an app and works offline." }]),
+            ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: "In Safari: ••• at the bottom, then Share, then View More and Add to Home Screen near the bottom. It opens like an app and works offline." }]),
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
         ];
     }

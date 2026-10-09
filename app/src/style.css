@@ -193,7 +193,9 @@ body {
 }
 .empty {
   max-width: 460px;
-  margin: 15vh auto 0;
+  /* a modest gap above at every height: 15vh left a big empty band in the taller home-screen app,
+     and on a short screen pushed the buttons out of view */
+  margin: clamp(20px, 6vh, 64px) auto 0;
   padding: 0 20px;
   text-align: center;
   color: #333;
@@ -267,6 +269,8 @@ body {
   z-index: 5;
 }
 .zoom span { min-width: 42px; text-align: center; }
+/* nothing to zoom on the start screen, and on a short screen it would cover the start screen's buttons */
+body:has(#empty:not([hidden])) .zoom { display: none; }
 
 .transport {
   display: flex;

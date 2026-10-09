@@ -237,6 +237,7 @@ No. PocketScore is for reading, playing and practising. Make changes in MuseScor
 | Drawing scrolls the page (or it won't scroll) | Check **Draw with finger** in the notes bar |
 | Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once |
 | A score won't open | It must be a `.mscz` file saved by MuseScore |
+| A light strip under the bottom bar (iPhone, added to the home screen before version 1.0.3) | It's only cosmetic. To remove it, open PocketScore in Safari or Chrome until the start screen says 1.0.3 or later, then add it to your home screen again. **The new icon starts without your notes and settings** (each icon keeps its own), so keep the old one until you no longer need them |
 
 **Report a problem:** [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or message
 the developer. Say which device and system version, which score, what you did and what happened.

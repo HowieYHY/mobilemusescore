@@ -191,6 +191,10 @@ build, tests, status) before working here.
   GitHub Pages lets browsers keep `sw.js` 10 minutes (now registered with `updateViaCache: "none"`).
   Rule: when testing a change to the status bar style, `apple-*` tags or the manifest, first check the
   page shows the new version number, then add it; tell existing users the same.
+- **Each home-screen icon on an iPhone keeps its own storage.** A note saved in one PocketScore icon
+  was not in a second icon added from the same site (checked on the iPhone). Rule: never advise
+  re-adding the app without saying the new icon starts without notes and settings; prefer fixes
+  that reach existing icons through the normal update.
 - **Safari and the home-screen app are different heights.** A top gap fixed for Safari (short, with
   its bars) left a big empty band in the taller home-screen app. Rule: check both, and prefer one rule
   that works at every height (`clamp()`) to a breakpoint.

@@ -1897,7 +1897,9 @@ ui.viewMode.onchange = async () => {
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
     const sw = navigator.serviceWorker;
     const isUpdate = !!sw.controller; // an older version is running this page
-    sw.register("./sw.js").then((reg) => {
+    // updateViaCache "none": check sw.js itself for updates, not a copy kept by the browser's cache
+    // (GitHub Pages lets browsers keep it 10 minutes; Safari then stayed on the old version after 1.0.3)
+    sw.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
         // a home-screen app can stay open for days: look for updates when it comes back
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {

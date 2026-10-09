@@ -184,6 +184,13 @@ build, tests, status) before working here.
   `box-sizing: content-box`, since the page is border-box) and decide from it. Undo a fix that makes
   things worse at once (`100lvh` pushed the buttons off the screen). Fixed with
   `apple-mobile-web-app-status-bar-style` `black`; keep it unless a device shows otherwise.
+- **iOS takes the home-screen app's settings from the page as it is when Add to Home Screen is
+  tapped, and keeps them.** After 1.0.3, copies added from a browser still showing the stored 1.0.2
+  (the offline copy hadn't updated yet) kept the old status bar, and updating the app later didn't
+  change it; re-adding from a page showing 1.0.3 did. Safari stayed on 1.0.2 for a long time because
+  GitHub Pages lets browsers keep `sw.js` 10 minutes (now registered with `updateViaCache: "none"`).
+  Rule: when testing a change to the status bar style, `apple-*` tags or the manifest, first check the
+  page shows the new version number, then add it; tell existing users the same.
 - **Safari and the home-screen app are different heights.** A top gap fixed for Safari (short, with
   its bars) left a big empty band in the taller home-screen app. Rule: check both, and prefer one rule
   that works at every height (`clamp()`) to a breakpoint.

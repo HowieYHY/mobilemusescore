@@ -166,6 +166,12 @@ build, tests, status) before working here.
 - **Wait for the new result, not for any result.** Checks waited for "N scores" or for page canvases,
   which the previous search or score already showed. Rule: wait for something only the new state has.
 
+- **A phone test can stall on another tab's background work.** Connecting to the Pixel's Chrome timed
+  out (even after 2 minutes) while the user's Stripe dashboard was the open tab: its service worker was
+  running, and Playwright's connection waits on every target. Rule: open the test page as its own tab
+  first (`adb shell am start -a android.intent.action.VIEW -d <url> com.android.chrome`), wait until
+  `/json/list` shows no `service_worker`, then connect; close only the tabs at the test's address.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

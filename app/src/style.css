@@ -960,3 +960,46 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 
 /* the tour and its invitation are PocketScore's own help, not part of the website's preview */
 .embedded #help, .embedded #tour-invite, .embedded #install-ios { display: none; }
+
+/* ---------------------------------------------------------------- motion */
+
+/* Panels come and go smoothly, like focus mode: a short slide and fade, transforms and opacity only.
+   They are still shown and hidden with the `hidden` attribute; @starting-style animates the
+   showing, and `display … allow-discrete` keeps a panel on screen while it fades out. Browsers
+   without these simply show and hide at once, as before. */
+.mixer, .practice, .sounds, .notesbar, .palette, .ask, .ask::backdrop {
+  transition:
+    opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    display 0.22s allow-discrete,
+    overlay 0.22s allow-discrete;
+}
+/* sheets above the bottom bar rise from it */
+.mixer[hidden], .practice[hidden] { opacity: 0; transform: translateY(14px); }
+@starting-style {
+  .mixer:not([hidden]), .practice:not([hidden]) { opacity: 0; transform: translateY(14px); }
+}
+/* the sound list slides in from the side, like a page of the mixer */
+.sounds[hidden] { opacity: 0; transform: translateX(18px); }
+@starting-style {
+  .sounds:not([hidden]) { opacity: 0; transform: translateX(18px); }
+}
+/* the notes bar drops from the top bar */
+.notesbar[hidden] { opacity: 0; transform: translateY(-8px); }
+@starting-style {
+  .notesbar:not([hidden]) { opacity: 0; transform: translateY(-8px); }
+}
+/* the colour palette and the question box grow from a little smaller */
+.palette[hidden] { opacity: 0; transform: scale(0.96); }
+@starting-style {
+  .palette:not([hidden]) { opacity: 0; transform: scale(0.96); }
+}
+.ask:not([open]) { opacity: 0; transform: scale(0.97); }
+.ask:not([open])::backdrop { opacity: 0; }
+@starting-style {
+  .ask[open] { opacity: 0; transform: scale(0.97); }
+  .ask[open]::backdrop { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mixer, .practice, .sounds, .notesbar, .palette, .ask, .ask::backdrop { transition: none; }
+}

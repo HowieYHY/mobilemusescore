@@ -878,7 +878,11 @@ engine.on("status", (s) => {
         reports.length = 0;
         ignoreReportsUntil = performance.now() + 500;
     }
+    const wasPlaying = state.playing;
     state.playing = nowPlaying;
+    if (wasPlaying !== nowPlaying) {
+        scheduleAutoFocus(); // the wait is shorter while playing
+    }
     ui.play.innerHTML = state.playing ? ICON_PAUSE : ICON_PLAY;
     ui.play.setAttribute("aria-label", state.playing ? "Pause" : "Play");
 });
@@ -1308,7 +1312,22 @@ let focusFullscreen = false;
 let focusHintTimer = 0;
 
 let focusStarting = false;
-async function enterFocus() {
+// Smooth, and only with transforms and opacity. Going in, the score rises with the top bar as the bars
+// slide off their edges, so no gap opens above the music; then the layout changes under it. Coming
+// back, the layout changes at once and the score is drawn where it was and glides down (a FLIP) as
+// the bars slide in. Off for readers who ask for less motion.
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
+let barAnimations: Animation[] = [];
+const barEls = () => [document.querySelector<HTMLElement>(".topbar")!, $("transport")];
+function glideViewer(fromTop: number) {
+    const dy = fromTop - ui.viewer.getBoundingClientRect().top;
+    if (dy && !reduceMotion.matches) {
+        ui.viewer.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 300, easing: EASE_OUT });
+    }
+}
+
+async function enterFocus(fullscreen = true) {
     if (state.focus || focusStarting || !state.score) {
         return;
     }
@@ -1323,14 +1342,35 @@ async function enterFocus() {
         await closed;
         focusStarting = false;
     }
+    clearTimeout(autoFocusTimer);
     state.focus = true;
-    document.documentElement.classList.add("focus");
     openLayer(leaveFocus);
+    // full screen only from the Focus button: browsers allow it just after the reader's own tap
     const root = document.documentElement as any;
     const request = root.requestFullscreen || root.webkitRequestFullscreen;
-    if (request && !embedded && !document.fullscreenElement) {
+    if (fullscreen && request && !embedded && !document.fullscreenElement) {
         focusFullscreen = true;
         Promise.resolve(request.call(root, { navigationUI: "hide" })).catch(() => (focusFullscreen = false));
+    }
+    if (!reduceMotion.matches) {
+        const [top, bottom] = barEls();
+        const out = { duration: 240, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" as FillMode };
+        const rise = ui.viewer.getBoundingClientRect().top; // where the score starts once the bar is gone
+        barAnimations = [
+            top.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(-100%)", opacity: 0 }], out),
+            bottom.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(100%)", opacity: 0 }], out),
+            ui.viewer.animate([{ transform: "none" }, { transform: `translateY(${-rise}px)` }], out),
+        ];
+        await Promise.all(barAnimations.map((a) => a.finished.catch(() => {})));
+        if (!state.focus) {
+            return; // left again meanwhile
+        }
+    }
+    document.documentElement.classList.add("focus");
+    barAnimations.forEach((a) => a.cancel()); // the layout now puts the score where it was drawn
+    barAnimations = [];
+    if (!reduceMotion.matches) {
+        ui.play.animate([{ opacity: 0, transform: "scale(0.85)" }, { opacity: 1, transform: "none" }], { duration: 260, delay: 120, easing: EASE_OUT, fill: "backwards" });
     }
     clearTimeout(focusHintTimer);
     focusHint.classList.remove("fading");
@@ -1342,8 +1382,21 @@ async function enterFocus() {
 }
 
 function leaveFocus() {
+    barAnimations.forEach((a) => a.cancel());
+    barAnimations = [];
+    const before = ui.viewer.getBoundingClientRect().top;
+    const wasFocused = document.documentElement.classList.contains("focus");
     state.focus = false;
     document.documentElement.classList.remove("focus");
+    if (wasFocused) {
+        glideViewer(before);
+        if (!reduceMotion.matches) {
+            const [top, bottom] = barEls();
+            const back = { duration: 300, easing: EASE_OUT };
+            top.animate([{ transform: "translateY(-100%)", opacity: 0 }, { transform: "none", opacity: 1 }], back);
+            bottom.animate([{ transform: "translateY(100%)", opacity: 0 }, { transform: "none", opacity: 1 }], back);
+        }
+    }
     clearTimeout(focusHintTimer);
     focusHint.hidden = true;
     const d = document as any;
@@ -1351,6 +1404,37 @@ function leaveFocus() {
         Promise.resolve((d.exitFullscreen || d.webkitExitFullscreen).call(d)).catch(() => {});
     }
     focusFullscreen = false;
+    scheduleAutoFocus();
+}
+
+// Focus also starts by itself when the reader leaves the screen alone: after 4 s while the music
+// plays (like a video player's controls), 10 s while stopped (time to reach the mixer or speed).
+// Not while something is in use: a panel, notes, the tour or a question. Without the reader's tap it
+// can't go full screen, so it hides PocketScore's own bars only.
+const AUTO_FOCUS_PLAYING_MS = 4000;
+const AUTO_FOCUS_STOPPED_MS = 10000;
+let autoFocusTimer = 0;
+function scheduleAutoFocus() {
+    clearTimeout(autoFocusTimer);
+    // Not under test automation (navigator.webdriver, never set for a reader), where pauses longer
+    // than 4 s would hide the controls the tests tap next; focus-test.mjs turns it on.
+    if (!state.score || state.focus || embedded || (navigator.webdriver && !(window as any).app?.testAutoFocus)) {
+        return;
+    }
+    autoFocusTimer = window.setTimeout(autoFocus, state.playing ? AUTO_FOCUS_PLAYING_MS : AUTO_FOCUS_STOPPED_MS);
+}
+function autoFocus() {
+    if (!state.score || state.focus) {
+        return;
+    }
+    if (layers.length || notes.active || tour.open || ui.ask.open || document.hidden || focusStarting) {
+        scheduleAutoFocus();
+        return;
+    }
+    void enterFocus(false);
+}
+for (const type of ["pointerdown", "pointermove", "keydown", "wheel"]) {
+    document.addEventListener(type, () => scheduleAutoFocus(), { capture: true, passive: true });
 }
 
 function exitFocus() {
@@ -1953,6 +2037,7 @@ async function openScore(name: string, data: ArrayBuffer) {
         return;
     }
     state.score = res.score;
+    scheduleAutoFocus();
     state.duration = res.score.duration;
     state.position = 0;
     state.tracks = res.score.tracks;

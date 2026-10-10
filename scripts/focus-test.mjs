@@ -97,6 +97,7 @@ for (const [name, width, height, touch] of sizes) {
     await page.waitForSelector(".page canvas", { timeout: 180000 });
     await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });
     check(await visible(page, "#focus-toggle"), `${name}: Focus button shows once a score is open`);
+    await page.evaluate(() => (app.testAutoFocus = true)); // off under automation unless asked for
 
     // an open mixer is hidden while focusing and comes back after
     await tap("#mixer-toggle");
@@ -170,7 +171,59 @@ for (const [name, width, height, touch] of sizes) {
         await tap(".tour-next");
         await page.waitForTimeout(150);
     }
-    check(titles.includes("Focus"), `${name}: tour has a Focus step (${titles.length} steps)`);
+    const order = ["The score", "Play and pause", "Move through the score", "Speed", "Loop", "Mixer", "Save", "Write on the score", "Focus", "Help is here", "Buy me a bubble tea"];
+    check(titles.join("|") === order.join("|"), `${name}: tour goes bottom bar, top bar, tip last (${titles.join(" / ")})`);
+
+    // smooth: the bars slide and the score glides (transforms and opacity only)
+    await page.waitForTimeout(500);
+    await tap("#focus-toggle");
+    await page.waitForTimeout(120);
+    const moving = await page.evaluate(() => document.querySelector(".viewer").getAnimations().length > 0);
+    await page.waitForTimeout(500);
+    check(moving && (await inFocus()), `${name}: entering focus moves the score up with the bar`);
+    await page.goBack();
+    await page.waitForTimeout(60);
+    const back = await page.evaluate(() => document.querySelector(".topbar").getAnimations().length > 0);
+    await page.waitForTimeout(500);
+    check(back && !(await inFocus()), `${name}: leaving focus slides the bars back`);
+
+    if (name !== "ipad-air") {
+        // focus starts by itself: 4 s without a touch while playing, 10 s while stopped, never over a panel
+        await tap("#play");
+        await page.waitForFunction(() => app.state.playing, null, { timeout: 20000 }).catch(() => {});
+        await page.waitForTimeout(5000);
+        const auto = await page.evaluate(() => ({ focus: app.state.focus, fullscreen: !!document.fullscreenElement }));
+        check(auto.focus && !auto.fullscreen, `${name}: focus starts by itself after 4 s of playing untouched (no full screen without a tap)`);
+        await page.screenshot({ path: path.join(outDir, `${name}-auto.png`) });
+        await tap("#play");
+        await page.goBack();
+        await page.waitForTimeout(600);
+        await page.waitForTimeout(6000);
+        check(!(await inFocus()), `${name}: stopped, not yet after 6 s`);
+        await page.waitForTimeout(5000);
+        check(await inFocus(), `${name}: stopped, focus after 10 s untouched`);
+        await page.goBack();
+        await page.waitForTimeout(600);
+        await tap("#mixer-toggle");
+        await page.waitForTimeout(11000);
+        check(!(await inFocus()), `${name}: never over an open panel (mixer, 11 s)`);
+        await tap("#mixer-close");
+    }
+    await context.close();
+}
+
+// readers who ask for less motion get none
+{
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
+    await page.setInputFiles("#file-input", main);
+    await page.waitForSelector(".page canvas", { timeout: 180000 });
+    await page.click("#focus-toggle");
+    await page.waitForTimeout(50);
+    const still = await page.evaluate(() => app.state.focus && document.getAnimations().filter((a) => a.playState === "running" && !(a instanceof CSSTransition)).length === 0);
+    check(still, "reduced motion: focus comes at once, with no animation");
     await context.close();
 }
 

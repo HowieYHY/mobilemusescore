@@ -86,6 +86,9 @@ A blue line shows where you are, and the page follows it.
   goes full screen (no browser bars); an iPhone's Safari doesn't allow that, so there it hides
   PocketScore's own bars. Tapping a note still plays from it. To bring the controls back, tap anywhere
   off the music (a margin, the title, between lines), or use your phone's **Back** or **Esc**.
+- **Focus also starts by itself** when you leave the screen alone: after 4 seconds while the music
+  plays, 10 seconds while it's stopped. Not while a panel (mixer, speed, loop) or notes are open. It
+  hides PocketScore's bars but doesn't go full screen (browsers only allow that after your own tap).
 
 </details>
 

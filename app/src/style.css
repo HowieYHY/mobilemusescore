@@ -422,7 +422,20 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 #tempo-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 .tempo-row output { font-size: 15px; font-weight: 500; color: var(--ink-2); }
 .loop-markers .btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.practice-hint.armed { color: var(--accent); font-weight: 600; }
+/* the loop hint's three sentences stacked in one cell: the tallest sets the height, so the panel
+   doesn't move when a marker button is tapped, and the sentences cross-fade */
+#loop-hint { display: grid; }
+#loop-hint > span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-out, visibility 0.2s;
+}
+#loop-hint .hint-left, #loop-hint .hint-right { color: var(--accent); font-weight: 600; }
+#loop-hint[data-armed=""] .hint-idle,
+#loop-hint[data-armed="left"] .hint-left,
+#loop-hint[data-armed="right"] .hint-right { opacity: 1; visibility: visible; }
+@media (prefers-reduced-motion: reduce) { #loop-hint > span { transition: none; } }
 .loop-clear { align-self: flex-start; font-size: 14px; min-height: 36px; }
 .practice-hint { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
 

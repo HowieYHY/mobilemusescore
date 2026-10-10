@@ -179,6 +179,11 @@ build, tests, status) before working here.
   first (`adb shell am start -a android.intent.action.VIEW -d <url> com.android.chrome`), wait until
   `/json/list` shows no `service_worker`, then connect; close only the tabs at the test's address.
 
+- **Text that changes inside a panel must not change its size.** The loop panel's hint went from two
+  lines to one when a marker button was tapped; the panel, anchored to the bottom bar, shrank 17 px
+  and its buttons jumped (seen by the user in a demo video, on every device). Rule: alternative
+  texts share one grid cell (the tallest sets the height) and cross-fade; measure element positions
+  frame by frame while clicking, at phone, iPad and desktop widths.
 - **Work queued for one layout can run after the layout changed.** Reopening a score after an update
   switched it to the continuous view at once; a page drawing still queued for the page view's 6 pages
   then asked for page 5 of a 1-page layout and threw. Rule: anything queued per page checks the page

@@ -1652,14 +1652,15 @@ ui.loopToggle.onclick = async () => showPractice(await engine.setLoop(!practice.
 // note tapped (without moving the playback or sounding the note). Tapping the
 // button again, or closing the panel, cancels.
 let armedMarker: "left" | "right" | null = null;
-const LOOP_HINT = "Tap a marker button, then tap the note where the loop should start or end.";
 function armMarker(which: "left" | "right" | null) {
     armedMarker = which;
     ui.loopLeft.setAttribute("aria-pressed", String(which === "left"));
     ui.loopRight.setAttribute("aria-pressed", String(which === "right"));
-    ui.loopHint.textContent = which === "left" ? "Now tap the note where the loop starts."
-        : which === "right" ? "Now tap the note where the loop ends." : LOOP_HINT;
-    ui.loopHint.classList.toggle("armed", !!which);
+    // the three sentences share one spot (style.css), so the panel keeps its height
+    ui.loopHint.dataset.armed = which || "";
+    for (const span of ui.loopHint.querySelectorAll("span")) {
+        span.setAttribute("aria-hidden", String(!span.classList.contains(which ? `hint-${which}` : "hint-idle")));
+    }
 }
 async function placeMarker(tap: { page: number; x: number; y: number; radius: number }) {
     const right = armedMarker === "right";

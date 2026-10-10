@@ -4,7 +4,7 @@
 
 // Replaced with the build's content hash by scripts/gen-precache.mjs, so every
 // build is a new service worker and a new cache (old ones are deleted).
-const VERSION = "9e9a7a8bb1bcc6ec";
+const VERSION = "d71c0b51f2e0d850";
 const CACHE = "pocketscore-" + VERSION;
 
 async function sha1(res) {
@@ -70,7 +70,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
     event.waitUntil((async () => {
         for (const key of await caches.keys()) {
-            if (key !== CACHE) {
+            if (key !== CACHE && key !== SHARED) {
                 await caches.delete(key);
             }
         }
@@ -78,10 +78,34 @@ self.addEventListener("activate", (event) => {
     })());
 });
 
+// A score shared to PocketScore from another app (Android's Share list, from
+// the manifest's share_target) arrives as a form POST. Keep it until the app
+// picks it up (main.ts, ?shared=1), then show the app.
+const SHARED = "shared-score";
+
+async function receiveShared(req) {
+    try {
+        const file = (await req.formData()).getAll("score").find((f) => f instanceof File);
+        if (file) {
+            const cache = await caches.open(SHARED);
+            await cache.put(new URL("shared-score", self.registration.scope).href, new Response(file, {
+                headers: { "x-name": encodeURIComponent(file.name || "shared.mscz") },
+            }));
+        }
+    } catch (err) {
+        // the app says there was nothing to open
+    }
+    return Response.redirect(new URL("./?shared=1", self.registration.scope).href, 303);
+}
+
 // Cache first (everything here is versioned by the build), falling back to the
 // network and remembering what it returns.
 self.addEventListener("fetch", (event) => {
     const req = event.request;
+    if (req.method === "POST" && new URL(req.url).pathname.endsWith("/share")) {
+        event.respondWith(receiveShared(req));
+        return;
+    }
     if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) {
         return;
     }

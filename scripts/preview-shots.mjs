@@ -78,6 +78,10 @@ for (const [size, width, height, mobile] of sizes) {
         ["open-label", "save", "notes-toggle", "score-title"].every((id) => getComputedStyle(document.getElementById(id)).display === "none")
         && getComputedStyle(document.querySelector(".tip-icon")).display === "none");
     check(hidden, `${size}: no Open, Save, Notes, title or tip in the preview`);
+    const from = inner().url();
+    check(from.startsWith(`${site}/pocketscore/index.html`), `${size}: PocketScore comes from the website's own copy (${from})`);
+    const version = await inner().evaluate(() => document.getElementById("version").textContent);
+    check(version === "PocketScore 1.0.4", `${size}: frozen copy is 1.0.4 (${version})`);
     await shot("preview-score");
 
     await frame.locator("#play").click();
@@ -88,6 +92,40 @@ for (const [size, width, height, mobile] of sizes) {
     await frame.locator("#mixer-toggle").click();
     await frame.locator("#mixer:not([hidden])").waitFor({ timeout: 10000 });
     await shot("preview-mixer");
+
+    // play only one part: solo the first part, the others go silent
+    const parts = frame.locator("#mixer-body .strip:not(.master):not(.metronome)");
+    const partCount = await parts.count();
+    await parts.nth(0).locator(".s").click();
+    await page.waitForTimeout(500);
+    const solo = await inner().evaluate(() => {
+        const ps = window.app.state.tracks.filter((t) => !t.metronome);
+        return { first: ps[0].solo, othersSilent: ps.slice(1).every((t) => t.forceMute || t.mute) };
+    });
+    check(solo.first && (partCount < 2 || solo.othersSilent), `${size}: Solo plays only one part (${partCount} parts)`);
+    await parts.nth(0).scrollIntoViewIfNeeded();
+    await shot("preview-solo");
+
+    // change a part's sound
+    const before = await inner().evaluate(() => window.app.state.tracks.find((t) => !t.metronome).soundId);
+    await parts.nth(0).locator(".sound").click();
+    await frame.locator("#sounds:not([hidden])").waitFor({ timeout: 10000 });
+    await shot("preview-sounds");
+    const group = frame.locator("#sounds-body details").nth(1);
+    await group.locator("summary").click();
+    const choice = group.locator(".pick").filter({ hasNot: frame.locator('[aria-checked="true"]') }).first();
+    const chosen = await choice.locator("span:nth-child(2)").textContent();
+    await choice.click();
+    await frame.locator("#sounds").waitFor({ state: "hidden", timeout: 10000 });
+    await inner().waitForFunction((b) => window.app.state.tracks.find((t) => !t.metronome).soundId !== b, before, { timeout: 120000 });
+    await inner().waitForFunction(() => window.app.state.tracks.every((t) => t.ready), null, { timeout: 120000 });
+    const shown = await parts.nth(0).locator(".sound span").textContent();
+    check(shown === chosen, `${size}: sound changed to ${chosen} (mixer shows ${shown})`);
+    await frame.locator("#play").click();
+    await page.waitForTimeout(2500);
+    check(await inner().evaluate(() => window.app.state.playing), `${size}: plays the soloed part with its new sound`);
+    await frame.locator("#play").click();
+    await shot("preview-new-sound");
     await frame.locator("#mixer-close").click();
 
     await frame.locator("#speed-open").click();

@@ -46,9 +46,12 @@ No app store needed.
   PocketScore has no accounts, ads or tracking.)
 - **The music pauses when you leave the app** (another app, home screen, screen locked).
   Tap Play when you're back.
-- **It updates itself.** With internet, it checks for a new version when you open it.
-  If a score is open, a yellow bar asks you to tap it to restart; then reopen your score.
-  Unsaved changes are kept. The version number is on the start screen.
+- **It updates itself, even if you never close it.** With internet, it looks for a new version when
+  you open it, when you come back to it, and every 30 minutes. If a score is open, it restarts into
+  the new version at a quiet moment: when you switch away, or after 20 seconds of not touching it
+  while the music is stopped (never while it plays, or while the mixer, speed, loop or notes are
+  open). Your score comes back where you were: the same page, view, zoom, speed and loop, with
+  unsaved changes kept. The version number is on the start screen.
 
 ---
 

@@ -179,6 +179,12 @@ build, tests, status) before working here.
   first (`adb shell am start -a android.intent.action.VIEW -d <url> com.android.chrome`), wait until
   `/json/list` shows no `service_worker`, then connect; close only the tabs at the test's address.
 
+- **Work queued for one layout can run after the layout changed.** Reopening a score after an update
+  switched it to the continuous view at once; a page drawing still queued for the page view's 6 pages
+  then asked for page 5 of a 1-page layout and threw. Rule: anything queued per page checks the page
+  still exists when it runs, and restores are tested by switching views immediately
+  (`update-restart-test.mjs`).
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

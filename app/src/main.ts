@@ -269,6 +269,12 @@ async function renderPage(i: number) {
     }
 
     const page = state.score.pages[i];
+    if (!page) {
+        // queued for a layout with more pages (the view changed meanwhile, e.g. a score reopened after
+        // an update going back to its continuous view): nothing to draw
+        state.rendered.delete(i);
+        return;
+    }
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     // keep canvases within mobile limits (about 16 megapixels)
     let scale = unitsToCss(1) * dpr;
@@ -1433,8 +1439,12 @@ function autoFocus() {
     }
     void enterFocus(false);
 }
+let lastInputAt = performance.now();
 for (const type of ["pointerdown", "pointermove", "keydown", "wheel"]) {
-    document.addEventListener(type, () => scheduleAutoFocus(), { capture: true, passive: true });
+    document.addEventListener(type, () => {
+        lastInputAt = performance.now();
+        scheduleAutoFocus();
+    }, { capture: true, passive: true });
 }
 
 function exitFocus() {
@@ -2030,6 +2040,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     ui.mixerToggle.disabled = true;
     const key = await scoreKey(name, data); // before the data goes to the engine
     state.scoreKey = key;
+    openedScore = { name, data: data.slice(0) }; // a copy to reopen after restarting into an update
     const res = await engine.load(name, data);
     if (!res.ok || !res.score) {
         mixRestoreDone(false);
@@ -2104,6 +2115,12 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
                 reg.update().catch(() => {});
             }
         });
+        // and every 30 minutes while it stays open (a tablet on a music stand)
+        setInterval(() => {
+            if (document.visibilityState === "visible") {
+                reg.update().catch(() => {});
+            }
+        }, 30 * 60 * 1000);
     }).catch((err) => console.warn("service worker:", err));
     sw.addEventListener("message", (e) => {
         if (isUpdate && e.data?.type === "sw-progress" && !state.playing) {
@@ -2114,15 +2131,168 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
         if (!isUpdate) {
             return; // first visit, not an update
         }
+        updateReady = true;
         if (!state.score) {
             location.reload();
             return;
         }
-        setStatus("PocketScore has been updated. Tap here to restart it (reopen your score afterwards).");
+        // a fallback the reader can use at once; otherwise it restarts by itself at a quiet moment
+        setStatus("PocketScore has been updated. It restarts by itself when you pause (your score comes back), or tap here now.");
         ui.status.classList.add("action");
-        ui.status.onclick = () => location.reload();
+        ui.status.onclick = () => void restartForUpdate();
+        void maybeRestartForUpdate();
     });
 }
+
+// ---------------------------------------------------------------- updating while a score is open
+
+// An update is applied by restarting the page, which would close the score: so PocketScore restarts by
+// itself at a quiet moment and reopens the score where the reader was. Never while the music plays,
+// nor while a panel, notes, the tour or a question is open (focus mode is fine); at once when the app
+// is in the background (another app, home screen, locked), otherwise after 20 s untouched. The score
+// is kept in IndexedDB across the restart only, and deleted when it has been reopened; unsaved notes
+// and mixer changes come back from their silent drafts, as after closing the app.
+let updateReady = false;
+let restarting = false;
+let openedScore: { name: string; data: ArrayBuffer } | null = null;
+const UPDATE_IDLE_MS = 20000;
+const RESTART_DB = "pocketscore-restart";
+
+function quietForUpdate(): boolean {
+    return !state.playing && !restarting && !focusStarting && !notes.active && !tour.open && !ui.ask.open
+        && !layers.some((close) => close !== leaveFocus);
+}
+async function maybeRestartForUpdate() {
+    if (updateReady && state.score && quietForUpdate()
+        && (document.hidden || performance.now() - lastInputAt >= UPDATE_IDLE_MS)) {
+        await restartForUpdate();
+    }
+}
+setInterval(() => void maybeRestartForUpdate(), 2000);
+document.addEventListener("visibilitychange", () => void maybeRestartForUpdate());
+
+function restartStore<T>(write: boolean, act: (s: IDBObjectStore) => IDBRequest<T> | void): Promise<T | undefined> {
+    return new Promise((resolve) => {
+        const open = indexedDB.open(RESTART_DB, 1);
+        open.onupgradeneeded = () => open.result.createObjectStore("s");
+        open.onerror = () => resolve(undefined);
+        open.onsuccess = () => {
+            const db = open.result;
+            const tx = db.transaction("s", write ? "readwrite" : "readonly");
+            const req = act(tx.objectStore("s"));
+            tx.oncomplete = () => {
+                db.close();
+                resolve(req ? (req.result as T) : undefined);
+            };
+            tx.onerror = tx.onabort = () => {
+                db.close();
+                resolve(undefined);
+            };
+        };
+    });
+}
+
+interface RestartState {
+    at: number;
+    name: string;
+    data: ArrayBuffer;
+    view: string;
+    zoom: number;
+    scrollTop: number;
+    scrollLeft: number;
+    position: number;
+    speed: number;
+    loop: boolean;
+    from?: number;
+    to?: number;
+    focus: boolean;
+}
+
+async function restartForUpdate() {
+    if (restarting) {
+        return;
+    }
+    restarting = true;
+    if (openedScore && state.score) {
+        clearTimeout(draftTimer); // unsaved mixer changes: their draft now, not in 400 ms
+        mix.store?.setDraft(mix.dirty ? currentMix() : null);
+        const keep: RestartState = {
+            at: Date.now(),
+            name: openedScore.name,
+            data: openedScore.data,
+            view: ui.viewMode.value,
+            zoom: state.zoom,
+            scrollTop: ui.viewer.scrollTop,
+            scrollLeft: ui.viewer.scrollLeft,
+            position: state.position,
+            speed: practice.speed,
+            loop: practice.loop,
+            from: practice.from,
+            to: practice.to,
+            focus: state.focus,
+        };
+        await restartStore(true, (s) => s.put(keep, "score"));
+    }
+    if (!document.hidden) {
+        setStatus("Updating PocketScore…");
+    }
+    location.reload();
+}
+
+// After the restart: the score, its layout, speed, loop, place and view, as they were
+async function reopenAfterUpdate() {
+    if (embedded) {
+        return;
+    }
+    const keep = await restartStore<RestartState>(false, (s) => s.get("score"));
+    if (!keep) {
+        return;
+    }
+    await restartStore(true, (s) => {
+        s.delete("score");
+    });
+    if (Date.now() - keep.at > 10 * 60 * 1000 || !(keep.data instanceof ArrayBuffer)) {
+        return; // not from a restart just now
+    }
+    await engineReady;
+    await openScore(keep.name, keep.data);
+    if (!state.score) {
+        return;
+    }
+    if (keep.view !== "page" && [...ui.viewMode.options].some((o) => o.value === keep.view)) {
+        ui.viewMode.value = keep.view;
+        await (ui.viewMode.onchange as any)?.(new Event("change"));
+    }
+    if (keep.speed !== 1) {
+        showPractice(await engine.setSpeed(keep.speed, 0));
+    }
+    if (keep.from !== undefined && keep.to !== undefined) {
+        await engine.setLoopMarker(false, keep.from);
+        showPractice(await engine.setLoopMarker(true, keep.to));
+        if (practice.loop !== keep.loop) {
+            showPractice(await engine.setLoop(keep.loop));
+        }
+    }
+    if (keep.position > 0) {
+        // the engine takes a jump once the sounds are ready; one sent earlier is lost
+        for (let waited = 0; !state.playbackReady && waited < 60000; waited += 100) {
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        await engine.seek(keep.position);
+    }
+    if (Math.abs(keep.zoom - state.zoom) > 0.001) {
+        state.zoom = clampZoom(keep.zoom);
+        rerenderAll(true);
+    }
+    state.followUntil = performance.now() + 3000; // the reader's own place, not the cursor's
+    ui.viewer.scrollTop = keep.scrollTop;
+    ui.viewer.scrollLeft = keep.scrollLeft;
+    setStatus(`PocketScore is up to date (${__APP_VERSION__}). Your score is back where you were.`, "info", 5000);
+    if (keep.focus) {
+        void enterFocus(false);
+    }
+}
+void reopenAfterUpdate();
 
 // Install: Chrome and Edge (Android, Windows, ChromeOS…) offer to install the
 // web app as an app; show a button for it on the start screen. Safari has no
@@ -2345,7 +2515,9 @@ ui.notesClear.onclick = async () => {
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs) };
+(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
+    // update-restart-test.mjs: an update can't be produced on demand there
+    markUpdateReady: () => (updateReady = true), restartForUpdate };
 
 // ---------------------------------------------------------------- preview in the Reso website
 

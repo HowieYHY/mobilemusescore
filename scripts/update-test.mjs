@@ -19,24 +19,28 @@ const { chromium } = require("playwright");
 const oldDir = path.resolve(process.argv[2]);
 const newDir = path.resolve(process.argv[3] || path.join(root, "app/dist"));
 
-// a third build: the new one with a changed index.html, to test updating
-// from a version that has the update prompt
-const newerDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-newer-"));
-fs.cpSync(newDir, newerDir, { recursive: true });
-{
-    const idx = path.join(newerDir, "index.html");
-    fs.writeFileSync(idx, fs.readFileSync(idx, "utf8").replace("</body>", "<!-- newer -->\n</body>"));
-    const pre = JSON.parse(fs.readFileSync(path.join(newerDir, "precache.json"), "utf8"));
+// later builds: the new one with a changed index.html, to test updating from a version that
+// updates by itself ("newer": no score open; "newest": a score open)
+function laterBuild(tag) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `ps-${tag}-`));
+    fs.cpSync(newDir, dir, { recursive: true });
+    const idx = path.join(dir, "index.html");
+    fs.writeFileSync(idx, fs.readFileSync(idx, "utf8").replace("</body>", `<!-- ${tag} -->\n</body>`));
+    const pre = JSON.parse(fs.readFileSync(path.join(dir, "precache.json"), "utf8"));
     const f = pre.files.find((x) => x.url === "index.html");
     const data = fs.readFileSync(idx);
     f.size = data.length;
     f.h = crypto.createHash("sha1").update(data).digest("hex");
     const oldVersion = pre.version;
-    pre.version = "newer" + oldVersion.slice(5);
-    fs.writeFileSync(path.join(newerDir, "precache.json"), JSON.stringify(pre));
-    const sw = path.join(newerDir, "sw.js");
+    pre.version = (tag + oldVersion).slice(0, oldVersion.length);
+    fs.writeFileSync(path.join(dir, "precache.json"), JSON.stringify(pre));
+    const sw = path.join(dir, "sw.js");
     fs.writeFileSync(sw, fs.readFileSync(sw, "utf8").replace(oldVersion, pre.version));
+    return dir;
 }
+const newerDir = laterBuild("newer");
+const newestDir = laterBuild("newest");
+const scorePath = path.join(root, "real test musescores/I am move it(howie version).mscz");
 
 let serveDir = oldDir;
 let bytes = 0;
@@ -123,6 +127,30 @@ await page.waitForTimeout(500);
 const html = await page.content();
 check(html.includes("<!-- newer -->"), `the open app reloaded into the newer build by itself (${mb(bytes)} downloaded)`);
 
+// 4. a later build while a score is open: it restarts by itself once left alone (20 s), and the
+// score comes back where the reader was
+await page.setInputFiles("#file-input", scorePath);
+await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 300000 });
+await page.evaluate(async () => {
+    await app.engine.seek(app.state.duration * 0.4);
+});
+await page.waitForTimeout(1000);
+const placeBefore = await page.evaluate(() => ({ title: document.getElementById("score-title").textContent, position: app.state.position }));
+serveDir = newestDir;
+bytes = 0;
+const restarted = page.waitForEvent("load", { timeout: 300000 });
+const t0 = Date.now();
+await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()));
+await restarted;
+const tookS = ((Date.now() - t0) / 1000).toFixed(0);
+await page.waitForFunction((t) => document.getElementById("score-title").textContent === t, placeBefore.title, { timeout: 300000 }).catch(() => {});
+await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 300000 }).catch(() => {});
+await page.waitForTimeout(1500);
+const placeAfter = await page.evaluate(() => ({ title: document.getElementById("score-title").textContent, position: app.state.position }));
+check((await page.content()).includes("<!-- newest -->"), `with a score open, it restarted into the newest build by itself after ${tookS} s untouched`);
+check(placeAfter.title === placeBefore.title && Math.abs(placeAfter.position - placeBefore.position) < 0.3,
+    `the score came back where it was: ${placeAfter.title} at ${placeAfter.position.toFixed(1)} s (was ${placeBefore.position.toFixed(1)} s)`);
+
 // offline afterwards: still opens
 await ctx.setOffline(true);
 await page.goto(url);
@@ -131,5 +159,6 @@ check(await page.isVisible("#open-label"), "the updated app opens offline");
 await ctx.close();
 server.close();
 fs.rmSync(newerDir, { recursive: true, force: true });
+fs.rmSync(newestDir, { recursive: true, force: true });
 console.log(failures ? `${failures} failure(s)` : "update checks passed");
 process.exit(failures ? 1 : 0);

@@ -49,6 +49,10 @@ build, tests, status) before working here.
   nothing kept on the device. PocketScore takes a score only from the website's own page. The
   connection does not go the other way (no searching the library from PocketScore): the user's
   decision after a first version was built.
+  The website serves its **own frozen copy of PocketScore 1.0.4** (`public/pocketscore/` there), so it
+  works when this site is down; releases here don't reach it, and the user doesn't plan to update it
+  (their decision, 10 Oct 2026). Features for the preview's bar (e.g. Files: the `.mscz` download and
+  the score's PDFs and recordings) go in the website's `ScorePreview.js`, not in PocketScore.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 

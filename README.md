@@ -52,6 +52,10 @@ No app store needed.
   while the music is stopped (never while it plays, or while the mixer, speed, loop or notes are
   open). Your score comes back where you were: the same page, view, zoom, speed and loop, with
   unsaved changes kept. The version number is on the start screen.
+- **On a version older than 1.0.8?** Those don't update by themselves while a score is open. Once,
+  with internet: close PocketScore completely (swipe it away in your recent apps, or close the browser
+  tab) and open it again. If the start screen still shows the old number, wait a moment and do it once
+  more. From 1.0.8 on, updates happen by themselves.
 
 ---
 

@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (10 Oct 2026, version 1.0.8)
+## Current status (11 Oct 2026, version 1.0.10)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -50,6 +50,7 @@ session. First make sure the start screen shows 1.0.8 or later.
 | Feature | Notes |
 | --- | --- |
 | Open a local `.mscz` / `.mscx` | Through the file picker. MuseScore 2.x to 4.7 files tested. |
+| Open from another app (Android) | The manifest's `share_target` puts the installed app in Android's Share list. `sw.js` (`receiveShared`) takes the POSTed file, keeps it in the `shared-score` cache and opens `./?shared=1`; `main.ts` (`openShared`) opens it like *Open score* (asking about unsaved changes). Android knows no type for `.mscz` (MediaStore says `application/octet-stream`), so that type is accepted and PocketScore shows for other unknown files too; Chrome drops the `.mscz` extension from the intent filter. Checked on the Pixel 9a on 11 Oct 2026: Files, then Share, then PocketScore opened the score. Telegram's own Share sends `.mscz` with no usable type (no app listed, not even Drive), so the README says to save to Downloads first. *Open with* (ACTION_VIEW) isn't possible: Chrome ignores `file_handlers` on Android (the WebAPK registers only https links); it would need a Play Store app (TWA), see issue #18. |
 | Score display | MuseScore's layout. Page counts of all five test scores match desktop 4.7.5, and page 1 of "I am move it" matches its saved thumbnail. Pictures (PNG, JPEG, GIF, BMP) are drawn. |
 | Zoom and scroll | Opens fitted to the screen width. Zoom with − / + (around the middle of the view) or pinch (around the point between the fingers, which stays under them while pinching and after the redraw: `zoomAround`, anchored to a page and the fraction across it). Two fingers are handled in one place, in and out of notes mode: a plain scroll that follows the fingers until their distance changes by 8% (`PINCH_START`), then a pinch scaled with CSS and redrawn at the new size when the **last** finger lifts (finishing at the first rebuilt the pages under the other finger, whose lifting never reached the app: page drawing then waited for it for good and the pages stayed blank, issue #9). Page drawing waits while fingers are down, but a finger count with no touch activity for 3 s is not trusted; page canvases have `pointer-events: none`, so touches land on the page element. The viewer has `overflow-anchor: none` (the app keeps the reader's place). |
 | View modes | Page (default); Continuous vertical and horizontal. |

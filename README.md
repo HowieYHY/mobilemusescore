@@ -67,6 +67,7 @@ No app store needed.
 | To… | Do this |
 | --- | --- |
 | Open a score | Tap **Open score**, choose a `.mscz` file |
+| Open a score from another app (Android) | In **Files**, tap ⋮ beside the score, then **Share**, **PocketScore** |
 | Play / pause | Tap **▶** / **❚❚** |
 | Start from a note | Tap the note |
 | Hear one note | While stopped, tap it |
@@ -86,6 +87,12 @@ A blue line shows where you are, and the page follows it.
 - **iPad and iPhone:** save your scores to the **Files** app first (AirDrop them, or save them
   from email or a cloud drive). **Open score** goes straight to Files.
 - **Android:** the file list shows all your files, not only scores. Scores end in `.mscz`.
+- **Android, from another app:** share the score to PocketScore (in **Files**: ⋮, **Share**, **PocketScore**)
+  and it opens straight away. PocketScore is in the Share list once it is installed from Chrome. It isn't
+  in *Open with*, which Android keeps for apps from the Play Store. From **Telegram**, save the file
+  first (⋮, **Save to Downloads**) and share it from Files: Telegram's own Share finds no app for
+  scores. Because Android doesn't recognise `.mscz` as a type, PocketScore also appears when sharing
+  other unknown files; it says so if a file isn't a score.
 - PocketScore opens `.mscz` and `.mscx` files. Not PDF, MusicXML or MIDI.
 - Opening another score stops the music.
 - If you scroll away while it plays, the page waits a moment before following the music again.

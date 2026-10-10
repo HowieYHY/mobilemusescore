@@ -2004,6 +2004,12 @@ ui.fileInput.onchange = async () => {
     if (!file) {
         return;
     }
+    await openChosen(file.name, await file.arrayBuffer());
+};
+
+// A score the reader chose (Open score, or shared from another app): asks
+// about unsaved changes first
+async function openChosen(name: string, data: ArrayBuffer) {
     if (state.playing) {
         await engine.stop();
     }
@@ -2018,8 +2024,8 @@ ui.fileInput.onchange = async () => {
             discardAll();
         }
     }
-    await openScore(file.name, await file.arrayBuffer());
-};
+    await openScore(name, data);
+}
 
 async function openScore(name: string, data: ArrayBuffer) {
     if (!/\.(mscz|mscx)$/i.test(name)) {
@@ -2295,6 +2301,36 @@ async function reopenAfterUpdate() {
 }
 void reopenAfterUpdate();
 
+// A score shared to PocketScore from another app (Android's Share list): the
+// service worker keeps it and opens the app with ?shared=1 (sw.js receiveShared)
+async function openShared() {
+    const url = new URL(location.href);
+    if (url.searchParams.get("shared") !== "1" || embedded) {
+        return;
+    }
+    url.searchParams.delete("shared");
+    history.replaceState(null, "", url.href); // a reload doesn't open it again
+    let found: { name: string; data: ArrayBuffer } | null = null;
+    try {
+        const cache = await caches.open("shared-score");
+        const key = new URL("shared-score", url).href;
+        const res = await cache.match(key);
+        if (res) {
+            found = { name: decodeURIComponent(res.headers.get("x-name") || "shared.mscz"), data: await res.arrayBuffer() };
+            await cache.delete(key);
+        }
+    } catch {
+        // no cache storage: nothing was kept
+    }
+    if (!found) {
+        setStatus("Nothing arrived from the other app. Use Open score instead.", "error");
+        return;
+    }
+    await engineReady;
+    await openChosen(found.name, found.data);
+}
+void openShared();
+
 // Install: Chrome and Edge (Android, Windows, ChromeOS…) offer to install the
 // web app as an app; show a button for it on the start screen. Safari has no
 // such prompt (Share > Add to Home Screen), so the button stays hidden there.
@@ -2556,7 +2592,7 @@ function tourSteps(): TourStep[] {
     const tipStep: TourStep = { target: el("tip-heart"), title: "Leave a tip", text: "PocketScore is free. If it helps you, tap the heart to leave a tip by PayNow or card. Tips pay UI designers and, in future, the App Store and Google Play fees." };
     if (!state.score) {
         return [
-            { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },
+            { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first. On Android you can also share a score to PocketScore from the Files app." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },

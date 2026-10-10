@@ -19,14 +19,30 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (10 Oct 2026, version 1.0.4)
+## Current status (10 Oct 2026, version 1.0.8)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
 was measured over USB (see *Tests*). All issues up to #16 are closed except #3 (design, open to
 contributors); the RESO website's preview (#2, #14) is live on nusresonance.com since 10 Oct 2026.
-#17 (focus mode) is built and waits for a check on the user's phone and iPad.
+#17 (focus mode) is live since 1.0.5 and passes on the Pixel 9a (`android-focus-test.mjs`); it stays
+open until the iPad and iPhone checks below are done.
+
+### Still to check by hand on an iPad and an iPhone
+
+These can't be automated from Windows (see CLAUDE.md, *iPhone*). The user will do them in a later
+session; close #17 once the focus items pass. First make sure the start screen shows 1.0.8 or later.
+
+| What | How | Expected |
+| --- | --- | --- |
+| Focus, by the button (iPad) | Open a score, tap ⛶ beside ? | iPad Safari's own bars go too (it allows full screen); only the music and Play remain |
+| Focus, by the button (iPhone) | Same, in Safari and in the home-screen app | Only PocketScore's bars go (an iPhone's Safari has no full screen); nothing else changes |
+| Focus, taps | In focus: tap a note, then a margin or the title | The note plays and focus stays; off the music, the bars slide back |
+| Focus, by itself | Play and don't touch for 4 s; stop and don't touch for 10 s | Focus starts both times, without full screen; never with the mixer open |
+| Leaving focus | Swipe back / the iPad's Esc key | Bars come back, still in PocketScore |
+| Motion | Open and close the mixer, speed, loop, the sound list, notes, the colour palette | Each slides and fades (Safari 17.5+; older ones show and hide at once) |
+| Update with a score open | Needs a newer version published: open a score, then switch to another app and back (or leave it 20 s, stopped) | It restarts into the new version (maybe a second or two of loading when you return: iOS pauses apps in the background) and the score is back at the same place, view, zoom, speed and loop |
 
 ### What works
 

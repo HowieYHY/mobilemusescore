@@ -79,7 +79,8 @@ try {
     await page.reload();
     await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 300000 });
     await page.waitForTimeout(3000); // "Ready" hides itself
-    check(await page.evaluate(() => document.getElementById("version").textContent) === "PocketScore 1.0.4", "the 1.0.4 build");
+    const want = JSON.parse(fs.readFileSync(path.join(root, "app/package.json"), "utf8")).version;
+    check(await page.evaluate(() => document.getElementById("version").textContent) === `PocketScore ${want}`, `the ${want} build`);
     check(await page.isVisible("#tour-invite"), "a newcomer is invited to the tour");
     check(await page.isHidden("#install-ios"), "no iPhone install box on Android");
     console.log(`     Chrome's Install button: ${(await page.isVisible("#install-row")) ? "shown" : "not offered here (normal for a local address)"}`);
@@ -87,7 +88,7 @@ try {
 
     await page.click("#tour-start");
     const start = await walkTour(page, "start", ["Open a score"]);
-    check(start.at(-1) === "Leave a tip", `start tour: ${start.join(" / ")}`);
+    check(start.at(-1) === "Buy me a bubble tea", `start tour: ${start.join(" / ")}`);
 
     // a score, as the Android test opens one
     const b64 = fs.readFileSync(scorePath).toString("base64");
@@ -102,8 +103,8 @@ try {
     await page.waitForTimeout(1000);
 
     await page.click("#help");
-    const score = await walkTour(page, "score", ["The score", "Mixer", "Leave a tip"]);
-    check(score.length === 10 && score.at(-1) === "Leave a tip", `score tour, ${score.length} steps: ${score.join(" / ")}`);
+    const score = await walkTour(page, "score", ["The score", "Mixer", "Buy me a bubble tea"]);
+    check(score.length === 11 && score.at(-1) === "Buy me a bubble tea", `score tour, ${score.length} steps: ${score.join(" / ")}`);
 
     // the phone's own Back button
     await page.click("#help");

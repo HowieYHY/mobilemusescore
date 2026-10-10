@@ -2305,16 +2305,17 @@ function tourSteps(): TourStep[] {
             tipStep,
         ];
     }
+    // bottom bar left to right, then the top bar, the tip last: no bouncing between the two
     return [
         { target: () => ui.viewer, title: "The score", text: "Tap any note to play from there. While stopped, a tap plays just that note. Pinch, or use − and +, to zoom." },
         { target: el("play"), title: "Play and pause", text: "The blue line shows where you are, and the page follows it." },
         { target: el("seek"), title: "Move through the score", text: "Drag the slider to jump anywhere. The button on the far left goes back to the start." },
         { target: el("speed-open"), title: "Speed", text: "Practise slower or faster, or type the tempo you want." },
         { target: el("loop-open"), title: "Loop", text: "Repeat a passage: put the loop markers on the notes where it starts and ends." },
-        { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
         { target: el("save"), title: "Save", text: "Keeps your notes and mixer changes for this score. If you forget, PocketScore asks before you open another score." },
+        { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
+        { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
         { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
         tipStep,
     ];

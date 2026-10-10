@@ -273,6 +273,46 @@ body {
 /* nothing to zoom on the start screen, and on a short screen it would cover the start screen's buttons */
 body:has(#empty:not([hidden])) .zoom { display: none; }
 
+/* Focus (issue #17): only the music and a play button. The bars and any open panel are hidden, not
+   closed, and come back as they were; tapping off the staves leaves (handled in main.ts). */
+body:has(#empty:not([hidden])) #focus-toggle { display: none; }
+.focus .topbar, .focus .status, .focus .notesbar, .focus .palette,
+.focus .zoom, .focus .mixer, .focus .practice { display: none !important; }
+.focus .pages { padding: calc(8px + var(--safe-t)) 8px calc(96px + var(--safe-b)); }
+.focus .transport {
+  display: block;
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + var(--safe-b));
+  padding: 0;
+  background: none;
+}
+.focus .transport > :not(#play) { display: none; }
+.focus #play {
+  background: rgba(30, 42, 58, 0.88);
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.focus-hint {
+  position: fixed;
+  left: 50%;
+  top: calc(14px + var(--safe-t));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: rgba(30, 42, 58, 0.88);
+  color: var(--text-on-chrome);
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 7;
+  transition: opacity 0.4s ease-out;
+}
+.focus-hint.fading { opacity: 0; }
+.focus-hint[hidden] { display: none; }
+
 .transport {
   display: flex;
   align-items: center;

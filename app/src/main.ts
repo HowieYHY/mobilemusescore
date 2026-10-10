@@ -110,6 +110,7 @@ const state = {
     playbackReady: false,
     masterDb: 0,
     scoreKey: "",
+    focus: false, // focus mode: only the music and a play button (issue #17)
 };
 
 // ---------------------------------------------------------------- status
@@ -583,6 +584,9 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         }
         const pageEl = (e.target as HTMLElement).closest(".page") as HTMLElement | null;
         if (!pageEl) {
+            if (state.focus) {
+                exitFocus(); // between or around the pages: off the music
+            }
             return;
         }
         const r = pageEl.getBoundingClientRect();
@@ -592,6 +596,10 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         const sp = state.score.spatium;
         const radius = Math.max(0.75 * sp, Math.min(toUnits(18), 3 * sp));
         const tap = { page: Number(pageEl.dataset.index), x: toUnits(e.clientX - r.left), y: toUnits(e.clientY - r.top), radius };
+        if (state.focus && !onStave(tap.page, tap.x, tap.y)) {
+            exitFocus(); // in a margin or between systems; a tap on a stave plays as usual
+            return;
+        }
         if (armedMarker) {
             void placeMarker(tap);
             return;
@@ -1288,6 +1296,111 @@ function closeLayer(close: () => void) {
 window.addEventListener("popstate", () => {
     layers.pop()?.();
 });
+
+// ---------------------------------------------------------------- focus mode
+
+// Focus (issue #17): the bars go, leaving the music and a play button, and the browser goes full
+// screen where it allows (not on an iPhone, nor inside the Reso website). A tap on a stave plays as
+// usual; a tap anywhere off the staves, Escape or the phone's Back brings everything back. Open
+// panels are only hidden, so they come back as they were.
+const focusHint = $("focus-hint");
+let focusFullscreen = false;
+let focusHintTimer = 0;
+
+let focusStarting = false;
+async function enterFocus() {
+    if (state.focus || focusStarting || !state.score) {
+        return;
+    }
+    if (notes.active) {
+        // finish writing first (the notes bar would be hidden anyway). Closing the top layer goes
+        // through history.back(), whose popstate comes later: wait for it, or it would close focus.
+        focusStarting = true;
+        const closed = layers[layers.length - 1] === closeNotes
+            ? new Promise<void>((done) => window.addEventListener("popstate", () => done(), { once: true }))
+            : null;
+        closeLayer(closeNotes);
+        await closed;
+        focusStarting = false;
+    }
+    state.focus = true;
+    document.documentElement.classList.add("focus");
+    openLayer(leaveFocus);
+    const root = document.documentElement as any;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (request && !embedded && !document.fullscreenElement) {
+        focusFullscreen = true;
+        Promise.resolve(request.call(root, { navigationUI: "hide" })).catch(() => (focusFullscreen = false));
+    }
+    clearTimeout(focusHintTimer);
+    focusHint.classList.remove("fading");
+    focusHint.hidden = false;
+    focusHintTimer = window.setTimeout(() => {
+        focusHint.classList.add("fading");
+        focusHintTimer = window.setTimeout(() => (focusHint.hidden = true), 450);
+    }, 2600);
+}
+
+function leaveFocus() {
+    state.focus = false;
+    document.documentElement.classList.remove("focus");
+    clearTimeout(focusHintTimer);
+    focusHint.hidden = true;
+    const d = document as any;
+    if (focusFullscreen && (d.fullscreenElement || d.webkitFullscreenElement)) {
+        Promise.resolve((d.exitFullscreen || d.webkitExitFullscreen).call(d)).catch(() => {});
+    }
+    focusFullscreen = false;
+}
+
+function exitFocus() {
+    if (state.focus) {
+        closeLayer(leaveFocus);
+    }
+}
+
+// leaving full screen the browser's way (Escape, Android's Back, a swipe) leaves focus too
+for (const type of ["fullscreenchange", "webkitfullscreenchange"]) {
+    document.addEventListener(type, () => {
+        const d = document as any;
+        if (!(d.fullscreenElement || d.webkitFullscreenElement) && focusFullscreen) {
+            focusFullscreen = false;
+            exitFocus();
+        }
+    });
+}
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && state.focus) {
+        exitFocus();
+    }
+});
+$("focus-toggle").onclick = () => void enterFocus();
+
+// The systems on each page, from the timeline: a tap counts as on a stave when it is inside a
+// system's band, or near enough that a tap there would pick one of its notes.
+let bands: { page: number; top: number; bottom: number; left: number; right: number }[] = [];
+let bandsOf: TimelinePoint[] | null = null;
+function onStave(page: number, x: number, y: number): boolean {
+    if (bandsOf !== timeline) {
+        const systems = new Map<string, (typeof bands)[number]>();
+        for (const [, pg, px, py, h] of timeline) {
+            const key = `${pg}|${py}`;
+            const b = systems.get(key);
+            if (b) {
+                b.left = Math.min(b.left, px);
+                b.right = Math.max(b.right, px);
+            } else {
+                systems.set(key, { page: pg, top: py, bottom: py + h, left: px, right: px });
+            }
+        }
+        bands = [...systems.values()];
+        bandsOf = timeline;
+    }
+    const sp = state.score?.spatium || 25;
+    // clefs and key signatures sit before the first note, the final barline after the last
+    return bands.some((b) => b.page === page && y >= b.top - 3 * sp && y <= b.bottom + 3 * sp
+        && x >= b.left - 10 * sp && x <= b.right + 6 * sp);
+}
 
 // ---------------------------------------------------------------- speed and loop
 
@@ -2198,6 +2311,7 @@ function tourSteps(): TourStep[] {
         { target: el("seek"), title: "Move through the score", text: "Drag the slider to jump anywhere. The button on the far left goes back to the start." },
         { target: el("speed-open"), title: "Speed", text: "Practise slower or faster, or type the tempo you want." },
         { target: el("loop-open"), title: "Loop", text: "Repeat a passage: put the loop markers on the notes where it starts and ends." },
+        { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
         { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
         { target: el("save"), title: "Save", text: "Keeps your notes and mixer changes for this score. If you forget, PocketScore asks before you open another score." },

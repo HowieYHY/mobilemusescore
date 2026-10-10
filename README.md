@@ -68,6 +68,7 @@ No app store needed.
 | Zoom | Pinch, or use **−** and **+** |
 | Scroll | Drag with one or two fingers |
 | Change the layout | Menu at the top right: *Page view* or *Continuous* |
+| Read with nothing in the way | Tap **⛶** (Focus) at the top, beside **?** |
 | Close a panel | Tap **Done**, or your phone's **Back** |
 
 A blue line shows where you are, and the page follows it.
@@ -81,6 +82,10 @@ A blue line shows where you are, and the page follows it.
 - PocketScore opens `.mscz` and `.mscx` files. Not PDF, MusicXML or MIDI.
 - Opening another score stops the music.
 - If you scroll away while it plays, the page waits a moment before following the music again.
+- **Focus** hides everything but the music and a play button. On Android, a computer or an iPad it also
+  goes full screen (no browser bars); an iPhone's Safari doesn't allow that, so there it hides
+  PocketScore's own bars. Tapping a note still plays from it. To bring the controls back, tap anywhere
+  off the music (a margin, the title, between lines), or use your phone's **Back** or **Esc**.
 
 </details>
 

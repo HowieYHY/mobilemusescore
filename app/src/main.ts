@@ -2380,7 +2380,7 @@ tourInvite.hidden = embedded || !firstTime.isNewcomer() || firstTime.hasSeen("to
 function tourSteps(): TourStep[] {
     const el = (id: string) => () => $(id);
     // last in both: a tip, never called a donation (Stripe's rules)
-    const tipStep: TourStep = { target: el("tip-heart"), title: "Buy me a bubble tea", text: "PocketScore is free. If it helps you, tap the heart to leave a tip by PayNow or card. Tips pay UI designers and, in future, the App Store and Google Play fees." };
+    const tipStep: TourStep = { target: el("tip-heart"), title: "Leave a tip", text: "PocketScore is free. If it helps you, tap the heart to leave a tip by PayNow or card. Tips pay UI designers and, in future, the App Store and Google Play fees." };
     if (!state.score) {
         return [
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first." },

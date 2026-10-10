@@ -2,7 +2,7 @@
 // (CDP Input.dispatchTouchEvent, so the browser treats taps as the reader's own and allows full
 // screen): Focus goes full screen with only Play showing, a tap on a note stays in focus, Play plays,
 // a tap off the staves (the title area) leaves focus and full screen, and so does the phone's real
-// Back button, staying in PocketScore. Screenshots come from the phone.
+// Back button, staying in PocketScore; focus also starts by itself after 4 s of playing untouched. Screenshots come from the phone.
 //
 // Runs on 127.0.0.1:4173 (a local build, its own storage, so the reader's PocketScore is untouched):
 //   cd app && npm run build && npx vite preview --port 4173 --host 127.0.0.1
@@ -164,6 +164,22 @@ try {
     const back = await now();
     check(!back.focus && back.topbar && !back.fullscreen && back.url.startsWith(url) && back.score, "the phone's Back leaves focus and full screen, staying in PocketScore");
     shot("05-after-back");
+
+    // focus starts by itself after 4 s untouched while playing, without full screen
+    await page.evaluate(() => (app.testAutoFocus = true)); // in case the phone reports automation
+    await tapEl("#play");
+    await page.waitForFunction(() => app.state.playing, null, { timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(5500);
+    const auto = await now();
+    check(auto.focus && !auto.topbar && !auto.fullscreen, "focus starts by itself after 4 s of playing untouched (bars hidden, no full screen)");
+    shot("06-auto-focus");
+    await tapEl("#play");
+    await page.waitForTimeout(600);
+    await page.evaluate(() => document.querySelector(".viewer").scrollTo(0, 0));
+    await page.waitForTimeout(400);
+    await tapPage(pts.title);
+    await page.waitForTimeout(1200);
+    check(!(await now()).focus, "a tap off the staves brings the bars back after automatic focus");
 } catch (err) {
     failures++;
     console.log("FAIL ", String(err.message).split("\n")[0]);

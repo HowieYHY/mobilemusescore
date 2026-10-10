@@ -171,7 +171,7 @@ for (const [name, width, height, touch] of sizes) {
         await tap(".tour-next");
         await page.waitForTimeout(150);
     }
-    const order = ["The score", "Play and pause", "Move through the score", "Speed", "Loop", "Mixer", "Save", "Write on the score", "Focus", "Help is here", "Buy me a bubble tea"];
+    const order = ["The score", "Play and pause", "Move through the score", "Speed", "Loop", "Mixer", "Save", "Write on the score", "Focus", "Help is here", "Leave a tip"];
     check(titles.join("|") === order.join("|"), `${name}: tour goes bottom bar, top bar, tip last (${titles.join(" / ")})`);
 
     // smooth: the bars slide and the score glides (transforms and opacity only)

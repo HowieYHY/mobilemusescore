@@ -88,7 +88,7 @@ try {
 
     await page.click("#tour-start");
     const start = await walkTour(page, "start", ["Open a score"]);
-    check(start.at(-1) === "Buy me a bubble tea", `start tour: ${start.join(" / ")}`);
+    check(start.at(-1) === "Leave a tip", `start tour: ${start.join(" / ")}`);
 
     // a score, as the Android test opens one
     const b64 = fs.readFileSync(scorePath).toString("base64");
@@ -103,8 +103,8 @@ try {
     await page.waitForTimeout(1000);
 
     await page.click("#help");
-    const score = await walkTour(page, "score", ["The score", "Mixer", "Buy me a bubble tea"]);
-    check(score.length === 11 && score.at(-1) === "Buy me a bubble tea", `score tour, ${score.length} steps: ${score.join(" / ")}`);
+    const score = await walkTour(page, "score", ["The score", "Mixer", "Leave a tip"]);
+    check(score.length === 11 && score.at(-1) === "Leave a tip", `score tour, ${score.length} steps: ${score.join(" / ")}`);
 
     // the phone's own Back button
     await page.click("#help");

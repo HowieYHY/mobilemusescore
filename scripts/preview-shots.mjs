@@ -56,7 +56,7 @@ for (const [size, width, height, mobile] of sizes) {
         await page.screenshot({ path: path.join(outDir, `${size}-${String(++n).padStart(2, "0")}-${what}.png`) });
     };
 
-    await page.goto(`${site}/students/library?q=dream`);
+    await page.goto(`${site}/students/library?q=${encodeURIComponent(process.env.QUERY || "dream")}`);
     await page.waitForSelector(".file-preview", { timeout: 180000 });
     const buttons = await page.locator(".file-preview").count();
     const rows = await page.locator(".file-list li").count();
@@ -66,7 +66,7 @@ for (const [size, width, height, mobile] of sizes) {
     await page.evaluate(() => window.scrollBy(0, -80));
     await shot("library");
 
-    await page.locator(".file-preview").first().click();
+    await page.locator(process.env.FILE ? `.file-list li:has-text("${process.env.FILE}") .file-preview` : ".file-preview").first().click();
     await page.waitForSelector("dialog.score-preview[open] iframe", { timeout: 30000 });
     await shot("preview-opening");
 
@@ -135,6 +135,28 @@ for (const [size, width, height, mobile] of sizes) {
     // nothing kept: a preview writes no saved settings or drafts
     const kept = await inner().evaluate(() => Object.keys(localStorage).filter((k) => /mixer|notes(?!Prefs)/.test(k)));
     check(kept.length === 0, `${size}: nothing kept on the device (${kept.join(", ") || "no keys"})`);
+
+    // Files: download the score, and its PDF and recordings from the same folder
+    await page.click(".score-preview-files");
+    await page.waitForSelector(".score-files .score-files-note:not(:has-text('Looking'))", { timeout: 30000 });
+    const listed = await page.locator(".score-files .file-row strong").allTextContents();
+    check(listed.length >= 1, `${size}: Files lists ${listed.join(" | ")} (${await page.textContent(".score-files-note")})`);
+    await shot("preview-files");
+    const [download] = await Promise.all([page.waitForEvent("download"), page.locator(".score-files .file-row").first().click()]);
+    const saved = path.join(outDir, `${size}-download-${download.suggestedFilename()}`);
+    await download.saveAs(saved);
+    check(fs.statSync(saved).size > 1000 && download.suggestedFilename().endsWith(".mscz"), `${size}: downloads ${download.suggestedFilename()} (${fs.statSync(saved).size} bytes)`);
+    fs.rmSync(saved);
+    if (!(await page.isVisible(".score-files"))) await page.click(".score-preview-files");
+    await page.keyboard.press("Escape");
+    check(!(await page.isVisible(".score-files")) && (await page.isVisible("dialog.score-preview[open]")), `${size}: Escape closes Files, not the preview`);
+    if (size === "phone") {
+        const fits = await page.evaluate(() => {
+            const bar = document.querySelector(".score-preview-bar").getBoundingClientRect();
+            return [...document.querySelectorAll(".score-preview-bar > *")].every((el) => el.getBoundingClientRect().right <= bar.right + 0.5);
+        });
+        check(fits, `${size}: the bar's buttons fit at ${width} px`);
+    }
 
     await page.click(".score-preview-close");
     await page.waitForFunction(() => !document.querySelector("dialog.score-preview"), null, { timeout: 10000 });

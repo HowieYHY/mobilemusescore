@@ -186,9 +186,11 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 ## Support PocketScore
 
 PocketScore is free. If it helps you, you can **[leave a tip](https://buy.stripe.com/3cI00jg1L7X3f1c8Zgd7q00)**, any amount, by
-**PayNow** or **card**. In the app, tap the **♥** at the top, or **Tip PocketScore** on the start screen.
+**PayNow** or **card**. In the app, tap the **♥** at the top, or **Buy me a bubble tea** on the start screen.
 
 - It's optional, and nothing in the app is locked.
+- **Where tips go:** paying UI designers to make PocketScore nicer to use and, in future, the fees for
+  putting it on Apple's App Store and Google Play.
 - **PayNow is best:** almost all of your tip reaches PocketScore. Card payments lose more to fees,
   especially small ones.
 - Tips go through **Stripe**, a payment company. The page is on `buy.stripe.com` and says

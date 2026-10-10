@@ -24,15 +24,16 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
-was measured over USB (see *Tests*). All issues up to #16 are closed except #3 (design, open to
-contributors); the RESO website's preview (#2, #14) is live on nusresonance.com since 10 Oct 2026.
-#17 (focus mode) is live since 1.0.5 and passes on the Pixel 9a (`android-focus-test.mjs`); it stays
-open until the iPad and iPhone checks below are done.
+was measured over USB (see *Tests*). Open issues: #3 (design, open to contributors) and #18
+(possibly shipping to the App Store and Google Play). The RESO website's preview (#2, #14) is live on
+nusresonance.com since 10 Oct 2026; focus mode (#17) is live since 1.0.5, passes on the Pixel 9a
+(`android-focus-test.mjs`) and was closed by the user on 10 Oct 2026, with the iPad and iPhone checks
+below still to do.
 
 ### Still to check by hand on an iPad and an iPhone
 
 These can't be automated from Windows (see CLAUDE.md, *iPhone*). The user will do them in a later
-session; close #17 once the focus items pass. First make sure the start screen shows 1.0.8 or later.
+session. First make sure the start screen shows 1.0.8 or later.
 
 | What | How | Expected |
 | --- | --- | --- |

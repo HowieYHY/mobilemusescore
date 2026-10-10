@@ -53,6 +53,9 @@ build, tests, status) before working here.
   works when this site is down; releases here don't reach it, and the user doesn't plan to update it
   (their decision, 10 Oct 2026). Features for the preview's bar (e.g. Files: the `.mscz` download and
   the score's PDFs and recordings) go in the website's `ScorePreview.js`, not in PocketScore.
+- **Every new or changed feature updates the tour and the README**, without being asked: a tour step
+  (`tour` steps in `main.ts`) for any new control, and the README's user guide. The user's standing
+  request (10 Oct 2026).
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 

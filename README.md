@@ -77,7 +77,7 @@ No app store needed.
 | Scroll | Drag with one or two fingers |
 | Move quickly through a long score | Start scrolling, then drag the handle that appears at the right edge (along the bottom in *Continuous (horizontal)*). It shows the page, or in the continuous views the time in the music, and fades away when you stop |
 | Change the layout | Menu at the top right: *Page view*, *Page by page* or *Continuous* |
-| Read one page at a time | Choose *Page by page*: each page fills the screen whole; swipe left or right (or use the arrow keys) to turn one page. The page turns by itself as the music reaches the next one. There is no zoom in this view; in notes mode, swipe with two fingers |
+| Read one page at a time | Choose *Page by page*: each page fills the screen whole; swipe left or right (or use the arrow keys) to turn one page. The page turns by itself as the music reaches the next one. You can zoom in (pinch, or **+**), but never out past the whole page; zoomed in, drag to move around the page, and keep swiping past its edge to turn. In notes mode, use two fingers |
 | Read with nothing in the way | Tap **⛶** (Focus) at the top, beside **?** |
 | Close a panel | Tap **Done**, or your phone's **Back** |
 

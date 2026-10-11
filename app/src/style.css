@@ -274,12 +274,11 @@ body {
 /* nothing to zoom on the start screen, and on a short screen it would cover the start screen's buttons */
 body:has(#empty:not([hidden])) .zoom { display: none; }
 
-/* Page by page: one page per screen; main.ts turns them with the finger (a swipe turns one and
-   the view locks onto it), so the browser mustn't scroll by itself. No zoom. */
-.viewer.turn { overflow-y: hidden; touch-action: none; }
+/* Page by page: one page per screen (bigger when zoomed in); main.ts moves and turns them with the
+   finger (a swipe turns one and the view locks onto it), so the browser mustn't scroll by itself. */
+.viewer.turn { touch-action: none; }
 .pages.turn, .focus .pages.turn { gap: 0; padding: 0; }
 .pages.turn .slot { flex: none; display: flex; align-items: center; justify-content: center; }
-body.page-turn .zoom { display: none; }
 
 /* The browser's own scrollbars on touch screens: Chrome on Android draws them over the score, beside
    the drag handle, which does their job. Kept with a mouse. */

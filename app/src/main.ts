@@ -204,9 +204,10 @@ function tileRects(w: number, h: number, scale: number): Rect[] {
     return rects;
 }
 
-// "Page by page": the page layout shown one page at a time, each page fitted whole to the screen;
-// a swipe turns exactly one page and the view locks onto it (CSS scroll snapping on `.slot`s, one
-// viewer wide each). No zoom there, so a page is never partly shown.
+// "Page by page": the page layout shown one page at a time, each page in a `.slot` at least one
+// screen wide and high; a swipe turns exactly one page and the view locks onto it. Zoom goes from
+// the whole page fitted to the screen (never smaller, so no other page shows) up to the usual
+// limit; zoomed in, a finger moves around the page and a swipe past its edge turns it.
 const pageTurn = () => ui.viewMode.value === "page_turn";
 const engineMode = (v: string): ViewMode => (v === "page_turn" ? "page" : v as ViewMode);
 
@@ -223,10 +224,33 @@ function fitPageZoom() {
 
 // measured on the slots, which keep their width until rebuilt (the viewer may have changed size)
 const slotWidth = () => (state.pageEls[0]?.parentElement as HTMLElement | null)?.offsetWidth || ui.viewer.clientWidth;
-const turnedTo = () => Math.round(ui.viewer.scrollLeft / Math.max(1, slotWidth()));
+// the page whose slot holds the middle of the screen (a slot is never narrower than the screen,
+// except just after the screen widened, before the slots are rebuilt: then the slot's middle)
+const turnedTo = () => Math.max(0, Math.min(state.pageEls.length - 1,
+    Math.floor((ui.viewer.scrollLeft + Math.min(ui.viewer.clientWidth, slotWidth()) / 2) / Math.max(1, slotWidth()))));
+// the scroll positions that show only page i (one, unless zoomed in)
+const slotRange = (i: number) => [i * slotWidth(), i * slotWidth() + Math.max(0, slotWidth() - ui.viewer.clientWidth)];
 function turnTo(i: number, smooth = true) {
     i = Math.max(0, Math.min(state.pageEls.length - 1, i));
-    ui.viewer.scrollTo({ left: i * slotWidth(), behavior: smooth ? "smooth" : "instant" });
+    ui.viewer.scrollTo({ left: i * slotWidth(), top: 0, behavior: smooth ? "smooth" : "instant" });
+}
+// After a swipe or a two-finger scroll that started on page `from`: past the page's edge by a fifth
+// of the screen, or a quick flick, turns to the next page that way; otherwise back within the page.
+function settleTurn(from: number, quick: boolean) {
+    const [lo, hi] = slotRange(from);
+    const sl = ui.viewer.scrollLeft;
+    const over = (sl < lo ? sl - lo : sl > hi ? sl - hi : 0) / ui.viewer.clientWidth;
+    const step = Math.abs(over) > 0.2 || (quick && Math.abs(over) > 0.05) ? Math.sign(over) : 0;
+    if (step && from + step >= 0 && from + step < state.pageEls.length) {
+        turnTo(from + step);
+    } else if (sl < lo || sl > hi) {
+        ui.viewer.scrollTo({ left: Math.min(hi, Math.max(lo, sl)), behavior: "smooth" });
+    }
+}
+// keeps the view on the page under it (after a zoom or a drag of the handle)
+function keepOnPage() {
+    const [lo, hi] = slotRange(turnedTo());
+    ui.viewer.scrollLeft = Math.min(hi, Math.max(lo, ui.viewer.scrollLeft));
 }
 
 // The page nearest the middle of the screen
@@ -284,8 +308,10 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
     ui.pages.classList.toggle("turn", turn);
     ui.viewer.classList.toggle("turn", turn);
     document.body.classList.toggle("page-turn", turn);
-    const slotW = ui.viewer.clientWidth;
-    const slotH = ui.viewer.clientHeight;
+    // one screen per page, bigger when zoomed in past it (all slots alike: the largest page)
+    const css = (u: number) => unitsToCss(u) + 16;
+    const slotW = Math.max(ui.viewer.clientWidth, ...score.pages.map((p) => turn ? css(p.w) : 0));
+    const slotH = Math.max(ui.viewer.clientHeight, ...score.pages.map((p) => turn ? css(p.h) : 0));
     observer = new IntersectionObserver(tilesSeen, { root: ui.viewer, rootMargin: horizontal ? `${ACROSS}px ${NEAR}px` : `${NEAR}px ${ACROSS}px` });
     const scale = pageScale();
     score.pages.forEach((p, i) => {
@@ -326,6 +352,9 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
         notes.attach(el, i, p.w, p.h);
     });
     ui.zoomLabel.textContent = Math.round(state.zoom * 100) + "%";
+    if (turn) {
+        turnFitted = Math.abs(state.zoom - fitPageZoom()) < 0.001;
+    }
 }
 
 function tilesSeen(entries: IntersectionObserverEntry[]) {
@@ -595,7 +624,8 @@ function fitWidthZoom() {
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 4;
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+// page by page: never smaller than the whole page on the screen
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(pageTurn() ? fitPageZoom() : MIN_ZOOM, z));
 
 // Where a screen point falls on the score: a page and the fraction across and
 // down it (the nearest page when the point is in a gap)
@@ -615,9 +645,6 @@ function anchorAt(x: number, y: number): { page: number; fx: number; fy: number 
 
 // Zoom so that the point of the score under (x, y) stays under (toX, toY)
 function zoomAround(z: number, x: number, y: number, toX = x, toY = y) {
-    if (pageTurn()) {
-        return; // each page fits the screen
-    }
     const a = anchorAt(x, y);
     state.zoom = clampZoom(z);
     rerenderAll(true);
@@ -626,6 +653,9 @@ function zoomAround(z: number, x: number, y: number, toX = x, toY = y) {
         const r = el.getBoundingClientRect();
         ui.viewer.scrollLeft += r.left + a.fx * r.width - toX;
         ui.viewer.scrollTop += r.top + a.fy * r.height - toY;
+    }
+    if (pageTurn()) {
+        keepOnPage();
     }
 }
 
@@ -649,16 +679,11 @@ const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
     let last = { f: 1, x: 0, y: 0 };
     const mid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
     const dist = (t: TouchList) => Math.max(1, Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY));
-    // Page by page has no zoom. A finger draws in notes mode, so there two fingers swiped
-    // sideways turn the page (elsewhere the browser's own scrolling turns it).
-    let turnSwipe: { x0: number; x: number } | null = null;
+    // page by page: the page the fingers started on, and when (to settle on a page after)
+    let turnFrom = { page: 0, t0: 0 };
     ui.viewer.addEventListener("touchstart", (e) => {
-        if (e.touches.length === 2 && state.score && pageTurn()) {
-            const x = mid(e.touches).x;
-            turnSwipe = { x0: x, x };
-            return;
-        }
         if (e.touches.length === 2 && state.score) {
+            turnFrom = { page: turnedTo(), t0: performance.now() };
             const m = mid(e.touches);
             const r = ui.pages.getBoundingClientRect();
             pinch = {
@@ -695,10 +720,6 @@ const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
         last = { f, x: m.x, y: m.y };
     };
     ui.viewer.addEventListener("touchmove", (e) => {
-        if (turnSwipe && e.touches.length === 2) {
-            turnSwipe.x = mid(e.touches).x;
-            return;
-        }
         if (!pinch || e.touches.length !== 2) {
             return;
         }
@@ -717,14 +738,6 @@ const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
     // pages under the other finger, whose lifting then never reached the app,
     // and page drawing waited for it (issue #9)
     const end = (e: TouchEvent) => {
-        if (turnSwipe && e.touches.length === 0) {
-            const dx = turnSwipe.x - turnSwipe.x0;
-            turnSwipe = null;
-            if (notes.active && Math.abs(dx) > 40) {
-                turnTo(turnedTo() + (dx < 0 ? 1 : -1));
-            }
-            return;
-        }
         if (!pinch || e.touches.length > 0) {
             return;
         }
@@ -738,6 +751,10 @@ const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
             if (p.zooming) { // pinched and back: where the fingers left it
                 ui.viewer.scrollLeft -= last.x - (left0 + p.px);
                 ui.viewer.scrollTop -= last.y - (top0 + p.py);
+            }
+            if (pageTurn()) {
+                // two fingers moved sideways (notes mode, where one finger draws): turn or stay
+                settleTurn(turnFrom.page, performance.now() - turnFrom.t0 < 300);
             }
             return; // a scroll: already in place
         }
@@ -1037,8 +1054,8 @@ function followCursor(pageEl: HTMLElement) {
         const i = Number(pageEl.dataset.index);
         if (i !== turnedTo()) {
             turnTo(i); // the music reached another page
+            return;
         }
-        return;
     }
     const v = ui.viewer.getBoundingClientRect();
     const r = cursorEl.getBoundingClientRect();
@@ -1049,7 +1066,9 @@ function followCursor(pageEl: HTMLElement) {
     if (r.right > v.right - v.width * margin || r.left < v.left) {
         ui.viewer.scrollLeft += r.left - v.left - v.width * 0.25;
     }
-    void pageEl;
+    if (pageTurn()) {
+        keepOnPage(); // zoomed in: within the page
+    }
 }
 
 // The audio engine renders ahead and reports its position in bursts, so while
@@ -2485,11 +2504,15 @@ ui.viewMode.onchange = async () => {
     state.score = await engine.setViewMode(engineMode(view));
     notes.setMode(engineMode(view)); // notes belong to the layout they were written on
     await loadTimeline();
+    // before fitting: the message above the score takes height, and when it goes within the same
+    // frame nothing reports the screen growing back (the page stayed fitted to the shorter screen)
+    setStatus("");
     if (view === "page_turn") {
         if (was !== "page_turn") {
             zoomBeforeTurn = state.zoom;
         }
         state.zoom = fitPageZoom();
+        turnFitted = true;
     } else if (was === "page_turn") {
         state.zoom = zoomBeforeTurn;
     }
@@ -2499,13 +2522,13 @@ ui.viewMode.onchange = async () => {
     } else if (was === "page_turn" && view === "page") {
         state.pageEls[keepPage]?.scrollIntoView({ block: "start" });
     }
-    setStatus("");
 };
 let shownView = "page";
 let zoomBeforeTurn = 1;
+let turnFitted = true; // page by page at the whole-page zoom (kept that way when the screen changes)
 
 // Page by page: a new screen size (turning the phone, focus mode, the notes bar) fits the page
-// again, on the same page
+// again (or, zoomed in, keeps the zoom within the new limits), on the same page
 {
     let size = "";
     let timer = 0;
@@ -2521,7 +2544,7 @@ let zoomBeforeTurn = 1;
         clearTimeout(timer);
         timer = window.setTimeout(() => {
             const page = turnedTo(); // now, not when the size changed: the reader may have turned since
-            state.zoom = fitPageZoom();
+            state.zoom = turnFitted ? fitPageZoom() : clampZoom(state.zoom);
             rerenderAll(true);
             turnTo(page, false);
         }, 150);
@@ -2530,17 +2553,17 @@ let zoomBeforeTurn = 1;
 
 // Page by page: turning with a finger. The browser's own scroll snapping chose the nearest page
 // when the finger lifted, so a slow half swipe went back, and it differs between Chrome and Safari;
-// here the page follows the finger, and on lifting it turns one page in the swipe's direction if it
-// went a fifth of the way or was a quick flick, else it springs back. The viewer has
-// touch-action: none in this view, so the browser doesn't scroll by itself. (A finger that draws in
-// notes mode draws; two fingers turn the page there.)
+// here the page follows the finger (zoomed in, it moves around the page), and on lifting past the
+// page's edge it turns one page that way if it went a fifth of the screen or was a quick flick, else
+// it springs back (settleTurn). The viewer has touch-action: none in this view, so the browser
+// doesn't scroll by itself. (A finger that draws in notes mode draws; two fingers move there.)
 {
-    let swipe: { x0: number; y0: number; left: number; from: number; t0: number; moving: boolean } | null = null;
+    let swipe: { x0: number; y0: number; left: number; top: number; from: number; t0: number; moving: boolean } | null = null;
     ui.viewer.addEventListener("touchstart", (e) => {
         swipe = null;
         if (pageTurn() && e.touches.length === 1 && !ui.pages.classList.contains("finger-draw")) {
             const t = e.touches[0];
-            swipe = { x0: t.clientX, y0: t.clientY, left: ui.viewer.scrollLeft, from: turnedTo(), t0: performance.now(), moving: false };
+            swipe = { x0: t.clientX, y0: t.clientY, left: ui.viewer.scrollLeft, top: ui.viewer.scrollTop, from: turnedTo(), t0: performance.now(), moving: false };
         }
     }, { passive: true });
     ui.viewer.addEventListener("touchmove", (e) => {
@@ -2549,26 +2572,25 @@ let zoomBeforeTurn = 1;
             return;
         }
         const dx = e.touches[0].clientX - swipe.x0;
-        if (!swipe.moving && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.touches[0].clientY - swipe.y0)) {
+        const dy = e.touches[0].clientY - swipe.y0;
+        if (!swipe.moving && Math.hypot(dx, dy) > 8) {
             swipe.moving = true;
             state.followUntil = performance.now() + 2500; // the reader's page, not the music's
         }
         if (swipe.moving) {
             // never further than the next page either way
-            const w = slotWidth();
-            ui.viewer.scrollLeft = Math.min(Math.max(swipe.left - dx, (swipe.from - 1) * w), (swipe.from + 1) * w);
+            const [lo, hi] = slotRange(swipe.from);
+            const vw = ui.viewer.clientWidth;
+            ui.viewer.scrollLeft = Math.min(Math.max(swipe.left - dx, lo - vw), hi + vw);
+            ui.viewer.scrollTop = swipe.top - dy;
         }
     }, { passive: true });
     const lift = () => {
         const sw = swipe;
         swipe = null;
-        if (!sw?.moving) {
-            return;
+        if (sw?.moving) {
+            settleTurn(sw.from, performance.now() - sw.t0 < 300);
         }
-        const moved = (ui.viewer.scrollLeft - sw.from * slotWidth()) / slotWidth();
-        const quick = performance.now() - sw.t0 < 300;
-        const step = Math.abs(moved) > 0.2 || (quick && Math.abs(moved) > 0.05) ? Math.sign(moved) : 0;
-        turnTo(sw.from + step);
     };
     ui.viewer.addEventListener("touchend", lift);
     ui.viewer.addEventListener("touchcancel", lift);
@@ -2584,9 +2606,10 @@ let zoomBeforeTurn = 1;
             if (!pageTurn() || swipe || fingersDown > 0 || scrollerDragging) {
                 return;
             }
-            const at = ui.viewer.scrollLeft / slotWidth();
-            if (Math.abs(at - Math.round(at)) * slotWidth() >= 1) {
-                turnTo(Math.round(at));
+            const [lo, hi] = slotRange(turnedTo());
+            const sl = ui.viewer.scrollLeft;
+            if (sl < lo - 0.5 || sl > hi + 0.5) {
+                ui.viewer.scrollTo({ left: Math.min(hi, Math.max(lo, sl)), behavior: "smooth" });
             }
         }, 150);
     }, { passive: true });
@@ -2783,7 +2806,7 @@ async function reopenAfterUpdate() {
         }
         await engine.seek(keep.position);
     }
-    if (!pageTurn() && Math.abs(keep.zoom - state.zoom) > 0.001) {
+    if (Math.abs(keep.zoom - state.zoom) > 0.001) {
         state.zoom = clampZoom(keep.zoom);
         rerenderAll(true);
     }
@@ -3105,7 +3128,7 @@ function tourSteps(): TourStep[] {
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
         { target: el("save"), title: "Save", text: "Keeps your notes and mixer changes for this score. If you forget, PocketScore asks before you open another score." },
         { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
-        { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it. Continuous lays the music out in one long line." },
+        { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
         { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
         tipStep,

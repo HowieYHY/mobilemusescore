@@ -1,7 +1,8 @@
 // "Page by page" view, with real touch input: one whole page on screen, never part of another; a
 // swipe turns exactly one page (a long fast one too, a short one none); the page turns with the
 // music; turning the phone fits the page again on the same page; in notes mode two fingers turn it;
-// arrow keys turn it; there is no zoom; back in Page view the same page is shown.
+// arrow keys turn it; zoom never goes below the whole page, and zoomed in a finger moves around the
+// page (no other page shows) and a swipe past its edge turns it; back in Page view the same page.
 //
 // Needs the dev server: (cd app && npx vite --host 127.0.0.1 --port 5180)
 // Usage: [WIDTH=412 HEIGHT=915] node scripts/pageturn-test.mjs [score.mscz]
@@ -95,10 +96,24 @@ await page.evaluate(() => {
 const bars = await page.evaluate(() => getComputedStyle(document.getElementById("viewer")).scrollbarWidth);
 check(bars === "none", `touch screen: the browser's own scrollbars are hidden (scrollbar-width ${bars})`);
 await page.selectOption("#view-mode", "page_turn");
-await page.waitForTimeout(2500);
+await page.waitForTimeout(500);
+// the status message ("Laying out…") going makes the screen taller, and the page is fitted again
+await page.waitForFunction(() => document.getElementById("status").hidden, null, { timeout: 30000 }).catch(() => {});
+await page.waitForTimeout(1500);
+if (process.env.DEBUG) {
+    for (let k = 0; k < 6; k++) {
+        console.log("     zoom", await page.evaluate(() => [app.state.zoom.toFixed(3), document.getElementById("viewer").clientHeight, document.getElementById("status").hidden]));
+        await page.waitForTimeout(500);
+    }
+}
 let s = await view();
 check(onePage(s) && s.whole === 0, `opens on page 1, whole and alone (shown ${s.shown})`);
-check(!s.zoomShown, "no zoom buttons");
+check(s.zoomShown, "zoom buttons shown");
+const fit = s.zoom;
+await page.click("#zoom-out");
+await settle();
+s = await view();
+check(Math.abs(s.zoom - fit) < 0.001 && onePage(s) && s.whole === 0, `− at the whole page goes no smaller (zoom ${s.zoom.toFixed(3)}, fitted ${fit.toFixed(3)})`);
 
 await swipe(-W * 0.5);
 s = await view();
@@ -121,8 +136,9 @@ const drawn = await page.evaluate(() => {
 });
 check(drawn, "the page shown is drawn");
 
-// pinch does nothing here
+// pinch out: zoomed in, still only this page; a finger moves around it; past its edge a swipe turns
 const z0 = s.zoom;
+const onPage = s.whole;
 {
     const m = await middle();
     await touch("touchStart", [{ x: m.x - 50, y: m.y, id: 1 }, { x: m.x + 50, y: m.y, id: 2 }]);
@@ -131,10 +147,48 @@ const z0 = s.zoom;
         await page.waitForTimeout(16);
     }
     await touch("touchEnd", []);
-    await settle();
+    await page.waitForTimeout(1500);
 }
 s = await view();
-check(s.zoom === z0 && onePage(s), `pinching doesn't zoom (zoom ${s.zoom.toFixed(3)}, was ${z0.toFixed(3)})`);
+check(s.zoom > z0 * 1.5 && s.shown.length === 1 && s.shown[0] === onPage, `pinching zooms in (zoom ${s.zoom.toFixed(2)}, was ${z0.toFixed(2)}), only page ${onPage + 1} shows (shown ${s.shown})`);
+const scrollOf = () => page.evaluate(() => ({ left: document.getElementById("viewer").scrollLeft, top: document.getElementById("viewer").scrollTop }));
+{
+    const a = await scrollOf();
+    const m = await middle();
+    await touch("touchStart", [{ x: m.x, y: m.y + 100, id: 1 }]);
+    for (let k = 1; k <= 8; k++) {
+        await touch("touchMove", [{ x: m.x, y: m.y + 100 - k * 25, id: 1 }]);
+        await page.waitForTimeout(16);
+    }
+    await touch("touchEnd", []);
+    await settle();
+    const b = await scrollOf();
+    s = await view();
+    check(b.top > a.top + 100 && s.shown.length === 1 && s.shown[0] === onPage, `zoomed in, a finger moves down the page (${(b.top - a.top).toFixed(0)} px), still page ${onPage + 1} only`);
+}
+// to the page's right edge, then past it
+let swipesToTurn = 0;
+for (let k = 0; k < 8; k++) {
+    await swipe(-W * 0.6, { ms: 400 });
+    swipesToTurn++;
+    s = await view();
+    if (s.shown[0] !== onPage) {
+        break; // turned
+    }
+}
+console.log(`     (${swipesToTurn} swipes: across the zoomed page, then past its edge)`);
+const pastEdge = s.shown.length === 1 ? s.shown[0] : -1;
+check(pastEdge === onPage + 1, `swiping on past the page's right edge turns to the next page (page ${pastEdge + 1}, shown ${s.shown})`);
+await swipe(W * 0.6);
+s = await view();
+check(s.shown.length === 1 && s.shown[0] === onPage, `and a swipe back past its left edge returns (shown ${s.shown})`);
+for (let k = 0; k < 8; k++) {
+    await page.click("#zoom-out");
+    await page.waitForTimeout(150);
+}
+await settle();
+s = await view();
+check(Math.abs(s.zoom - fit) < 0.001 && onePage(s) && s.whole === onPage, `− back to the whole page (zoom ${s.zoom.toFixed(3)}, page ${s.whole + 1})`);
 
 // keys
 await page.keyboard.press("ArrowRight");
@@ -252,7 +306,7 @@ const back = await page.evaluate(() => {
     return { atTop: tops.indexOf(Math.min(...tops)), zoom: app.state.zoom, zoomShown: document.querySelector(".zoom").getBoundingClientRect().width > 0 };
 });
 check(back.atTop === before.whole, `page view opens on the same page (${back.atTop + 1}, was ${before.whole + 1})`);
-check(back.zoomShown && Math.abs(back.zoom - z0) > 0.001 || back.zoomShown, `page view has its zoom buttons back (zoom ${back.zoom.toFixed(2)})`);
+check(back.zoomShown, `page view has its zoom (${back.zoom.toFixed(2)})`);
 
 if (process.env.DEBUG) {
     console.log((await page.evaluate(() => window.__statusLog)).join(" | "));

@@ -35,6 +35,10 @@ async function open() {
     await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
     await page.setInputFiles("#file-input", scorePath);
     await page.waitForSelector(".page canvas", { timeout: 180000 });
+    // the sounds loaded and their message gone: it sits above the score, and its going moved the
+    // score up 36 px in the middle of a check
+    await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 }).catch(() => {});
+    await page.waitForFunction(() => document.getElementById("status").hidden, null, { timeout: 30000 }).catch(() => {});
 }
 
 await open();
@@ -96,7 +100,7 @@ await page.mouse.move(corner.x + corner.width / 2 + 80, corner.y + corner.height
 await page.mouse.up();
 const after = await bodyAt();
 check(after.width > before.width * 1.3 && after.height > before.height * 1.3, `dragging the corner makes the text bigger (${Math.round(before.width)}x${Math.round(before.height)} to ${Math.round(after.width)}x${Math.round(after.height)} px)`);
-check(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, "and the text still starts in the same place");
+check(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, `and the text still starts in the same place (moved ${(after.x - before.x).toFixed(1)}, ${(after.y - before.y).toFixed(1)} px)`);
 await page.mouse.click(tx, ty + 200); // finish it
 check(await page.locator(".tnote.sel").count() === 0 && await page.locator(".tnote").count() === 1,
     "one tap outside finishes the text box without adding another");

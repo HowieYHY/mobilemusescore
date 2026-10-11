@@ -178,7 +178,10 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 - **Text boxes:** tap a box to change it, drag the arrows on its left to move it, drag its bottom
   corner to resize it (the text grows with it), tap **×** to delete it. While you're typing, a new
   colour changes that box.
-- Notes made in page view and in the continuous views are kept separately.
+- Notes follow the music: a note written in one view shows in the others on the same notes (Page view
+  and Page by page show the same page). Marks away from the music, such as in a margin or by the
+  title, stay in the view they were written in. A text box from another view can be erased here but
+  is changed in the view it was written in. **Clear** removes your notes from every view.
 
 </details>
 

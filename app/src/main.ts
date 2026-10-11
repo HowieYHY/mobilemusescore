@@ -1080,6 +1080,8 @@ const anchor = { secs: 0, clock: 0 };
 
 async function loadTimeline() {
     timeline = await engine.timeline();
+    // notes are pinned to the music through it (they show in every view); its times follow the speed
+    notes.setLayout(timeline, practice.speed, state.score?.spatium ?? 100);
 }
 
 function cursorFromTimeline(secs: number): CursorInfo | null {
@@ -3061,7 +3063,7 @@ ui.notesUndo.onclick = () => notes.undo();
 // The app's own question, not confirm(): a system dialog stops the sound on iPad
 ui.notesClear.onclick = async () => {
     const choice = await ask("Clear all notes?",
-        "This removes all your notes from this score (in this view). You can undo it.",
+        "This removes all your notes from this score, in every view. You can undo it.",
         [["cancel", "Cancel"], ["clear", "Clear all"]]);
     if (choice === "clear") {
         notes.clear();

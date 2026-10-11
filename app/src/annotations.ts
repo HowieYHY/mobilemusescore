@@ -1,20 +1,32 @@
 // Your own notes on the score: pen and highlighter ink and text boxes. Kept on
-// this device, per score and per view mode, in page units so they stay put
-// when zooming. A stylus always draws; a finger draws when "Draw with finger"
-// is on (by default until a stylus is seen), and two fingers then scroll.
+// this device, per score, in page units of the layout they were written in, so
+// they stay put when zooming. Each is also pinned to the music (musicmap.ts),
+// so it shows in the other layouts too, on the same music; marks away from the
+// music (margins, the title) show only where they were written. A stylus always
+// draws; a finger draws when "Draw with finger" is on (by default until a
+// stylus is seen), and two fingers then scroll.
+
+import { MusicMap, type Anchor, type TimelinePoint } from "./musicmap";
 
 export type Tool = "pen" | "highlighter" | "text" | "eraser";
 
-interface Stroke { id: string; tool: "pen" | "highlighter"; color: string; width: number; pts: number[] } // x,y,x,y… page units
-interface TextNote { id: string; x: number; y: number; size: number; color: string; text: string }
+// `a`: the music under each point (null where there is none), filled in by the layout it was written in
+interface Stroke { id: string; tool: "pen" | "highlighter"; color: string; width: number; pts: number[]; a?: (Anchor | null)[] } // x,y,x,y… page units
+interface TextNote { id: string; x: number; y: number; size: number; color: string; text: string; a?: Anchor | null }
 interface PageNotes { strokes: Stroke[]; texts: TextNote[] }
 type ModeNotes = Record<string, PageNotes>; // by page index
 interface Stored { v: 1; modes: Record<string, ModeNotes> }
 
+// `mode`: the layout the item belongs to (a note from another layout can be erased here)
 type Undo =
-    | { op: "add" | "remove"; page: number; kind: "stroke"; item: Stroke }
-    | { op: "add" | "remove"; page: number; kind: "text"; item: TextNote }
-    | { op: "restore"; data: ModeNotes };
+    | { op: "add" | "remove"; mode: string; page: number; kind: "stroke"; item: Stroke }
+    | { op: "add" | "remove"; mode: string; page: number; kind: "text"; item: TextNote }
+    | { op: "restore"; data: Record<string, ModeNotes> };
+
+// A note from another layout as placed in this one
+interface Shown { mode: string; page: number } // where it belongs
+interface ShownStroke extends Shown { item: Stroke; parts: number[][] } // its points here, a part per run on one page
+interface ShownText extends Shown { item: TextNote; x: number; y: number }
 
 interface PageView { el: HTMLElement; svg: SVGSVGElement; texts: HTMLElement; w: number; h: number }
 
@@ -50,7 +62,7 @@ const TEXT_PX = 16; // new text boxes
 const MIN_TEXT_PX = 8;
 
 /** Notes as stored: empty pages and views dropped, so equal notes give equal text. */
-function normalised(d: Stored): string {
+function serialised(d: Stored): string {
     const modes: Record<string, ModeNotes> = {};
     for (const [m, pages] of Object.entries(d.modes)) {
         const kept: ModeNotes = {};
@@ -64,6 +76,12 @@ function normalised(d: Stored): string {
         }
     }
     return JSON.stringify({ v: 1, modes });
+}
+
+/** The same without the pins to the music, to tell whether the reader changed anything: older
+ * notes get their pins when their layout is shown, which must not light up Save. */
+function normalised(d: Stored): string {
+    return JSON.stringify(JSON.parse(serialised(d)), (k, v) => (k === "a" ? undefined : v));
 }
 
 const ICON_RESIZE = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M20 4L4 20M20 4h-6M20 4v6M4 20h6M4 20v-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -99,6 +117,10 @@ export class Annotations {
     private key = "";
     private mode = "page";
     private data: Stored = { v: 1, modes: {} };
+    /** Where the music is in the current layout (null until its timeline is known). */
+    private map: MusicMap | null = null;
+    /** Other layouts' notes as placed in this one, by page. */
+    private shown = new Map<number, { strokes: ShownStroke[]; texts: ShownText[] }>();
     private views = new Map<number, PageView>();
     private undoStack: Undo[] = [];
     private saveTimer = 0;
@@ -231,6 +253,8 @@ export class Annotations {
         clearTimeout(this.saveTimer);
         this.key = key;
         this.mode = mode;
+        this.map = null; // the new score's layout comes with its timeline (setLayout)
+        this.shown.clear();
         this.undoStack = [];
         const read = (k: string): Stored | null => {
             try {
@@ -262,7 +286,7 @@ export class Annotations {
             if (json === normalised({ v: 1, modes: {} })) {
                 localStorage.removeItem(STORAGE_PREFIX + this.key);
             } else {
-                localStorage.setItem(STORAGE_PREFIX + this.key, json);
+                localStorage.setItem(STORAGE_PREFIX + this.key, serialised(this.data)); // with the pins
             }
             localStorage.removeItem(DRAFT_PREFIX + this.key);
         } catch (err) {
@@ -286,22 +310,115 @@ export class Annotations {
 
     setMode(mode: string) {
         this.mode = mode;
+        this.map = null; // until the new layout's timeline comes (setLayout)
+        this.shown.clear();
         this.undoStack = [];
         this.onChange();
+    }
+
+    /**
+     * The current layout's timeline (after open or setMode, and again when the speed changes its
+     * times): this layout's notes get pinned to the music, and the other layouts' are placed here.
+     */
+    setLayout(timeline: TimelinePoint[], speed: number, spatium: number) {
+        this.map = new MusicMap(timeline, speed, spatium);
+        for (const [page, p] of Object.entries(this.modeNotes())) {
+            for (const st of p.strokes) {
+                st.a ??= this.pin(Number(page), st.pts);
+            }
+            for (const t of p.texts) {
+                if (t.a === undefined) {
+                    t.a = this.map.anchor(Number(page), t.x, t.y);
+                }
+            }
+        }
+        this.placeOthers();
+        this.renderAll();
+    }
+
+    // the music under each point of a stroke (undefined while the layout isn't known)
+    private pin(page: number, pts: number[]): (Anchor | null)[] | undefined {
+        const map = this.map;
+        if (!map || map.empty) {
+            return undefined;
+        }
+        const a: (Anchor | null)[] = [];
+        for (let i = 0; i + 1 < pts.length; i += 2) {
+            a.push(map.anchor(page, pts[i], pts[i + 1]));
+        }
+        return a;
+    }
+
+    // The other layouts' notes, placed in this one by their pins
+    private placeOthers() {
+        this.shown.clear();
+        const map = this.map;
+        if (!map || map.empty) {
+            return;
+        }
+        const on = (page: number) => {
+            let s = this.shown.get(page);
+            if (!s) {
+                this.shown.set(page, (s = { strokes: [], texts: [] }));
+            }
+            return s;
+        };
+        for (const [mode, pages] of Object.entries(this.data.modes)) {
+            if (mode === this.mode) {
+                continue;
+            }
+            for (const [pg, p] of Object.entries(pages)) {
+                const page = Number(pg);
+                for (const st of p.strokes) {
+                    // a run of pinned points on one page here makes a part; a point with no music,
+                    // or one on another page here, ends it
+                    const parts = new Map<number, number[][]>();
+                    let run: number[] | null = null;
+                    let runPage = -1;
+                    for (const a of st.a ?? []) {
+                        const at = a && map.place(a);
+                        if (!at) {
+                            run = null;
+                            continue;
+                        }
+                        if (!run || at.page !== runPage) {
+                            run = [];
+                            runPage = at.page;
+                            const list = parts.get(at.page) ?? [];
+                            list.push(run);
+                            parts.set(at.page, list);
+                        }
+                        run.push(at.x, at.y);
+                    }
+                    for (const [here, list] of parts) {
+                        on(here).strokes.push({ mode, page, item: st, parts: list });
+                    }
+                }
+                for (const t of p.texts) {
+                    const at = t.a && map.place(t.a);
+                    if (at) {
+                        on(at.page).texts.push({ mode, page, item: t, x: at.x, y: at.y });
+                    }
+                }
+            }
+        }
     }
 
     private modeNotes(): ModeNotes {
         return (this.data.modes[this.mode] ||= {});
     }
 
-    private pageNotes(page: number): PageNotes {
-        return (this.modeNotes()[page] ||= { strokes: [], texts: [] });
+    private pageNotes(page: number, mode = this.mode): PageNotes {
+        return ((this.data.modes[mode] ||= {})[page] ||= { strokes: [], texts: [] });
     }
 
+    /** All notes, in every layout (Clear removes them all). */
     get count(): number {
         let n = 0;
-        for (const p of Object.values(this.modeNotes())) {
-            n += p.strokes.length + p.texts.length;
+        for (const pages of Object.values(this.data.modes)) {
+            for (const p of Object.values(pages)) {
+                n += p.strokes.length + p.texts.length;
+            }
         }
         return n;
     }
@@ -316,7 +433,7 @@ export class Annotations {
             }
             try {
                 if (this.dirty) {
-                    localStorage.setItem(DRAFT_PREFIX + this.key, normalised(this.data));
+                    localStorage.setItem(DRAFT_PREFIX + this.key, serialised(this.data));
                 } else {
                     localStorage.removeItem(DRAFT_PREFIX + this.key);
                 }
@@ -407,10 +524,9 @@ export class Annotations {
             return;
         }
         if (u.op === "restore") {
-            this.data.modes[this.mode] = u.data;
-            this.renderAll();
+            this.data.modes = u.data;
         } else {
-            const p = this.pageNotes(u.page);
+            const p = this.pageNotes(u.page, u.mode);
             const list = (u.kind === "stroke" ? p.strokes : p.texts) as { id: string }[];
             if (u.op === "add") {
                 const i = list.findIndex((x) => x.id === u.item.id);
@@ -420,14 +536,17 @@ export class Annotations {
             } else {
                 list.push(u.item);
             }
-            this.renderPage(u.page);
         }
+        this.placeOthers();
+        this.renderAll();
         this.save();
     }
 
+    /** Remove every note of this score, in every layout (undoable). */
     clear() {
-        this.undoStack.push({ op: "restore", data: JSON.parse(JSON.stringify(this.modeNotes())) });
-        this.data.modes[this.mode] = {};
+        this.undoStack.push({ op: "restore", data: JSON.parse(JSON.stringify(this.data.modes)) });
+        this.data.modes = {};
+        this.placeOthers();
         this.renderAll();
         this.save();
     }
@@ -468,16 +587,48 @@ export class Annotations {
             return;
         }
         const notes = this.modeNotes()[index] || { strokes: [], texts: [] };
+        const others = this.shown.get(index) ?? { strokes: [], texts: [] };
         v.svg.replaceChildren();
-        // highlighter under pen
-        for (const s of [...notes.strokes].sort((a, b) => Number(a.tool === "pen") - Number(b.tool === "pen"))) {
-            v.svg.appendChild(this.strokeEl(s));
+        // highlighter under pen; this layout's notes and the others' alike
+        const paths: [Stroke, SVGPathElement][] = notes.strokes.map((s) => [s, this.strokeEl(s)]);
+        for (const o of others.strokes) {
+            for (const part of o.parts) {
+                const path = this.strokeEl({ ...o.item, pts: part });
+                path.dataset.mode = o.mode;
+                path.dataset.page = String(o.page);
+                paths.push([o.item, path]);
+            }
+        }
+        paths.sort((a, b) => Number(a[0].tool === "pen") - Number(b[0].tool === "pen"));
+        for (const [, path] of paths) {
+            v.svg.appendChild(path);
         }
         v.texts.replaceChildren();
         const ppu = parseFloat(v.el.style.width) / v.w;
         for (const t of notes.texts) {
             v.texts.appendChild(this.textEl(index, t, ppu));
         }
+        for (const o of others.texts) {
+            v.texts.appendChild(this.shownTextEl(index, o, ppu));
+        }
+    }
+
+    // A text box from another layout: shown here, edited where it was written (the eraser removes it)
+    private shownTextEl(page: number, o: ShownText, ppu: number): HTMLElement {
+        const box = document.createElement("div");
+        box.className = "tnote shown";
+        box.dataset.id = o.item.id;
+        box.dataset.mode = o.mode;
+        box.dataset.page = String(o.page);
+        box.style.left = (o.x / this.views.get(page)!.w * 100) + "%";
+        box.style.top = (o.y / this.views.get(page)!.h * 100) + "%";
+        box.style.color = o.item.color;
+        box.style.fontSize = (o.item.size * ppu) + "px";
+        const body = document.createElement("div");
+        body.className = "tbody";
+        body.textContent = o.item.text;
+        box.append(body);
+        return box;
     }
 
     private strokeEl(s: Stroke): SVGPathElement {
@@ -608,6 +759,9 @@ export class Annotations {
                 t.y = start.ty;
                 place();
             }
+            if (this.map) {
+                t.a = this.map.anchor(page, t.x, t.y); // moved: pinned where it is now
+            }
             this.save();
         };
         const up = () => end(true);
@@ -617,15 +771,23 @@ export class Annotations {
         grip.addEventListener("pointercancel", cancel);
     }
 
-    private removeText(page: number, t: TextNote, undoable: boolean) {
-        const p = this.pageNotes(page);
+    private removeText(page: number, t: TextNote, undoable: boolean, mode = this.mode) {
+        const p = this.pageNotes(page, mode);
         const i = p.texts.indexOf(t);
         if (i < 0) {
             return;
         }
         p.texts.splice(i, 1);
+        if (mode !== this.mode) {
+            // from another layout: shown here only
+            this.undoStack.push({ op: "remove", mode, page, kind: "text", item: t });
+            this.placeOthers();
+            this.renderAll();
+            this.save();
+            return;
+        }
         if (undoable && t.text) {
-            this.undoStack.push({ op: "remove", page, kind: "text", item: t });
+            this.undoStack.push({ op: "remove", mode, page, kind: "text", item: t });
         } else if (!undoable) {
             this.undoStack = this.undoStack.filter((u) => u.op === "restore" || u.item !== t);
         }
@@ -700,11 +862,14 @@ export class Annotations {
         const { x, y } = this.toUnits(hit.v, e);
         if (this.tool === "eraser") {
             this.erasing = { pointerId: e.pointerId, page: hit.index };
-            if (target.closest(".tnote")) {
-                const id = (target.closest(".tnote") as HTMLElement).dataset.id;
-                const t = this.pageNotes(hit.index).texts.find((n) => n.id === id);
+            const box = target.closest<HTMLElement>(".tnote");
+            if (box) {
+                // this layout's text box, or one from another layout shown here
+                const mode = box.dataset.mode ?? this.mode;
+                const page = box.dataset.mode ? Number(box.dataset.page) : hit.index;
+                const t = this.pageNotes(page, mode).texts.find((n) => n.id === box.dataset.id);
                 if (t) {
-                    this.removeText(hit.index, t, true);
+                    this.removeText(page, t, true, mode);
                 }
             }
             this.eraseAt(hit.index, hit.v, x, y);
@@ -761,8 +926,9 @@ export class Annotations {
         const d = this.drawing;
         if (d && d.pointerId === e.pointerId) {
             this.drawing = null;
+            d.stroke.a = this.pin(d.page, d.stroke.pts);
             this.pageNotes(d.page).strokes.push(d.stroke);
-            this.undoStack.push({ op: "add", page: d.page, kind: "stroke", item: d.stroke });
+            this.undoStack.push({ op: "add", mode: this.mode, page: d.page, kind: "stroke", item: d.stroke });
             this.save();
             return;
         }
@@ -799,9 +965,8 @@ export class Annotations {
     private eraseAt(page: number, v: PageView, x: number, y: number) {
         const p = this.pageNotes(page);
         const r = SIZES.eraser[this.sizes.eraser] / this.pxPerUnit(v);
-        const hit = p.strokes.filter((s) => {
-            const pts = s.pts;
-            const reach = r + s.width / 2;
+        const touches = (pts: number[], width: number) => {
+            const reach = r + width / 2;
             if (pts.length <= 2) {
                 return Math.hypot(pts[0] - x, pts[1] - y) <= reach;
             }
@@ -811,14 +976,28 @@ export class Annotations {
                 }
             }
             return false;
-        });
-        if (!hit.length) {
+        };
+        const hit = p.strokes.filter((s) => touches(s.pts, s.width));
+        // notes from other layouts, where they are shown here
+        const hitOthers = (this.shown.get(page)?.strokes ?? []).filter((o) => o.parts.some((part) => touches(part, o.item.width)));
+        if (!hit.length && !hitOthers.length) {
             return;
         }
         for (const s of hit) {
             p.strokes.splice(p.strokes.indexOf(s), 1);
             v.svg.querySelector(`[data-id="${s.id}"]`)?.remove();
-            this.undoStack.push({ op: "remove", page, kind: "stroke", item: s });
+            this.undoStack.push({ op: "remove", mode: this.mode, page, kind: "stroke", item: s });
+        }
+        for (const o of hitOthers) {
+            const list = this.pageNotes(o.page, o.mode).strokes;
+            if (list.includes(o.item)) {
+                list.splice(list.indexOf(o.item), 1);
+                this.undoStack.push({ op: "remove", mode: o.mode, page: o.page, kind: "stroke", item: o.item });
+            }
+        }
+        if (hitOthers.length) {
+            this.placeOthers();
+            this.renderAll();
         }
         this.save();
     }
@@ -852,8 +1031,11 @@ export class Annotations {
         const size = Math.round(TEXT_PX / ppu);
         // put the text's first line where the tap was
         const t: TextNote = { id: newId(), x, y: Math.round(y - size * 0.7), size, color: this.colors.text, text: "" };
+        if (this.map) {
+            t.a = this.map.anchor(hit.index, t.x, t.y);
+        }
         this.pageNotes(hit.index).texts.push(t);
-        this.undoStack.push({ op: "add", page: hit.index, kind: "text", item: t });
+        this.undoStack.push({ op: "add", mode: this.mode, page: hit.index, kind: "text", item: t });
         const el = this.textEl(hit.index, t, parseFloat(hit.v.el.style.width) / hit.v.w);
         hit.v.texts.appendChild(el);
         const body = el.querySelector<HTMLElement>(".tbody")!;

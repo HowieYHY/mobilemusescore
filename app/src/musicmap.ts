@@ -3,24 +3,39 @@
 // system and the system's height, in engraving units). Notes on the score are pinned to the music
 // through it, so a note written in one view lands on the same music in the others: a point is kept
 // as the moment under it (interpolated between the timeline's notes), how far beyond its line's
-// first or last note it is, and its height as a fraction of the system's.
+// first or last note it is, and its height: from the top of the staff nearest it (by the staff's
+// number in the score, from Session::stavesJson), and as a fraction of the system for when that
+// staff isn't shown in a layout. Staves are spread differently in each layout (page view fills the
+// page, and hides empty staves), so a fraction of the system put a line under one staff's lyrics up
+// to 7 staff spaces off in another view.
 
 export type TimelinePoint = [number, number, number, number, number]; // secs, page, x, y, h
+export type SystemStaves = [number, number, [number, number, number][]]; // page, y, [staff, top, bottom]
 
-/** A point pinned to the music: [seconds at 100% speed, x beyond the line's ends, fraction down the system]. */
-export type Anchor = [number, number, number];
+/** A point pinned to the music: [seconds at 100% speed, x beyond the line's ends, fraction down the
+ * system, staff number, distance below that staff's top line]. (Older pins have only the first three.) */
+export type Anchor = [number, number, number, number?, number?];
 
 interface System { page: number; y: number; h: number; xs: number[]; ts: number[] } // first playing, by x
 
 export class MusicMap {
     private systems: System[] = [];
+    private staves = new Map<string, [number, number, number][]>(); // by "page|y"
+
+    /** Whether staff positions are known (an engine build without them pins to the system only). */
+    get hasStaves() {
+        return this.staves.size > 0;
+    }
 
     /**
      * @param timeline the current layout's timeline, in played order (times only grow)
      * @param speed the playback speed it was made at (its times are divided by it)
      * @param spatium the staff space, for how far from a system a mark still belongs to it
      */
-    constructor(private timeline: TimelinePoint[], private speed: number, private spatium: number) {
+    constructor(private timeline: TimelinePoint[], private speed: number, private spatium: number, staves: SystemStaves[] = []) {
+        for (const [page, y, list] of staves) {
+            this.staves.set(`${page}|${y}`, list);
+        }
         const byKey = new Map<string, TimelinePoint[]>();
         for (const p of timeline) {
             const k = `${p[1]}|${p[3]}|${p[4]}`;
@@ -50,15 +65,20 @@ export class MusicMap {
         return this.systems.length === 0;
     }
 
-    /** The music under a point of a page, or null when it is too far from any system (a margin, the title). */
-    anchor(page: number, x: number, y: number): Anchor | null {
+    /**
+     * The music under a point of a page, or null when it is too far from any system (a margin, the
+     * title). `refY` chooses the system and staff: a stroke's middle, so the whole stroke follows
+     * one staff and keeps its shape (a circle between two staves came apart where they are spaced
+     * differently).
+     */
+    anchor(page: number, x: number, y: number, refY = y): Anchor | null {
         let best: System | null = null;
         let bestDist = Infinity;
         for (const s of this.systems) {
             if (s.page !== page) {
                 continue;
             }
-            const d = y < s.y ? s.y - y : y > s.y + s.h ? y - (s.y + s.h) : 0;
+            const d = refY < s.y ? s.y - refY : refY > s.y + s.h ? refY - (s.y + s.h) : 0;
             if (d < bestDist) {
                 bestDist = d;
                 best = s;
@@ -71,15 +91,26 @@ export class MusicMap {
         }
         const { xs, ts } = best;
         const fy = Math.round((y - best.y) / best.h * 10000) / 10000;
+        // the staff nearest the point, and how far below its top line
+        let staff: [number, number, number] | null = null;
+        let staffDist = Infinity;
+        for (const st of this.staves.get(`${best.page}|${best.y}`) ?? []) {
+            const d = refY < st[1] ? st[1] - refY : refY > st[2] ? refY - st[2] : 0;
+            if (d < staffDist) {
+                staffDist = d;
+                staff = st;
+            }
+        }
+        const pin = (t: number, ox: number): Anchor => staff ? [t, ox, fy, staff[0], Math.round(y - staff[1])] : [t, ox, fy];
         const n = xs.length - 1;
         // a line's last point can be its closing barline, at the same moment as the next line's
         // first note: just before that moment, so the point stays on this line
         const last = Math.max(ts[0], ts[n] - 1e-4);
         if (x <= xs[0]) {
-            return [ts[0], Math.round(x - xs[0]), fy];
+            return pin(ts[0], Math.round(x - xs[0]));
         }
         if (x >= xs[n]) {
-            return [last, Math.round(x - xs[n]), fy];
+            return pin(last, Math.round(x - xs[n]));
         }
         let k = 0;
         while (k < n - 1 && xs[k + 1] <= x) {
@@ -87,7 +118,7 @@ export class MusicMap {
         }
         const f = xs[k + 1] > xs[k] ? (x - xs[k]) / (xs[k + 1] - xs[k]) : 0;
         const t = Math.min(ts[k] + f * (ts[k + 1] - ts[k]), k + 1 === n ? last : Infinity);
-        return [Math.round(t * 10000) / 10000, 0, fy];
+        return pin(Math.round(t * 10000) / 10000, 0);
     }
 
     /** Where a pinned point is in this layout. */
@@ -118,6 +149,9 @@ export class MusicMap {
         if (q && q[1] === p[1] && q[3] === p[3] && q[0] > p[0] && t > p[0]) {
             x = p[2] + (q[2] - p[2]) * Math.min(1, (t - p[0]) / (q[0] - p[0]));
         }
-        return { page: p[1], x: Math.round(x + a[1]), y: Math.round(p[3] + a[2] * p[4]) };
+        // by its staff where this layout shows it, else by its place in the system
+        const st = a[3] !== undefined ? this.staves.get(`${p[1]}|${p[3]}`)?.find((s) => s[0] === a[3]) : undefined;
+        const y = st && a[4] !== undefined ? st[1] + a[4] : p[3] + a[2] * p[4];
+        return { page: p[1], x: Math.round(x + a[1]), y: Math.round(y) };
     }
 }

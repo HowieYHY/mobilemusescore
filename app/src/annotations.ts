@@ -6,7 +6,7 @@
 // draws; a finger draws when "Draw with finger" is on (by default until a
 // stylus is seen), and two fingers then scroll.
 
-import { MusicMap, type Anchor, type TimelinePoint } from "./musicmap";
+import { MusicMap, type Anchor, type SystemStaves, type TimelinePoint } from "./musicmap";
 
 export type Tool = "pen" | "highlighter" | "text" | "eraser";
 
@@ -320,14 +320,18 @@ export class Annotations {
      * The current layout's timeline (after open or setMode, and again when the speed changes its
      * times): this layout's notes get pinned to the music, and the other layouts' are placed here.
      */
-    setLayout(timeline: TimelinePoint[], speed: number, spatium: number) {
-        this.map = new MusicMap(timeline, speed, spatium);
+    setLayout(timeline: TimelinePoint[], speed: number, spatium: number, staves: SystemStaves[] = []) {
+        this.map = new MusicMap(timeline, speed, spatium, staves);
+        // pin this layout's notes that have no pins yet, or pins from before staves were known
+        const old = (a: Anchor | null | undefined) => a === undefined || (!!a && this.map!.hasStaves && a.length < 5);
         for (const [page, p] of Object.entries(this.modeNotes())) {
             for (const st of p.strokes) {
-                st.a ??= this.pin(Number(page), st.pts);
+                if (!st.a || st.a.some(old)) {
+                    st.a = this.pin(Number(page), st.pts);
+                }
             }
             for (const t of p.texts) {
-                if (t.a === undefined) {
+                if (old(t.a)) {
                     t.a = this.map.anchor(Number(page), t.x, t.y);
                 }
             }
@@ -336,15 +340,23 @@ export class Annotations {
         this.renderAll();
     }
 
-    // the music under each point of a stroke (undefined while the layout isn't known)
+    // the music under each point of a stroke (undefined while the layout isn't known); the whole
+    // stroke follows the staff nearest its middle, so it keeps its shape
     private pin(page: number, pts: number[]): (Anchor | null)[] | undefined {
         const map = this.map;
         if (!map || map.empty) {
             return undefined;
         }
+        let top = Infinity;
+        let bottom = -Infinity;
+        for (let i = 1; i < pts.length; i += 2) {
+            top = Math.min(top, pts[i]);
+            bottom = Math.max(bottom, pts[i]);
+        }
+        const middle = (top + bottom) / 2;
         const a: (Anchor | null)[] = [];
         for (let i = 0; i + 1 < pts.length; i += 2) {
-            a.push(map.anchor(page, pts[i], pts[i + 1]));
+            a.push(map.anchor(page, pts[i], pts[i + 1], middle));
         }
         return a;
     }

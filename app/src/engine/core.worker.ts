@@ -132,6 +132,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "timeline":
             result = JSON.parse(callStr("mss_timeline"));
             break;
+        case "staves":
+            // older engine builds have no staff list: notes then pin to the system only
+            result = core._mss_staves ? JSON.parse(callStr("mss_staves")) : [];
+            break;
         case "tracks":
             result = JSON.parse(callStr("mss_tracks"));
             break;

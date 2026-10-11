@@ -1096,9 +1096,11 @@ let timeline: TimelinePoint[] = [];
 const anchor = { secs: 0, clock: 0 };
 
 async function loadTimeline() {
-    timeline = await engine.timeline();
-    // notes are pinned to the music through it (they show in every view); its times follow the speed
-    notes.setLayout(timeline, practice.speed, state.score?.spatium ?? 100);
+    const [tl, staves] = await Promise.all([engine.timeline(), engine.staves()]);
+    timeline = tl;
+    // notes are pinned to the music through it and the staves (they show in every view); its times
+    // follow the speed
+    notes.setLayout(timeline, practice.speed, state.score?.spatium ?? 100, staves);
 }
 
 function cursorFromTimeline(secs: number): CursorInfo | null {

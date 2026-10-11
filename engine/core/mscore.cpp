@@ -85,6 +85,11 @@ EMSCRIPTEN_KEEPALIVE const char* mss_timeline()
     return ret(Session::instance()->timelineJson());
 }
 
+EMSCRIPTEN_KEEPALIVE const char* mss_staves()
+{
+    return ret(Session::instance()->stavesJson());
+}
+
 EMSCRIPTEN_KEEPALIVE const char* mss_cursor(double secs)
 {
     return ret(Session::instance()->cursorJson(secs));

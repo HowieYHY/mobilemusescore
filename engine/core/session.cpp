@@ -1505,6 +1505,46 @@ std::string Session::timelineJson() const
     return out + "]";
 }
 
+std::string Session::stavesJson() const
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "[]";
+    }
+    const double spatium = score->style().spatium();
+    const std::vector<Page*>& pages = score->pages();
+    std::string out = "[";
+    bool firstSystem = true;
+    for (size_t pi = 0; pi < pages.size(); ++pi) {
+        for (const System* system : pages[pi]->systems()) {
+            if (system->staves().empty() || system->vbox()) { // a frame (title box) has no music
+                continue;
+            }
+            // the same top as timelineJson's points, so the two match up
+            const double y = std::round(system->staffCanvasYpage(0) - 3.0 * spatium);
+            std::string staves;
+            for (size_t i = 0; i < score->nstaves() && i < system->staves().size(); ++i) {
+                const SysStaff* ss = system->staff(i);
+                if (!ss->show() || !score->staff(i)->show()) {
+                    continue;
+                }
+                const double top = system->staffCanvasYpage(i);
+                const double bottom = top + score->staff(i)->staffHeight();
+                if (!staves.empty()) {
+                    staves += ",";
+                }
+                staves += "[" + std::to_string(i) + "," + num(std::round(top)) + "," + num(std::round(bottom)) + "]";
+            }
+            if (!firstSystem) {
+                out += ",";
+            }
+            firstSystem = false;
+            out += "[" + std::to_string(pi) + "," + num(y) + ",[" + staves + "]]";
+        }
+    }
+    return out + "]";
+}
+
 double Session::totalPlayTime() const
 {
     return m_totalPlayTime;

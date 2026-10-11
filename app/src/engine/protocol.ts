@@ -11,6 +11,7 @@ export type WorkerRequest =
     | Req<{ cmd: "cursor"; secs: number }>
     | Req<{ cmd: "tracks" }>
     | Req<{ cmd: "timeline" }>
+    | Req<{ cmd: "staves" }>
     | Req<{ cmd: "play" | "pause" | "stop" }>
     | Req<{ cmd: "seek"; secs: number }>
     | Req<{ cmd: "seekAt"; page: number; x: number; y: number; radius: number; playNote: boolean }>

@@ -294,6 +294,7 @@ export class Engine {
     }
 
     timeline(): Promise<[number, number, number, number, number][]> { return this.request({ cmd: "timeline" }); }
+    staves(): Promise<[number, number, [number, number, number][]][]> { return this.request({ cmd: "staves" }); }
 
     /** How long after Play the music reaches the speaker: the audio queued ahead while playing plus the device's own delay. */
     get playLatency(): number {

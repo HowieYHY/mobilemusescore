@@ -115,6 +115,11 @@ public:
     // consecutive points on the same system.
     std::string timelineJson() const;
 
+    // Each system's visible staves, for pinning notes to a staff in every layout:
+    // [[page, y, [[staffIndex, top, bottom], ...]], ...] in page units; y is the
+    // system's top as in timelineJson's points.
+    std::string stavesJson() const;
+
 private:
     // The note (if any) and played seconds under a tap; false if off the music
     bool locate(int pageIndex, double x, double y, double radius, double& secs, const mu::engraving::Note*& note) const;

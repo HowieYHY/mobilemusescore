@@ -797,8 +797,8 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         const sp = state.score.spatium;
         const radius = Math.max(0.75 * sp, Math.min(toUnits(18), 3 * sp));
         const tap = { page: Number(pageEl.dataset.index), x: toUnits(e.clientX - r.left), y: toUnits(e.clientY - r.top), radius };
-        if (state.focus && !onStave(tap.page, tap.x, tap.y)) {
-            exitFocus(); // in a margin or between systems; a tap on a stave plays as usual
+        if (state.focus && !nearMusic(pageEl, tap, e.clientX, e.clientY)) {
+            exitFocus(); // blank paper; a tap on the music plays as usual
             return;
         }
         if (armedMarker) {
@@ -814,6 +814,23 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         const c = await engine.seekAt(tap.page, tap.x, tap.y, tap.radius, audioReady);
         if (c) {
             state.followUntil = 0;
+        }
+    });
+}
+
+// Focus mode: a tap on the screen around the score (the viewer itself, past the end of the pages:
+// a short score, or one far zoomed out) leaves it too; taps on the pages are handled above
+{
+    let down: { x: number; y: number; t: number; id: number } | null = null;
+    ui.viewer.addEventListener("pointerdown", (e) => {
+        down = e.isPrimary && !ui.pages.contains(e.target as Node) ? { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null;
+    });
+    ui.viewer.addEventListener("pointercancel", () => (down = null));
+    ui.viewer.addEventListener("pointerup", (e) => {
+        const d = down;
+        down = null;
+        if (d && d.id === e.pointerId && state.focus && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 10 && performance.now() - d.t <= 500) {
+            exitFocus();
         }
     });
 }
@@ -1864,6 +1881,44 @@ document.addEventListener("keydown", (e) => {
     }
 });
 $("focus-toggle").onclick = () => void enterFocus();
+
+// Focus mode: whether a tap is on the music (it plays from there) or off it (it leaves focus). On
+// the music = within a system's band (onStave: not the title or a margin) and with printed ink
+// (staff lines, notes) within a fingertip's reach on the drawn page. The bands alone counted the
+// white space between staves and inside empty bars as music, so far zoomed out most of the paper
+// couldn't leave focus. Before the page is drawn, the bands decide.
+function nearMusic(pageEl: HTMLElement, tap: { page: number; x: number; y: number }, cx: number, cy: number): boolean {
+    if (!onStave(tap.page, tap.x, tap.y)) {
+        return false;
+    }
+    const canvas = [...pageEl.querySelectorAll<HTMLCanvasElement>(".tile > canvas, canvas.stale")].find((c) => {
+        const r = c.getBoundingClientRect();
+        return c.width > 0 && cx >= r.left && cx < r.right && cy >= r.top && cy < r.bottom;
+    });
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) {
+        return true;
+    }
+    const r = canvas.getBoundingClientRect();
+    const k = canvas.width / r.width; // canvas pixels per CSS px
+    // a staff space and a half, at least a fingertip (8 px) and at most 24 px
+    const sp = unitsToCss(state.score?.spatium || 25);
+    const reach = Math.min(24, Math.max(8, 1.5 * sp)) * k;
+    const x0 = Math.max(0, Math.floor((cx - r.left) * k - reach));
+    const y0 = Math.max(0, Math.floor((cy - r.top) * k - reach));
+    const w = Math.min(canvas.width, Math.ceil((cx - r.left) * k + reach)) - x0;
+    const h = Math.min(canvas.height, Math.ceil((cy - r.top) * k + reach)) - y0;
+    if (w <= 0 || h <= 0) {
+        return true;
+    }
+    const d = ctx.getImageData(x0, y0, w, h).data;
+    for (let i = 0; i < d.length; i += 4) {
+        if (d[i] + d[i + 1] + d[i + 2] < 600) {
+            return true; // something printed nearby
+        }
+    }
+    return false;
+}
 
 // The systems on each page, from the timeline: a tap counts as on a stave when it is inside a
 // system's band, or near enough that a tap there would pick one of its notes.

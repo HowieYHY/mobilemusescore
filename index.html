@@ -9,9 +9,9 @@
   <title>PocketScore</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-B_kLWIYM.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DBe0cENe.css">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <script type="module" crossorigin src="./assets/index-B02ScujN.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BQJV6XUF.css">
 </head>
 <body>
   <header class="topbar">
@@ -107,6 +107,12 @@
     <button class="btn round" id="zoom-in" aria-label="Zoom in">+</button>
   </div>
 
+  <!-- Drag through a long score (issue #20): shown while the reader scrolls, placed by main.ts -->
+  <div class="scroller" id="scroller">
+    <div class="scroller-thumb" id="scroller-thumb" role="scrollbar" aria-label="Move through the score" aria-controls="viewer" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+    <span class="scroller-label" id="scroller-label"></span>
+  </div>
+
   <section class="mixer" id="mixer" hidden>
     <div class="mixer-head">
       <strong>Mixer</strong>
@@ -197,6 +203,6 @@
     <button class="btn round" id="loop-open" aria-label="Loop (off)" aria-expanded="false" aria-pressed="false" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M17 3l3 3-3 3M20 6H8.5A4.5 4.5 0 0 0 4 10.5V11M7 21l-3-3 3-3M4 18h11.5a4.5 4.5 0 0 0 4.5-4.5V13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <button class="btn" id="mixer-toggle" disabled>Mixer</button>
   </footer>
-
+
 </body>
 </html>

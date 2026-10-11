@@ -274,6 +274,13 @@ body {
 /* nothing to zoom on the start screen, and on a short screen it would cover the start screen's buttons */
 body:has(#empty:not([hidden])) .zoom { display: none; }
 
+/* The browser's own scrollbars on touch screens: Chrome on Android draws them over the score, beside
+   the drag handle, which does their job. Kept with a mouse. */
+@media (pointer: coarse) {
+  .viewer { scrollbar-width: none; }
+  .viewer::-webkit-scrollbar { display: none; }
+}
+
 /* Drag handle at the score's edge (issue #20): fades in while the reader scrolls, out after. The
    box is placed over the viewer's edge by main.ts; only the thumb takes touches, and only when shown. */
 .scroller { position: fixed; z-index: 4; pointer-events: none; opacity: 0; transition: opacity 0.3s; }

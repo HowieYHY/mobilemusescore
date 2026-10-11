@@ -87,7 +87,8 @@ const blankInView = () => page.evaluate(() => {
 });
 
 // drag the thumb with a finger to `f` of the way along its track; returns the state while still held
-async function drag(f) {
+async function drag(f, midway) {
+    await page.waitForFunction(() => document.getElementById("status").hidden); // the viewer at its full height
     const s = await state();
     const track = await page.evaluate(() => {
         const r = document.getElementById("scroller").getBoundingClientRect();
@@ -103,6 +104,9 @@ async function drag(f) {
         const k = i / steps;
         await touch("touchMove", across ? s.thumb.x + (target - s.thumb.x) * k : s.thumb.x, across ? s.thumb.y : s.thumb.y + (target - s.thumb.y) * k);
         await page.waitForTimeout(16);
+        if (i === steps / 2 && midway) {
+            await midway();
+        }
     }
     await page.waitForTimeout(1500); // held still: the pages in view get drawn
     const held = { ...(await state()), blank: await blankInView(), shown: await shown() };
@@ -163,6 +167,20 @@ await page.waitForTimeout(200);
 const end = await drag(1);
 const pages = await page.evaluate(() => app.state.score.pages.length);
 check(end.label === `Page ${pages} of ${pages}`, `page view: at the end the label says "${end.label}" (${pages} pages)`);
+
+// a status message appearing above the score mid-drag (the viewer gets shorter) doesn't move the
+// score away from where the finger put it
+await swipe(0, 300); // back from the end
+await page.waitForTimeout(200);
+const resized = await drag(0.5, () => page.evaluate(() => {
+    const s = document.getElementById("status");
+    s.textContent = "Loading instrument sounds… (test)";
+    s.hidden = false;
+}));
+await page.evaluate(() => (document.getElementById("status").hidden = true));
+check(Math.abs(resized.frac - 0.5) < 0.01, `status message mid-drag: the score is at ${(resized.frac * 100).toFixed(1)}% (50% wanted)`);
+await page.waitForTimeout(2200);
+
 
 // Focus mode: no zoom box, a floating play button at the bottom right instead; the handle stops short of it
 await page.click("#focus-toggle");

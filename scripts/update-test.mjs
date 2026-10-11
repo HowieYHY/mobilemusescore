@@ -2,7 +2,7 @@
 // only changed files are downloaded, and the new version shows after the
 // update. Serves builds from a local server that can switch between them.
 //
-// Usage: node scripts/update-test.mjs <old dist dir> [new dist dir = app/dist]
+// Usage: [SCORE=<file>] node scripts/update-test.mjs <old dist dir> [new dist dir = app/dist]
 
 import fs from "node:fs";
 import http from "node:http";
@@ -40,7 +40,8 @@ function laterBuild(tag) {
 }
 const newerDir = laterBuild("newer");
 const newestDir = laterBuild("newest");
-const scorePath = path.join(root, "real test musescores/I am move it(howie version).mscz");
+// SCORE=<file>: another score (each PC keeps the test scores under its own name)
+const scorePath = process.env.SCORE ? path.resolve(process.env.SCORE) : path.join(root, "real test musescores/I am move it(howie version).mscz");
 
 let serveDir = oldDir;
 let bytes = 0;
@@ -57,6 +58,9 @@ const server = http.createServer((req, res) => {
     }
     const data = fs.readFileSync(file);
     bytes += data.length;
+    if (process.env.VERBOSE) {
+        console.log(`  served ${p} ${data.length}`); // VERBOSE=1: every file served
+    }
     res.writeHead(200, { "content-type": types[path.extname(file)] || "application/octet-stream", "cache-control": "max-age=600" });
     res.end(data);
 });

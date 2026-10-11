@@ -11,6 +11,26 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "app/dist");
 
+// Text files with Windows line endings (a Windows checkout's public/ files) are
+// stored with Unix ones once committed to gh-pages, so their hashes would never
+// match what is served, and every update would download them again. Write them
+// as served. (.mjs, .wasm and .sf3 are kept byte for byte: build/ghpages's
+// .gitattributes marks them -text; fonts and pictures are binary.)
+const KEEP = /\.(mjs|wasm|sf3|otf|ttf|woff2?|png|jpe?g|gif|ico|webp)$/i;
+(function normalise(dir) {
+    for (const name of fs.readdirSync(dir)) {
+        const p = path.join(dir, name);
+        if (fs.statSync(p).isDirectory()) {
+            normalise(p);
+        } else if (!KEEP.test(name)) {
+            const b = fs.readFileSync(p);
+            if (!b.includes(0) && b.includes("\r\n")) {
+                fs.writeFileSync(p, b.toString("utf8").replace(/\r\n/g, "\n"));
+            }
+        }
+    }
+})(dist);
+
 const files = [];
 const hash = crypto.createHash("sha256");
 (function walk(dir) {

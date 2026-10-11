@@ -12,14 +12,14 @@
 // mixers on the published app are never touched):
 //   cd app && npm run build && npx vite preview --host --port 4173
 //   adb reverse tcp:4173 tcp:4173
-// adb is found on PATH or in ADB (default D:/tools/platform-tools/adb.exe).
+// adb: see scripts/lib/adb.mjs (ADB, either PC's usual place, or PATH).
 // Usage: APP_URL=http://localhost:4173/ PLAY_SECONDS=60 node scripts/android-test.mjs <score.mscz> [outDir]
 
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { adb } from "./lib/adb.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
@@ -29,10 +29,8 @@ const scorePath = path.resolve(process.argv[2] || path.join(root, "real test mus
 const outDir = path.resolve(process.argv[3] || path.join(root, "build/android"));
 const url = process.env.APP_URL || "http://localhost:4173/";
 const playSeconds = Number(process.env.PLAY_SECONDS || 30);
-const adbPath = process.env.ADB || (fs.existsSync("D:/tools/platform-tools/adb.exe") ? "D:/tools/platform-tools/adb.exe" : "adb");
 fs.mkdirSync(outDir, { recursive: true });
 
-const adb = (...args) => execFileSync(adbPath, args, { maxBuffer: 64 << 20 });
 const shot = (name) => fs.writeFileSync(path.join(outDir, name + ".png"), adb("exec-out", "screencap", "-p"));
 
 let failures = 0;

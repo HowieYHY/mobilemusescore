@@ -5,9 +5,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { adb } from "./lib/adb.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
@@ -15,9 +15,7 @@ const { chromium } = require("playwright");
 
 const outDir = path.resolve(process.argv[2] || path.join(root, "build/android-picker"));
 const url = new URL("picker-test.html", process.env.APP_URL || "http://localhost:4173/").href;
-const adbPath = process.env.ADB || (fs.existsSync("D:/tools/platform-tools/adb.exe") ? "D:/tools/platform-tools/adb.exe" : "adb");
 fs.mkdirSync(outDir, { recursive: true });
-const adb = (...args) => execFileSync(adbPath, args, { maxBuffer: 64 << 20 });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 adb("forward", "tcp:9222", "localabstract:chrome_devtools_remote");

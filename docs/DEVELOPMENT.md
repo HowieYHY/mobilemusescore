@@ -176,8 +176,8 @@ exported audio file.
 2. Run the same checks, plus: drawing with a finger with *Draw with finger* on and off, double-tap
    for a text box, the phone's Back button closing the mixer and notes, changing a part's sound,
    Save, and the question when opening another score with unsaved changes.
-3. With the phone on USB debugging (adb from Google's platform-tools; on the Windows PC it is in
-   `D:/tools/platform-tools`), `scripts/android-test.mjs` drives the phone's own Chrome over its debugging
+3. With the phone on USB debugging (adb from Google's platform-tools; on one Windows PC it is in
+   `D:/tools/platform-tools`, on the other in `~/tools/android-sdk/platform-tools`), `scripts/android-test.mjs` drives the phone's own Chrome over its debugging
    socket: a new tab at a local build (`npx vite preview --host --port 4173` in `app/`, then
    `adb reverse tcp:4173 tcp:4173`), or `ATTACH=1` for the installed app as the reader runs it. It measures
    gaps, frames and the playback line, also with `SCROLL=1` (a finger scrolling) and jumps while playing.

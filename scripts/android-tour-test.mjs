@@ -11,9 +11,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { adb } from "./lib/adb.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
@@ -22,8 +22,6 @@ const scorePath = path.resolve(process.argv[2] || path.join(root, "real test mus
 const url = process.env.APP_URL || "http://127.0.0.1:4173/";
 const outDir = path.join(root, "build/android-tour");
 fs.mkdirSync(outDir, { recursive: true });
-const adbPath = process.env.ADB || (fs.existsSync("D:/tools/platform-tools/adb.exe") ? "D:/tools/platform-tools/adb.exe" : "adb");
-const adb = (...args) => execFileSync(adbPath, args, { maxBuffer: 64 << 20 });
 const shot = (name) => fs.writeFileSync(path.join(outDir, name + ".png"), adb("exec-out", "screencap", "-p"));
 
 let failures = 0;

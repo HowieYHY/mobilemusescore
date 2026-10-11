@@ -484,7 +484,8 @@ async function drawJobs() {
 // is not trusted (page drawing once waited for it for good: issue #9).
 let fingersDown = 0;
 let lastTouch = 0;
-const fingersBusy = () => fingersDown > 0 && performance.now() - lastTouch < 3000;
+// (not while the finger drags the scroll handle: the app scrolls then, and the pages passed are drawn)
+const fingersBusy = () => fingersDown > 0 && !scrollerDragging && performance.now() - lastTouch < 3000;
 for (const t of ["touchstart", "touchmove", "touchend", "touchcancel"]) {
     window.addEventListener(t, (e) => {
         fingersDown = (e as TouchEvent).touches.length;
@@ -721,6 +722,201 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
 // pause following the cursor while the reader scrolls by hand
 for (const ev of ["wheel", "touchmove"]) {
     ui.viewer.addEventListener(ev, () => (state.followUntil = performance.now() + 2500), { passive: true });
+}
+
+// ---------------------------------------------------------------- drag handle (issue #20)
+
+// A handle at the score's edge (the right, or the bottom in the horizontal continuous view) to move
+// through a long score quickly. It shows only while the reader scrolls (not when the page follows
+// the music) and fades out after; dragging it shows the page, or in the continuous views the time
+// in the music, at the middle of the screen.
+let scrollerDragging = false;
+{
+    const box = $("scroller");
+    const thumb = $("scroller-thumb");
+    const label = $("scroller-label");
+    const EDGE = 4; // px between the track and the screen's edge or the controls
+    let hideTimer = 0;
+    let lastInput = -Infinity; // the reader's own scrolling, as opposed to the page following the music
+    let track = { start: 0, len: 0, across: false };
+    let grab = 0; // where on the thumb the finger took it
+
+    const across = () => ui.viewMode.value === "continuous_v";
+    const thumbLen = () => (across() ? thumb.offsetWidth : thumb.offsetHeight) || 56;
+    const scrollMax = () => across() ? ui.viewer.scrollWidth - ui.viewer.clientWidth : ui.viewer.scrollHeight - ui.viewer.clientHeight;
+    const scrollPos = () => (across() ? ui.viewer.scrollLeft : ui.viewer.scrollTop);
+    // worth having only when the score is at least two screens long
+    const useful = () => !!state.score && scrollMax() > (across() ? ui.viewer.clientWidth : ui.viewer.clientHeight);
+
+    // the track runs along the viewer's edge, stopping short of the controls over it (zoom box,
+    // focus mode's play button)
+    function placeTrack() {
+        const v = ui.viewer.getBoundingClientRect();
+        const a = across();
+        const right = v.left + ui.viewer.clientLeft + ui.viewer.clientWidth; // inside a desktop scrollbar
+        const bottom = v.top + ui.viewer.clientTop + ui.viewer.clientHeight;
+        let end = a ? right - EDGE : bottom - EDGE;
+        for (const el of document.querySelectorAll<HTMLElement>(".zoom, .focus .transport")) {
+            const r = el.getBoundingClientRect();
+            if (!r.width || !r.height) {
+                continue; // hidden
+            }
+            if (a && r.bottom > bottom - 40 && r.top < bottom) {
+                end = Math.min(end, r.left - EDGE);
+            } else if (!a && r.right > right - 40 && r.left < right) {
+                end = Math.min(end, r.top - EDGE);
+            }
+        }
+        box.classList.toggle("across", a);
+        if (a) {
+            track = { start: v.left + EDGE, len: Math.max(0, end - v.left - EDGE), across: true };
+            Object.assign(box.style, { left: track.start + "px", top: bottom - 40 + "px", width: track.len + "px", height: "40px" });
+        } else {
+            track = { start: v.top + EDGE, len: Math.max(0, end - v.top - EDGE), across: false };
+            Object.assign(box.style, { left: right - 40 + "px", top: track.start + "px", width: "40px", height: track.len + "px" });
+        }
+    }
+
+    // what is at the middle of the screen: the page in page view, the time in the music otherwise
+    function labelText() {
+        const v = ui.viewer.getBoundingClientRect();
+        const cx = v.left + v.width / 2;
+        const cy = v.top + v.height / 2;
+        if (ui.viewMode.value === "page") {
+            let best = 0;
+            let bestDist = Infinity;
+            state.pageEls.forEach((el, i) => {
+                const r = el.getBoundingClientRect();
+                const d = Math.hypot(Math.max(r.left - cx, 0, cx - r.right), Math.max(r.top - cy, 0, cy - r.bottom));
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = i;
+                }
+            });
+            return `Page ${best + 1} of ${state.pageEls.length}`;
+        }
+        const el = state.pageEls[0];
+        if (!el || !timeline.length) {
+            return "";
+        }
+        const r = el.getBoundingClientRect();
+        const toUnits = (css: number) => css / (CSS_PX_PER_INCH * state.zoom) * UNITS_PER_INCH;
+        const a = across();
+        const at = toUnits(a ? cx - r.left : cy - r.top);
+        // the nearest point along the score (its first playing, where there are repeats)
+        let secs = 0;
+        let bestDist = Infinity;
+        for (const [t, , x, y, h] of timeline) {
+            const d = a ? Math.abs(x - at) : Math.max(y - at, 0, at - (y + h));
+            if (d < bestDist - 1e-6) {
+                bestDist = d;
+                secs = t;
+            }
+        }
+        return `${fmt(secs)} of ${fmt(state.duration)}`;
+    }
+
+    function update() {
+        const max = scrollMax();
+        const room = Math.max(0, track.len - thumbLen());
+        const f = max > 0 ? Math.min(1, Math.max(0, scrollPos() / max)) : 0;
+        const t = f * room;
+        thumb.style.transform = track.across ? `translateX(${t}px)` : `translateY(${t}px)`;
+        thumb.setAttribute("aria-valuenow", String(Math.round(f * 100)));
+        if (scrollerDragging) {
+            label.textContent = labelText();
+            const lw = label.offsetWidth;
+            const lh = label.offsetHeight;
+            label.style.transform = track.across
+                ? `translateX(${Math.min(Math.max(0, t + thumbLen() / 2 - lw / 2), Math.max(0, track.len - lw))}px)`
+                : `translateY(${t + thumbLen() / 2 - lh / 2}px)`;
+        }
+    }
+
+    function show() {
+        if (!useful()) {
+            box.classList.remove("shown");
+            return;
+        }
+        if (!box.classList.contains("shown")) {
+            placeTrack();
+        }
+        box.classList.add("shown");
+        update();
+        clearTimeout(hideTimer);
+        hideTimer = window.setTimeout(() => {
+            if (!scrollerDragging) {
+                box.classList.remove("shown");
+            }
+        }, 1500);
+    }
+
+    for (const ev of ["wheel", "touchmove", "keydown"]) {
+        ui.viewer.addEventListener(ev, () => (lastInput = performance.now()), { passive: true });
+    }
+    // a desktop scrollbar dragged with the mouse
+    ui.viewer.addEventListener("pointerdown", (e) => {
+        if (e.target === ui.viewer) {
+            lastInput = Infinity;
+        }
+    });
+    window.addEventListener("pointerup", () => {
+        if (lastInput === Infinity) {
+            lastInput = performance.now();
+        }
+    });
+    ui.viewer.addEventListener("scroll", () => {
+        if (scrollerDragging || performance.now() - lastInput < 1000) {
+            show();
+        } else if (box.classList.contains("shown")) {
+            update();
+        }
+    }, { passive: true });
+    window.addEventListener("resize", () => box.classList.remove("shown"));
+    ui.viewMode.addEventListener("change", () => box.classList.remove("shown"));
+
+    thumb.addEventListener("pointerdown", (e) => {
+        if (!box.classList.contains("shown")) {
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        thumb.setPointerCapture(e.pointerId);
+        placeTrack();
+        const r = thumb.getBoundingClientRect();
+        grab = track.across ? e.clientX - r.left : e.clientY - r.top;
+        scrollerDragging = true;
+        box.classList.add("dragging");
+        state.followUntil = performance.now() + 3000;
+        update();
+    });
+    thumb.addEventListener("pointermove", (e) => {
+        if (!scrollerDragging) {
+            return;
+        }
+        const room = Math.max(1, track.len - thumbLen());
+        const p = (track.across ? e.clientX : e.clientY) - grab - track.start;
+        const f = Math.min(1, Math.max(0, p / room));
+        if (track.across) {
+            ui.viewer.scrollLeft = f * scrollMax();
+        } else {
+            ui.viewer.scrollTop = f * scrollMax();
+        }
+        state.followUntil = performance.now() + 3000; // the reader's place, not the music's
+        update();
+    });
+    const drop = () => {
+        if (!scrollerDragging) {
+            return;
+        }
+        scrollerDragging = false;
+        box.classList.remove("dragging");
+        state.followUntil = performance.now() + 3000;
+        show(); // fades out a moment later
+    };
+    thumb.addEventListener("pointerup", drop);
+    thumb.addEventListener("pointercancel", drop);
+    thumb.addEventListener("lostpointercapture", drop);
 }
 
 // ---------------------------------------------------------------- cursor
@@ -2696,7 +2892,7 @@ function tourSteps(): TourStep[] {
     }
     // bottom bar left to right, then the top bar, the tip last: no bouncing between the two
     return [
-        { target: () => ui.viewer, title: "The score", text: "Tap any note to play from there. While stopped, a tap plays just that note. Pinch, or use − and +, to zoom." },
+        { target: () => ui.viewer, title: "The score", text: "Tap any note to play from there. While stopped, a tap plays just that note. Pinch, or use − and +, to zoom. In a long score, start scrolling and drag the handle that appears at the edge." },
         { target: el("play"), title: "Play and pause", text: "The blue line shows where you are, and the page follows it." },
         { target: el("seek"), title: "Move through the score", text: "Drag the slider to jump anywhere. The button on the far left goes back to the start." },
         { target: el("speed-open"), title: "Speed", text: "Practise slower or faster, or type the tempo you want." },

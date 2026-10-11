@@ -274,6 +274,51 @@ body {
 /* nothing to zoom on the start screen, and on a short screen it would cover the start screen's buttons */
 body:has(#empty:not([hidden])) .zoom { display: none; }
 
+/* Drag handle at the score's edge (issue #20): fades in while the reader scrolls, out after. The
+   box is placed over the viewer's edge by main.ts; only the thumb takes touches, and only when shown. */
+.scroller { position: fixed; z-index: 4; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+.scroller.shown { opacity: 1; }
+.scroller-thumb {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 32px; /* the touch target; the visible pill is narrower */
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  will-change: transform;
+}
+.scroller.shown .scroller-thumb { pointer-events: auto; cursor: grab; }
+.scroller-thumb::before {
+  content: "";
+  width: 6px;
+  height: 44px;
+  border-radius: 3px;
+  background: rgba(30, 42, 58, 0.6);
+  transition: width 0.15s, background 0.15s;
+}
+.scroller.dragging .scroller-thumb::before { width: 10px; border-radius: 5px; background: rgba(30, 42, 58, 0.9); }
+.scroller.across .scroller-thumb { top: auto; bottom: 0; left: 0; right: auto; width: 56px; height: 32px; }
+.scroller.across .scroller-thumb::before { width: 44px; height: 6px; }
+.scroller.across.dragging .scroller-thumb::before { width: 44px; height: 10px; }
+.scroller-label {
+  position: absolute;
+  right: 40px;
+  top: 0;
+  display: none;
+  white-space: nowrap;
+  background: rgba(30, 42, 58, 0.9);
+  color: var(--text-on-chrome);
+  border-radius: 14px;
+  padding: 5px 12px;
+  font-size: 14px;
+  will-change: transform;
+}
+.scroller.dragging .scroller-label { display: block; }
+.scroller.across .scroller-label { right: auto; top: auto; left: 0; bottom: 40px; }
+
 /* Focus (issue #17): only the music and a play button. The bars and any open panel are hidden, not
    closed, and come back as they were; tapping off the staves leaves (handled in main.ts). */
 body:has(#empty:not([hidden])) #focus-toggle { display: none; }

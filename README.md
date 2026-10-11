@@ -75,6 +75,7 @@ No app store needed.
 | Back to the start | Tap **⏮** |
 | Zoom | Pinch, or use **−** and **+** |
 | Scroll | Drag with one or two fingers |
+| Move quickly through a long score | Start scrolling, then drag the handle that appears at the right edge (along the bottom in *Continuous (horizontal)*). It shows the page, or in the continuous views the time in the music, and fades away when you stop |
 | Change the layout | Menu at the top right: *Page view* or *Continuous* |
 | Read with nothing in the way | Tap **⛶** (Focus) at the top, beside **?** |
 | Close a panel | Tap **Done**, or your phone's **Back** |

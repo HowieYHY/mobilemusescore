@@ -106,6 +106,12 @@
     <button class="btn round" id="zoom-in" aria-label="Zoom in">+</button>
   </div>
 
+  <!-- Drag through a long score (issue #20): shown while the reader scrolls, placed by main.ts -->
+  <div class="scroller" id="scroller">
+    <div class="scroller-thumb" id="scroller-thumb" role="scrollbar" aria-label="Move through the score" aria-controls="viewer" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+    <span class="scroller-label" id="scroller-label"></span>
+  </div>
+
   <section class="mixer" id="mixer" hidden>
     <div class="mixer-head">
       <strong>Mixer</strong>

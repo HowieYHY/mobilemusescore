@@ -245,6 +245,7 @@ body {
   flex: none;
 }
 .page canvas { display: block; width: 100%; height: 100%; pointer-events: none; } /* touches land on the page, which stays while its drawing is replaced */
+.page .tile, .page canvas.stale { position: absolute; pointer-events: none; } /* placed in % of the page by placeOnPage */
 .cursor {
   position: absolute;
   left: 0;

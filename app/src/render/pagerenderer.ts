@@ -66,6 +66,7 @@ interface DrawState {
     pen: { color: string; width: number; cap: CanvasLineCap; join: CanvasLineJoin; dash: number[] } | null;
     brush: string | null;
     font: string;
+    size: number; // font size in engraving units
 }
 
 const CAPS: CanvasLineCap[] = ["butt", "square", "round"];
@@ -89,13 +90,52 @@ export function drawPage(ctx: CanvasRenderingContext2D, ops: Op[], scale: number
 // returns true once the page is finished. A whole page can take 100 ms or more
 // on a phone, which would stop the playback line; in pieces it never does.
 // The canvas keeps its drawing state between calls.
-export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: number): (budgetMs: number) => boolean {
-    let st: DrawState = { pen: { color: "#000", width: 0, cap: "butt", join: "miter", dash: [] }, brush: null, font: "10px serif" };
+// With `part`, the canvas holds only that part of the page (engraving units),
+// and what lies wholly outside it is skipped.
+export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: number,
+    part?: { x: number; y: number; w: number; h: number }): (budgetMs: number) => boolean {
+    let st: DrawState = { pen: { color: "#000", width: 0, cap: "butt", join: "miter", dash: [] }, brush: null, font: "10px serif", size: 10 };
     const stack: DrawState[] = [];
     let tf = [1, 0, 0, 1, 0, 0];
+    const ox = part?.x ?? 0;
+    const oy = part?.y ?? 0;
 
     const applyTransform = () => {
-        ctx.setTransform(scale * tf[0], scale * tf[1], scale * tf[2], scale * tf[3], scale * tf[4], scale * tf[5]);
+        ctx.setTransform(scale * tf[0], scale * tf[1], scale * tf[2], scale * tf[3], scale * (tf[4] - ox), scale * (tf[5] - oy));
+    };
+
+    // true when the box (x0, y0)-(x1, y1) in the current coordinates, grown
+    // by `pad`, lies wholly outside `part`
+    const outside = (x0: number, y0: number, x1: number, y1: number, pad: number) => {
+        if (!part) {
+            return false;
+        }
+        pad += (st.pen?.width ?? 0) + 20;
+        x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) {
+            const px = tf[0] * x + tf[2] * y + tf[4];
+            const py = tf[1] * x + tf[3] * y + tf[5];
+            minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+            minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+        }
+        return maxX < part.x || minX > part.x + part.w || maxY < part.y || minY > part.y + part.h;
+    };
+    // the same for a list of points: x, y pairs, each after a command number when `commands`
+    // (control points bound a curve)
+    const outsidePoints = (pts: number[], commands: boolean) => {
+        if (!part) {
+            return false;
+        }
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let i = 0; i < pts.length;) {
+            const n = !commands ? 1 : pts[i++] === 2 ? 3 : 1;
+            for (let k = 0; k < n; k++, i += 2) {
+                x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]);
+                y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]);
+            }
+        }
+        return outside(x0, y0, x1, y1, 0);
     };
 
     const applyPen = () => {
@@ -147,6 +187,7 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
             const fam = op[1] ? familyFor(op[1]) : "serif";
             // the face file already carries weight and style; don't synthesize
             st.font = `${op[2]}px "${fam}"`;
+            st.size = op[2];
             break;
         }
         case "S":
@@ -160,6 +201,9 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
             break;
         case "p": {
             const d: number[] = op[2];
+            if (outsidePoints(d, true)) {
+                break;
+            }
             const path = new Path2D();
             for (let i = 0; i < d.length;) {
                 const c = d[i];
@@ -179,6 +223,9 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
         }
         case "g": {
             const pts: number[] = op[2];
+            if (outsidePoints(pts, false)) {
+                break;
+            }
             const path = new Path2D();
             for (let i = 0; i + 1 < pts.length; i += 2) {
                 i === 0 ? path.moveTo(pts[i], pts[i + 1]) : path.lineTo(pts[i], pts[i + 1]);
@@ -192,6 +239,11 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
         }
         case "t":
         case "y": {
+            // text: about one font size per character; a music symbol can reach further
+            const n = op[0] === "y" ? 3 : String(op[3]).length + 1;
+            if (outside(op[1], op[2] - 2 * st.size, op[1] + n * st.size, op[2] + st.size, 2 * st.size)) {
+                break;
+            }
             // Qt draws text with the pen colour
             ctx.font = st.font;
             ctx.fillStyle = st.pen ? st.pen.color : "#000";
@@ -201,6 +253,9 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
         }
         case "tr": {
             const [, x, y, w, h, align, text] = op;
+            if (outside(x, y, x + w, y + h, 2 * st.size)) {
+                break;
+            }
             ctx.font = st.font;
             ctx.fillStyle = st.pen ? st.pen.color : "#000";
             // Qt alignment flags: 0x1 left, 0x2 right, 0x4 hcenter, 0x20 top, 0x40 bottom, 0x80 vcenter
@@ -231,6 +286,9 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
             break;
         }
         case "img": {
+            if (outside(op[1], op[2], op[1] + op[3], op[2] + op[4], 0)) {
+                break;
+            }
             const img = op[5] && images.get(op[5]);
             if (img) {
                 ctx.drawImage(img, op[1], op[2], op[3], op[4]);

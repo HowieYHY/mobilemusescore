@@ -100,7 +100,7 @@ const state = {
     zoom: 1,
     pageOps: new Map<number, any[]>(),
     pageEls: [] as HTMLDivElement[],
-    rendered: new Set<number>(),
+    rendered: new Set<string>(), // tiles drawn or being drawn
     playing: false,
     duration: 0,
     position: 0,
@@ -168,14 +168,68 @@ function unitsToCss(u: number) {
     return u / UNITS_PER_INCH * CSS_PX_PER_INCH * state.zoom;
 }
 
-// standIns: the pages' current drawings, shown stretched while each page is
+// Pages are drawn in tiles of at most TILE_SIDE canvas pixels a side and
+// TILE_PIXELS in all, and only the tiles near the view are drawn. In the
+// continuous views the whole score is one long page: squeezed into one canvas
+// (16 megapixels at most) it came out blurred (issue #21).
+const TILE_SIDE = 2048;
+const TILE_PIXELS = 4e6;
+// css px: tiles this close to the view along the reading direction are drawn,
+// so pages are ready before the music reaches them; across it, only this close
+// (at high zoom the page's sides took canvas memory for nothing)
+const NEAR = 1500;
+const ACROSS = 400;
+
+interface Rect { x: number; y: number; w: number; h: number }
+interface Tile extends Rect { key: string; page: number; whole: boolean; el: HTMLDivElement }
+const tiles = new Map<string, Tile>(); // by "page:tile"
+
+// canvas pixels per engraving unit at the current zoom
+const pageScale = () => unitsToCss(1) * Math.min(window.devicePixelRatio || 1, 3);
+
+// A page's tiles in engraving units. Each overlaps the next by two canvas
+// pixels, so no seam shows between them.
+function tileRects(w: number, h: number, scale: number): Rect[] {
+    const cols = Math.ceil(w * scale / TILE_SIDE);
+    const tw = w / cols;
+    const rows = Math.ceil(h * scale / Math.min(TILE_SIDE, TILE_PIXELS / (tw * scale)));
+    const th = h / rows;
+    const pad = 2 / scale;
+    const rects: Rect[] = [];
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            rects.push({ x: c * tw, y: r * th, w: Math.min(tw + pad, w - c * tw), h: Math.min(th + pad, h - r * th) });
+        }
+    }
+    return rects;
+}
+
+// places an element over a part of page `i` (engraving units), so it scales with the page
+function placeOnPage(el: HTMLElement, i: number, r: Rect) {
+    const p = state.score!.pages[i];
+    el.style.left = (r.x / p.w * 100) + "%";
+    el.style.top = (r.y / p.h * 100) + "%";
+    el.style.width = (r.w / p.w * 100) + "%";
+    el.style.height = (r.h / p.h * 100) + "%";
+}
+
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+// a stand-in's part of its page, in engraving units
+const standInRect = (c: HTMLCanvasElement): Rect => ({ x: +c.dataset.x!, y: +c.dataset.y!, w: +c.dataset.w!, h: +c.dataset.h! });
+const standInsOf = (i: number) => [...state.pageEls[i]?.querySelectorAll<HTMLCanvasElement>(":scope > canvas.stale") ?? []];
+
+// standIns: the pages' current drawings, shown stretched while each tile is
 // redrawn at a new size (zoom), so no page goes blank meanwhile
-function buildPages(standIns?: Map<number, HTMLCanvasElement>) {
+function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
     observer.disconnect(); // the old pages would report "out of view" as they go
+    const keep = new Set([...standIns?.values() ?? []].flat());
+    ui.pages.querySelectorAll("canvas").forEach((c) => keep.has(c) || freeCanvas(c));
     ui.pages.innerHTML = "";
     notes.detachAll();
     state.pageEls = [];
     state.rendered.clear();
+    tiles.clear();
     jobs.clear();
     const score = state.score;
     if (!score) {
@@ -183,38 +237,52 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement>) {
     }
     const horizontal = ui.viewMode.value === "continuous_v";
     ui.pages.style.flexDirection = horizontal ? "row" : "column";
+    observer = new IntersectionObserver(tilesSeen, { root: ui.viewer, rootMargin: horizontal ? `${ACROSS}px ${NEAR}px` : `${NEAR}px ${ACROSS}px` });
+    const scale = pageScale();
     score.pages.forEach((p, i) => {
         const el = document.createElement("div");
         el.className = "page";
         el.dataset.index = String(i);
         el.style.width = unitsToCss(p.w) + "px";
         el.style.height = unitsToCss(p.h) + "px";
-        const old = standIns?.get(i);
-        if (old) {
-            old.classList.add("stale");
-            el.prepend(old);
-        }
         ui.pages.appendChild(el);
         state.pageEls.push(el);
+        for (const old of standIns?.get(i) ?? []) {
+            old.classList.add("stale");
+            placeOnPage(old, i, standInRect(old));
+            el.append(old);
+        }
+        const rects = tileRects(p.w, p.h, scale);
+        rects.forEach((r, t) => {
+            const te = document.createElement("div");
+            te.className = "tile";
+            const key = `${i}:${t}`;
+            te.dataset.key = key;
+            Object.assign(te.dataset, { x: r.x, y: r.y }); // exact, for tests (a % style keeps about six digits)
+            placeOnPage(te, i, r);
+            el.append(te);
+            tiles.set(key, { key, page: i, ...r, whole: rects.length === 1, el: te });
+            observer.observe(te);
+        });
         notes.attach(el, i, p.w, p.h);
-        observer.observe(el);
     });
     ui.zoomLabel.textContent = Math.round(state.zoom * 100) + "%";
 }
 
-const observer = new IntersectionObserver((entries) => {
+function tilesSeen(entries: IntersectionObserverEntry[]) {
     for (const e of entries) {
-        const i = Number((e.target as HTMLElement).dataset.index);
-        if (e.target !== state.pageEls[i]) {
-            continue; // a page from before a rebuild
+        const key = (e.target as HTMLElement).dataset.key!;
+        if (tiles.get(key)?.el !== e.target) {
+            continue; // a tile from before a rebuild
         }
         if (e.isIntersecting) {
-            void renderPage(i);
+            void renderTile(key);
         } else {
-            releasePage(i);
+            releaseTile(key);
         }
     }
-}, { root: ui.viewer, rootMargin: "1500px" }); // well ahead, so pages are drawn before the music reaches them
+}
+let observer = new IntersectionObserver(tilesSeen);
 
 // A canvas's pixels are freed at once by sizing it to nothing (Safari counts a
 // removed canvas until it is collected)
@@ -226,77 +294,103 @@ function freeCanvas(c: HTMLCanvasElement | null | undefined) {
     }
 }
 
-// A page far out of view gives back its drawing (iPad Safari refuses new
+// A tile far out of view gives back its drawing (iPad Safari refuses new
 // canvases past a memory limit, leaving pages blank); it is drawn again when
-// it comes near
-function releasePage(i: number) {
-    const el = state.pageEls[i];
-    if (!el) {
+// it comes near. The page's stand-ins far from the view go too.
+function releaseTile(key: string) {
+    const tile = tiles.get(key);
+    if (!tile) {
         return;
     }
-    state.rendered.delete(i);
-    const job = jobs.get(i);
+    state.rendered.delete(key);
+    const job = jobs.get(key);
     if (job) {
-        jobs.delete(i);
+        jobs.delete(key);
         freeCanvas(job.canvas);
     }
-    freeCanvas(el.querySelector("canvas"));
+    freeCanvas(tile.el.querySelector("canvas"));
+    standInsOf(tile.page).filter((c) => distanceFromView(c) >= NEAR).forEach(freeCanvas);
+}
+
+// A page's stand-ins go once the tiles over them are drawn
+function dropCoveredStandIns(i: number) {
+    const own = [...tiles.values()].filter((t) => t.page === i);
+    for (const c of standInsOf(i)) {
+        const r = standInRect(c);
+        if (own.every((t) => !overlaps(t, r) || t.el.querySelector("canvas"))) {
+            freeCanvas(c);
+        }
+    }
 }
 
 let renderGeneration = 0;
 
-async function renderPage(i: number) {
-    if (state.rendered.has(i) || !state.score) {
+// a page's drawing commands, fetched once even when several tiles ask
+const opsLoading = new Map<string, Promise<any[]>>();
+async function pageOps(i: number, gen: number): Promise<any[] | null> {
+    const cached = state.pageOps.get(i);
+    if (cached) {
+        return cached;
+    }
+    const k = `${gen}:${i}`;
+    let p = opsLoading.get(k);
+    if (!p) {
+        p = engine.page(i).then((json) => {
+            const t0 = performance.now();
+            const ops = JSON.parse(json) as any[];
+            performance.measure("page-parse", { start: t0 }); // see app.state / perf tests
+            return ops;
+        });
+        opsLoading.set(k, p);
+        p.then(() => opsLoading.delete(k), () => opsLoading.delete(k));
+    }
+    const ops = await p;
+    if (gen !== renderGeneration) {
+        return null;
+    }
+    state.pageOps.set(i, ops);
+    return ops;
+}
+
+async function renderTile(key: string) {
+    const tile = tiles.get(key);
+    if (!tile || state.rendered.has(key) || !state.score) {
         return;
     }
-    state.rendered.add(i);
+    state.rendered.add(key);
     const gen = renderGeneration;
-    const still = () => gen === renderGeneration && state.rendered.has(i);
-    let ops = state.pageOps.get(i);
-    if (!ops) {
-        const json = await engine.page(i);
-        const t0 = performance.now();
-        ops = JSON.parse(json) as any[];
-        performance.measure("page-parse", { start: t0 }); // see app.state / perf tests
-        if (gen !== renderGeneration) {
-            return;
-        }
-        state.pageOps.set(i, ops);
+    // a tile queued for a layout with more pages (the view changed meanwhile, e.g. a score reopened
+    // after an update going back to its continuous view) has nothing to draw
+    const still = () => gen === renderGeneration && state.rendered.has(key) && !!state.score?.pages[tile.page];
+    if (!still()) {
+        state.rendered.delete(key);
+        return;
+    }
+    const ops = await pageOps(tile.page, gen).catch(() => null);
+    if (!ops || !still()) {
+        return;
     }
     await Promise.all([ensureFonts(ops, engine.base), ensureImages(ops)]);
     if (!still()) {
         return;
     }
 
-    const page = state.score.pages[i];
-    if (!page) {
-        // queued for a layout with more pages (the view changed meanwhile, e.g. a score reopened after
-        // an update going back to its continuous view): nothing to draw
-        state.rendered.delete(i);
-        return;
-    }
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    // keep canvases within mobile limits (about 16 megapixels)
-    let scale = unitsToCss(1) * dpr;
-    const maxPixels = 16e6;
-    if (page.w * page.h * scale * scale > maxPixels) {
-        scale = Math.sqrt(maxPixels / (page.w * page.h));
-    }
+    const scale = pageScale();
     // A device short of canvas memory refuses the context (iPad Safari). Make
-    // room first: this page's own stand-in, then stand-ins out of view; then
+    // room first: this tile's stand-ins, then stand-ins out of view; then
     // try smaller (a softer page beats a blank one), and else again in a while.
     const roomMakers = [
-        () => freeCanvas(state.pageEls[i]?.querySelector<HTMLCanvasElement>("canvas.stale")),
-        () => state.pageEls.forEach((el, k) => {
-            if (distanceFromView(k) > 0) {
-                freeCanvas(el.querySelector<HTMLCanvasElement>("canvas.stale"));
+        () => standInsOf(tile.page).filter((c) => overlaps(tile, standInRect(c))).forEach(freeCanvas),
+        () => ui.pages.querySelectorAll<HTMLCanvasElement>("canvas.stale").forEach((c) => {
+            if (distanceFromView(c) > 0) {
+                freeCanvas(c);
             }
         }),
     ];
     for (const s of [scale, scale, scale, scale / 2, scale / 4]) {
         const canvas = document.createElement("canvas");
-        canvas.width = Math.ceil(page.w * s);
-        canvas.height = Math.ceil(page.h * s);
+        canvas.width = Math.ceil(tile.w * s);
+        canvas.height = Math.ceil(tile.h * s);
         const ctx = canvas.getContext("2d");
         if (!ctx) {
             freeCanvas(canvas);
@@ -305,30 +399,29 @@ async function renderPage(i: number) {
         }
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        jobs.set(i, { gen, canvas, draw: pageDrawer(ctx, ops, s) });
+        jobs.set(key, { gen, tile, canvas, draw: pageDrawer(ctx, ops, s, tile.whole ? undefined : tile) });
         void drawJobs();
         return;
     }
-    state.rendered.delete(i);
+    state.rendered.delete(key);
     setTimeout(() => {
-        if (gen === renderGeneration && isNear(i)) {
-            void renderPage(i);
+        if (gen === renderGeneration && tiles.get(key) === tile && distanceFromView(tile.el) < NEAR) {
+            void renderTile(key);
         }
     }, 1500);
 }
 
-// Pages waiting to be drawn. Drawn in pieces (about 6 ms a frame while playing,
+// Tiles waiting to be drawn. Drawn in pieces (about 6 ms a frame while playing,
 // 12 when stopped) so the playback line keeps moving, nearest the view first.
-const jobs = new Map<number, { gen: number; canvas: HTMLCanvasElement; draw: (ms: number) => boolean }>();
+const jobs = new Map<string, { gen: number; tile: Tile; canvas: HTMLCanvasElement; draw: (ms: number) => boolean }>();
 let drawing = false;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
 
-function distanceFromView(i: number) {
+function distanceFromView(el: Element) {
     const v = ui.viewer.getBoundingClientRect();
-    const r = state.pageEls[i].getBoundingClientRect();
+    const r = el.getBoundingClientRect();
     return Math.hypot(Math.max(r.left - v.right, 0, v.left - r.right), Math.max(r.top - v.bottom, 0, v.top - r.bottom));
 }
-const isNear = (i: number) => !!state.pageEls[i] && distanceFromView(i) < 1500;
 
 async function drawJobs() {
     if (drawing) {
@@ -343,41 +436,41 @@ async function drawJobs() {
                 await nextFrame();
                 continue;
             }
-            let i = -1;
+            let key = "";
             let best = Infinity;
             for (const [k, job] of jobs) {
-                if (job.gen !== renderGeneration || !state.pageEls[k]) {
+                if (job.gen !== renderGeneration || tiles.get(k) !== job.tile) {
                     jobs.delete(k);
                     freeCanvas(job.canvas);
                     continue;
                 }
-                const d = distanceFromView(k);
+                const d = distanceFromView(job.tile.el);
                 if (d < best) {
                     best = d;
-                    i = k;
+                    key = k;
                 }
             }
-            if (i < 0) {
+            if (!key) {
                 break;
             }
-            const job = jobs.get(i)!;
+            const job = jobs.get(key)!;
             let done = false;
             const t1 = performance.now();
             try {
                 done = job.draw(state.playing ? 6 : 12);
             } catch (err) {
                 // one page failing must not stop the others
-                console.warn("page", i, "could not be drawn:", err);
-                jobs.delete(i);
+                console.warn("page tile", key, "could not be drawn:", err);
+                jobs.delete(key);
                 freeCanvas(job.canvas);
                 continue;
             }
             performance.measure("page-draw", { start: t1 });
             if (done) {
-                jobs.delete(i);
-                const el = state.pageEls[i];
-                freeCanvas(el.querySelector("canvas")); // the stand-in, if any
-                el.prepend(job.canvas);
+                jobs.delete(key);
+                freeCanvas(job.tile.el.querySelector("canvas"));
+                job.tile.el.prepend(job.canvas);
+                dropCoveredStandIns(job.tile.page);
             }
             await nextFrame();
         }
@@ -405,15 +498,17 @@ function rerenderAll(keepOps: boolean) {
         state.pageOps.clear();
     }
     // same layout (zoom): the current drawings stand in until redrawn
-    const standIns = new Map<number, HTMLCanvasElement>();
-    state.pageEls.forEach((el, i) => {
-        const c = el.querySelector("canvas");
-        if (c && keepOps) {
-            standIns.set(i, c);
-        } else {
-            freeCanvas(c);
+    const standIns = new Map<number, HTMLCanvasElement[]>();
+    if (keepOps) {
+        state.pageEls.forEach((_, i) => standIns.set(i, standInsOf(i)));
+        for (const tile of tiles.values()) {
+            const c = tile.el.querySelector("canvas");
+            if (c) {
+                Object.assign(c.dataset, { x: tile.x, y: tile.y, w: tile.w, h: tile.h });
+                standIns.get(tile.page)?.push(c);
+            }
         }
-    });
+    }
     for (const job of jobs.values()) {
         freeCanvas(job.canvas);
     }

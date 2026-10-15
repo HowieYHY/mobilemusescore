@@ -31,7 +31,10 @@ const check = (ok, what) => {
 };
 
 for (const engineName of (process.env.ENGINES || "chromium,webkit").split(",")) {
-    const browser = await playwright[engineName].launch();
+    // WebKit may be installed on another drive (this PC's C: is nearly full): D:/ms-playwright
+    const local = ["D:/ms-playwright"].flatMap((d) => (fs.existsSync(d) ? fs.readdirSync(d).filter((x) => x.startsWith(engineName + "-")).map((x) => path.join(d, x, "Playwright.exe")) : []))
+        .find((p) => fs.existsSync(p));
+    const browser = await playwright[engineName].launch(engineName === "webkit" && local ? { executablePath: local } : {});
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     const refused = [];

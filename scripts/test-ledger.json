@@ -1,10 +1,11 @@
 {
   "settings-test": {
-    "streak": 9,
+    "streak": 10,
     "last": "pass",
-    "commit": "f61698d+changes",
-    "passCommit": "f61698d",
-    "date": "2026-10-15"
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
+    "note": "ran on the code of this commit (Settings page on phones)"
   },
   "tour-test": {
     "streak": 4,
@@ -14,81 +15,81 @@
     "date": "2026-10-15"
   },
   "layout-shots": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "screenshots: look at them"
   },
   "no-change-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16"
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15"
   },
   "mobile-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "a27affe+changes",
-    "passCommit": "a27affe",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
     "date": "2026-10-15",
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "3ff2c3a",
-    "passCommit": "3ff2c3a",
-    "date": "2026-10-16",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar"
   },
   "goto-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "a27affe+changes",
-    "passCommit": "a27affe",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
     "date": "2026-10-15"
   },
   "csp-test": {
-    "streak": 2,
+    "streak": 1,
     "last": "pass",
-    "commit": "3ff2c3a",
-    "passCommit": "3ff2c3a",
-    "date": "2026-10-16",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
   "pageturn-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "bdf2efc",
-    "passCommit": "bdf2efc",
-    "date": "2026-10-16",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "scroller-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "131fa0f",
-    "passCommit": "131fa0f",
-    "date": "2026-10-16",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "update-restart-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "131fa0f",
-    "passCommit": "131fa0f",
-    "date": "2026-10-16"
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15"
   },
   "compare-engines": {
     "streak": 1,
@@ -123,19 +124,19 @@
     "note": "needs 'I am move it edited.mscz' (its layout), not on this PC"
   },
   "continuous-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "0fb2232",
-    "passCommit": "0fb2232",
-    "date": "2026-10-11",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "zoom-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "0fb2232",
-    "passCommit": "0fb2232",
-    "date": "2026-10-11",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "pinch-test": {
@@ -147,26 +148,26 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "0fb2232",
-    "passCommit": "0fb2232",
-    "date": "2026-10-11",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "selfcheck-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "0fb2232",
-    "passCommit": "0fb2232",
-    "date": "2026-10-11",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
+    "date": "2026-10-15",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "install-hint-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "a27affe+changes",
-    "passCommit": "a27affe",
+    "commit": "4f71342+changes",
+    "passCommit": "4f71342",
     "date": "2026-10-15"
   }
 }

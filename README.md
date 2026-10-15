@@ -211,8 +211,9 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 </details>
 
 ### Settings
-Tap the **gear** at the top. Each setting works straight away and is kept on this device, for every
-score. Until you change them, PocketScore works as described above.
+Tap the **gear** at the top. On a phone, Settings opens as a page of its own; **‹ Back** (or your
+phone's Back) returns to the score. Each setting works straight away and is kept on this device, for
+every score. Until you change them, PocketScore works as described above.
 
 | Setting | What it does |
 | --- | --- |

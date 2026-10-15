@@ -213,6 +213,13 @@ build, tests, status) before working here.
   app on Android; change them knowing installed copies follow late, and check what the installed
   copy holds (`adb pull` its APK) before guessing.
 
+- **Playwright tells a page it is always visible.** Connected to the Pixel's Chrome, the page said
+  "visible" on the home screen and with the screen off (Playwright's focus emulation), so leaving
+  the app looked like it never paused. Also `adb shell input keyevent KEYCODE_SLEEP` is ignored
+  while music plays; `KEYCODE_POWER` turns the screen off. Rule: test anything about leaving the
+  app over a plain DevTools connection (`android-background-test.mjs`), and record the screen state
+  (`dumpsys power` mWakefulness) with each result.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

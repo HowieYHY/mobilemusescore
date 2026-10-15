@@ -16,7 +16,6 @@ export interface Settings {
     follow: boolean;           // the view follows the music
     earlyTurn: boolean;        // page by page: the next page comes up on a page's last line
     keepAwake: boolean;        // the screen stays on while playing
-    darkPage: boolean;         // light music on a dark page
 }
 
 export const DEFAULTS: Readonly<Settings> = {
@@ -31,7 +30,6 @@ export const DEFAULTS: Readonly<Settings> = {
     follow: true,
     earlyTurn: false,
     keepAwake: false,
-    darkPage: false,
 };
 
 const KEY = "pocketscore.settings";

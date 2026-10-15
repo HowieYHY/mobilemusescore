@@ -12,7 +12,6 @@
 //   - Follow the music: off, the view stays put while the music plays,
 //   - Turn pages early: in Page by page, the next page shows while the last line plays,
 //   - Keep the screen on: the screen lock is asked for while playing and let go on pause,
-//   - Dark page: dark paper and light ink, in the drawing and the notes,
 // and with every score in "real test musescores", each view as the opening view. Screenshots in
 // build/settings.
 //
@@ -122,10 +121,10 @@ for (const [name, width, height, touch] of sizes) {
     check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
     const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
         `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
-    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true earlyTurn=false keepAwake=false darkPage=false",
+    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true earlyTurn=false keepAwake=false",
         `${name}: defaults are today's behaviour (${defaults})`);
     // every control is reachable: scroll to the last one and check it's on screen
-    const last = page.locator('[data-set="darkPage"]');
+    const last = page.locator('[data-set="keepAwake"]');
     await last.scrollIntoViewIfNeeded();
     const lb = await last.boundingBox();
     check(lb && lb.y >= box.top && lb.y + lb.height <= box.bottom + 0.5, `${name}: the last setting can be reached${box.scrolls ? " (by scrolling)" : ""}`);
@@ -365,55 +364,6 @@ for (const [name, width, height, touch] of sizes) {
     await page.screenshot({ path: path.join(outDir, "early-turn.png") });
     await setSetting(page, "earlyTurn", false);
 
-    // Dark page: the drawing and the notes
-    await page.evaluate(() => { const v = document.getElementById("view-mode"); v.value = "page"; v.dispatchEvent(new Event("change")); });
-    await page.waitForFunction(() => !document.body.classList.contains("page-turn") && document.querySelector(".page canvas"), null, { timeout: 60000 });
-    await page.evaluate(() => document.querySelector(".viewer").scrollTo(0, 0));
-    await setSetting(page, "darkPage", true);
-    await page.waitForFunction(() => {
-        const c = document.querySelector('.page[data-index="0"] .tile canvas');
-        if (!c) return false;
-        const d = c.getContext("2d").getImageData(2, 2, 1, 1).data;
-        return d[0] < 60;
-    }, null, { timeout: 30000 }).catch(() => {});
-    const dark = await page.evaluate(() => {
-        const c = document.querySelector('.page[data-index="0"] .tile canvas');
-        const ctx = c.getContext("2d");
-        const corner = [...ctx.getImageData(2, 2, 1, 1).data];
-        // the lightest pixel of the drawing: the ink
-        const d = ctx.getImageData(0, 0, c.width, Math.min(c.height, 1200)).data;
-        let max = 0;
-        for (let i = 0; i < d.length; i += 4) max = Math.max(max, d[i] + d[i + 1] + d[i + 2]);
-        return { corner, inkSum: max, cls: document.documentElement.classList.contains("dark-page") };
-    });
-    check(dark.cls && dark.corner[0] < 40 && dark.inkSum > 600, `dark page: dark paper (${dark.corner.slice(0, 3)}) and light ink (sum ${dark.inkSum})`);
-    // a black pen stroke shows light; its stored colour stays black
-    const pen = await page.evaluate(() => {
-        const svg = document.querySelector('.page[data-index="0"] .ink');
-        app.notes.setActive(true);
-        return !!svg;
-    });
-    const r = await page.evaluate(() => document.querySelector('.page[data-index="0"]').getBoundingClientRect());
-    await page.evaluate(() => app.notes.setFingerDraws(true));
-    await page.mouse.move(r.x + 60, r.y + 200);
-    await page.mouse.down();
-    await page.mouse.move(r.x + 160, r.y + 220, { steps: 5 });
-    await page.mouse.up();
-    const stroke = await page.evaluate(() => {
-        const p = document.querySelector('.page[data-index="0"] .ink path.pen');
-        return p && p.getAttribute("stroke");
-    });
-    check(pen && stroke && stroke !== "#000000" && /rgb\((2[0-9]{2}),/.test(stroke), `dark page: a black pen stroke is drawn light (${stroke})`);
-    await page.evaluate(() => app.notes.setActive(false));
-    await page.screenshot({ path: path.join(outDir, "dark-page.png") });
-    await page.evaluate(() => app.notes.discard());
-    await setSetting(page, "darkPage", false);
-    await page.waitForFunction(() => {
-        const c = document.querySelector('.page[data-index="0"] .tile canvas');
-        return c && c.getContext("2d").getImageData(2, 2, 1, 1).data[0] > 200;
-    }, null, { timeout: 30000 }).catch(() => {});
-    check(await page.evaluate(() => document.querySelector('.page[data-index="0"] .tile canvas').getContext("2d").getImageData(2, 2, 1, 1).data[0] > 200),
-        "dark page off: white paper again");
     await context.close();
 }
 

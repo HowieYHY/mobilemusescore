@@ -224,7 +224,6 @@ score. Until you change them, PocketScore works as described above.
 | **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
 | **Turn pages early** | In *Page by page*, the next page comes up when the music reaches a page's last line, so you can read ahead. A page of only one line still turns at its end |
 | **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
-| **Dark page** | Light music on a dark page, for dim rooms. Your notes show in matching colours (a black pen shows light); they change back when you turn it off |
 
 ---
 

@@ -1176,11 +1176,3 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   .set-row input[type=checkbox], .set-row input[type=checkbox]::after { transition: none; }
 }
 
-/* Dark page (Settings): the score is drawn in dark colours (pagerenderer.ts) and the notes follow
-   (annotations.ts); the highlighter lightens instead of darkening */
-.dark-page .page { background: rgb(31, 31, 31); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
-/* around the pages too, once a score is open (the start screen keeps its light background) */
-.dark-page .viewer:not(:has(#empty:not([hidden]))) { background: #12171e; }
-.dark-page .cursor { background: rgba(91, 156, 242, 0.6); }
-.dark-page .ink path.highlighter { mix-blend-mode: screen; stroke-opacity: 0.45; }
-.dark-page .annotating[data-tool="text"] .tnote .tbody { border-color: rgba(255, 255, 255, 0.3); }

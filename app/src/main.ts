@@ -2,7 +2,7 @@
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
-import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer, paperColor } from "./render/pagerenderer";
+import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 import { Tour, type TourStep } from "./tour";
@@ -94,7 +94,6 @@ if (embedded) {
 }
 // The reader's settings (the gear); a preview keeps nothing, so it plays with the defaults
 const settings: Settings = loadSettings(!embedded);
-document.documentElement.classList.toggle("dark-page", settings.darkPage);
 $("version").textContent = "PocketScore " + __APP_VERSION__;
 
 const engine = new Engine();
@@ -496,9 +495,9 @@ async function renderTile(key: string) {
             roomMakers.shift()?.();
             continue;
         }
-        ctx.fillStyle = paperColor(settings.darkPage);
+        ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        jobs.set(key, { gen, tile, canvas, draw: pageDrawer(ctx, ops, s, tile.whole ? undefined : tile, settings.darkPage) });
+        jobs.set(key, { gen, tile, canvas, draw: pageDrawer(ctx, ops, s, tile.whole ? undefined : tile) });
         void drawJobs();
         return;
     }
@@ -2324,18 +2323,8 @@ for (const el of settingInputs) {
             scheduleAutoFocus();
         } else if (k === "keepAwake") {
             void updateWakeLock();
-        } else if (k === "darkPage") {
-            applyDarkPage();
         }
     });
-}
-
-function applyDarkPage() {
-    document.documentElement.classList.toggle("dark-page", settings.darkPage);
-    notes.setDark(settings.darkPage);
-    if (state.score) {
-        rerenderAll(true); // the current drawings stand in until each is redrawn
-    }
 }
 
 // ---------------------------------------------------------------- mixer panel
@@ -3148,7 +3137,6 @@ async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
 // ---------------------------------------------------------------- notes
 
 const notes = new Annotations(ui.pages, ui.viewer, () => updateNotesBar(), (msg) => setStatus(msg, "error", 6000));
-notes.setDark(settings.darkPage);
 
 const COLOR_NAMES: Record<string, string> = {
     "#000000": "Black", "#ffffff": "White", "#d62828": "Red", "#1d5fd1": "Blue", "#2a9d4b": "Green", "#f2c200": "Yellow",
@@ -3353,7 +3341,7 @@ function tourSteps(): TourStep[] {
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first. On Android you can also share a score to PocketScore from the Files app." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
-            { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in, a dark page and more." },
+            { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in and more." },
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
             tipStep,
         ];
@@ -3370,7 +3358,7 @@ function tourSteps(): TourStep[] {
         { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
-        { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in, a dark page and more." },
+        { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in and more." },
         { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
         tipStep,
     ];

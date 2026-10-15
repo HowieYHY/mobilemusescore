@@ -72,52 +72,12 @@ interface DrawState {
 const CAPS: CanvasLineCap[] = ["butt", "square", "round"];
 const JOINS: CanvasLineJoin[] = ["miter", "bevel", "round"];
 
-// Dark page (Settings): lightness turned over, hue and saturation kept, so black ink becomes light,
-// the white paper dark, and a red marking stays red. Ink and paper stop short of pure white and
-// black, which glare in a dim room.
-export function darkRgb(r: number, g: number, b: number): [number, number, number] {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const l = (max + min) / 2;
-    const d = max - min;
-    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-    let h = 0;
-    if (d) {
-        h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    }
-    const l2 = 0.12 + (1 - l) * 0.76;
-    // back to rgb
-    const c = (1 - Math.abs(2 * l2 - 1)) * s;
-    const x = c * (1 - Math.abs((h % 2 + 2) % 2 - 1));
-    const m = l2 - c / 2;
-    const [r1, g1, b1] = h < 0 ? [c, 0, x]
-        : h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
-    return [Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255)];
-}
-
-/** A CSS colour (#rgb, #rrggbb) as shown on a dark page. */
-export function darkCss(css: string): string {
-    const hex = css.length === 4 ? "#" + [...css.slice(1)].map((ch) => ch + ch).join("") : css;
-    if (!/^#[0-9a-f]{6}$/i.test(hex)) {
-        return css;
-    }
-    const [r, g, b] = darkRgb(parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16));
-    return `rgb(${r},${g},${b})`;
-}
-
-/** The paper: white, or the dark page's paper. */
-export const paperColor = (dark: boolean) => (dark ? darkCss("#ffffff") : "#fff");
-
-function cssColor(hex: string, dark: boolean): string {
+function cssColor(hex: string): string {
     // "#rrggbbaa" -> rgba()
-    let r = parseInt(hex.slice(1, 3), 16);
-    let g = parseInt(hex.slice(3, 5), 16);
-    let b = parseInt(hex.slice(5, 7), 16);
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
     const a = parseInt(hex.slice(7, 9), 16) / 255;
-    if (dark) {
-        [r, g, b] = darkRgb(r, g, b);
-    }
     return `rgba(${r},${g},${b},${a})`;
 }
 
@@ -132,11 +92,9 @@ export function drawPage(ctx: CanvasRenderingContext2D, ops: Op[], scale: number
 // The canvas keeps its drawing state between calls.
 // With `part`, the canvas holds only that part of the page (engraving units),
 // and what lies wholly outside it is skipped.
-// With `dark`, in the dark page's colours.
 export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: number,
-    part?: { x: number; y: number; w: number; h: number }, dark = false): (budgetMs: number) => boolean {
-    const ink = cssColor("#000000ff", dark);
-    let st: DrawState = { pen: { color: ink, width: 0, cap: "butt", join: "miter", dash: [] }, brush: null, font: "10px serif", size: 10 };
+    part?: { x: number; y: number; w: number; h: number }): (budgetMs: number) => boolean {
+    let st: DrawState = { pen: { color: "#000", width: 0, cap: "butt", join: "miter", dash: [] }, brush: null, font: "10px serif", size: 10 };
     const stack: DrawState[] = [];
     let tf = [1, 0, 0, 1, 0, 0];
     const ox = part?.x ?? 0;
@@ -220,10 +178,10 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
             break;
         case "P":
             st.pen = op[1] === null ? null
-                : { color: cssColor(op[1], dark), width: op[2], cap: CAPS[op[3]] || "butt", join: JOINS[op[4]] || "miter", dash: op[5] || [] };
+                : { color: cssColor(op[1]), width: op[2], cap: CAPS[op[3]] || "butt", join: JOINS[op[4]] || "miter", dash: op[5] || [] };
             break;
         case "B":
-            st.brush = op[1] === null ? null : cssColor(op[1], dark);
+            st.brush = op[1] === null ? null : cssColor(op[1]);
             break;
         case "F": {
             const fam = op[1] ? familyFor(op[1]) : "serif";
@@ -288,7 +246,7 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
             }
             // Qt draws text with the pen colour
             ctx.font = st.font;
-            ctx.fillStyle = st.pen ? st.pen.color : ink;
+            ctx.fillStyle = st.pen ? st.pen.color : "#000";
             const text = op[0] === "y" ? String.fromCodePoint(op[3]) : op[3];
             ctx.fillText(text, op[1], op[2]);
             break;
@@ -299,7 +257,7 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
                 break;
             }
             ctx.font = st.font;
-            ctx.fillStyle = st.pen ? st.pen.color : ink;
+            ctx.fillStyle = st.pen ? st.pen.color : "#000";
             // Qt alignment flags: 0x1 left, 0x2 right, 0x4 hcenter, 0x20 top, 0x40 bottom, 0x80 vcenter
             ctx.textAlign = align & 0x2 ? "right" : align & 0x4 ? "center" : "left";
             ctx.textBaseline = align & 0x20 ? "top" : align & 0x40 ? "bottom" : align & 0x80 ? "middle" : "alphabetic";
@@ -338,7 +296,7 @@ export function pageDrawer(ctx: CanvasRenderingContext2D, ops: Op[], scale: numb
             }
             // picture missing or undecodable: outline where it goes
             ctx.save();
-            ctx.strokeStyle = dark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)";
+            ctx.strokeStyle = "rgba(0,0,0,0.25)";
             ctx.setLineDash([20, 20]);
             ctx.lineWidth = 4;
             ctx.strokeRect(op[1], op[2], op[3], op[4]);

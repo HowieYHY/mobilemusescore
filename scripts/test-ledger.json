@@ -1,17 +1,17 @@
 {
   "settings-test": {
-    "streak": 7,
+    "streak": 8,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16"
+    "commit": "a27affe+changes",
+    "passCommit": "a27affe",
+    "date": "2026-10-15"
   },
   "tour-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16"
+    "commit": "a27affe+changes",
+    "passCommit": "a27affe",
+    "date": "2026-10-15"
   },
   "layout-shots": {
     "streak": 4,
@@ -37,11 +37,11 @@
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16",
+    "commit": "a27affe+changes",
+    "passCommit": "a27affe",
+    "date": "2026-10-15",
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
@@ -53,11 +53,11 @@
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar"
   },
   "goto-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "82a833f",
-    "passCommit": "82a833f",
-    "date": "2026-10-16"
+    "commit": "a27affe+changes",
+    "passCommit": "a27affe",
+    "date": "2026-10-15"
   },
   "csp-test": {
     "streak": 2,
@@ -161,5 +161,12 @@
     "passCommit": "0fb2232",
     "date": "2026-10-11",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+  },
+  "install-hint-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "a27affe+changes",
+    "passCommit": "a27affe",
+    "date": "2026-10-15"
   }
 }

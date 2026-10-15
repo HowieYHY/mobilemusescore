@@ -1,89 +1,281 @@
 {
   "_about": "What each test covers, for scripts/tests.mjs: a settled test (3 passes in a row) runs again only when a change touches its files or a changed line matches one of its words (regular expressions, case-insensitive), or the user reports a problem in its area. phone: needs the Android phone on USB.",
   "settings-test": {
-    "files": ["app/src/settings.ts"],
-    "words": ["settings", "placeSettings", "wakeLock", "keepPlaying", "autoFocus", "startView", "tapToHear", "metronomeOn", "focusFullscreen", "set-row", "visibilitychange", "topbar"]
+    "files": [
+      "app/src/settings.ts"
+    ],
+    "words": [
+      "settings",
+      "placeSettings",
+      "wakeLock",
+      "keepPlaying",
+      "autoFocus",
+      "startView",
+      "tapToHear",
+      "metronomeOn",
+      "focusFullscreen",
+      "set-row",
+      "visibilitychange",
+      "topbar"
+    ]
   },
   "goto-test": {
-    "files": ["engine/core/session.cpp", "engine/core/mscore.cpp"],
-    "words": ["goto", "showBar", "loadBars", "barStarts", "sections", "mss_bars", "barsJson", "#bar\\b", "measure", "followCursor", "turnTo", "setSpeed"]
+    "files": [
+      "engine/core/session.cpp",
+      "engine/core/mscore.cpp"
+    ],
+    "words": [
+      "goto",
+      "showBar",
+      "loadBars",
+      "barStarts",
+      "sections",
+      "mss_bars",
+      "barsJson",
+      "#bar\\b",
+      "measure",
+      "followCursor",
+      "turnTo",
+      "setSpeed"
+    ]
   },
   "tour-test": {
-    "files": ["app/src/tour.ts"],
-    "words": ["tour", "TourStep", "firstTime", "install"]
+    "files": [
+      "app/src/tour.ts"
+    ],
+    "words": [
+      "tour",
+      "TourStep",
+      "firstTime",
+      "install"
+    ]
   },
   "focus-test": {
     "files": [],
-    "words": ["focus", "glideViewer", "barAnimations", "layers", "openLayer", "closeLayer", "tour"]
+    "words": [
+      "focus",
+      "glideViewer",
+      "barAnimations",
+      "layers",
+      "openLayer",
+      "closeLayer",
+      "tour"
+    ]
   },
   "notes-test": {
-    "files": ["app/src/annotations.ts", "app/src/musicmap.ts"],
-    "words": ["notes", "palette", "swatch", "notesbar", "tnote", "ink\\b"]
+    "files": [
+      "app/src/annotations.ts",
+      "app/src/musicmap.ts"
+    ],
+    "words": [
+      "notes",
+      "palette",
+      "swatch",
+      "notesbar",
+      "tnote",
+      "ink\\b"
+    ]
   },
   "notes-views-test": {
-    "files": ["app/src/annotations.ts", "app/src/musicmap.ts", "engine/core/session.cpp"],
-    "words": ["staves", "setLayout", "timeline", "setMode"]
+    "files": [
+      "app/src/annotations.ts",
+      "app/src/musicmap.ts",
+      "engine/core/session.cpp"
+    ],
+    "words": [
+      "staves",
+      "setLayout",
+      "timeline",
+      "setMode"
+    ]
   },
   "no-change-test": {
-    "files": ["app/src/mixerstore.ts", "app/src/annotations.ts"],
-    "words": ["mixChanged", "sameMix", "dirty", "updateSaveState", "volumeControl", "metronome", "\\bsave"]
+    "files": [
+      "app/src/mixerstore.ts",
+      "app/src/annotations.ts"
+    ],
+    "words": [
+      "mixChanged",
+      "sameMix",
+      "dirty",
+      "updateSaveState",
+      "volumeControl",
+      "metronome",
+      "\\bsave"
+    ]
   },
   "mobile-test": {
-    "files": ["app/src/annotations.ts", "app/src/mixerstore.ts"],
-    "words": ["layers", "openLayer", "closeLayer", "popstate", "openSheet", "mixer", "palette", "notes-finger", "\\bask\\("]
+    "files": [
+      "app/src/annotations.ts",
+      "app/src/mixerstore.ts"
+    ],
+    "words": [
+      "layers",
+      "openLayer",
+      "closeLayer",
+      "popstate",
+      "openSheet",
+      "mixer",
+      "palette",
+      "notes-finger",
+      "\\bask\\("
+    ]
   },
   "pageturn-test": {
     "files": [],
-    "words": ["pageTurn", "turnTo", "turnedTo", "page_turn", "slot", "settleTurn", "keepOnPage", "followCursor", "fitPageZoom"]
+    "words": [
+      "pageTurn",
+      "turnTo",
+      "turnedTo",
+      "page_turn",
+      "slot",
+      "settleTurn",
+      "keepOnPage",
+      "followCursor",
+      "fitPageZoom"
+    ]
   },
   "scroller-test": {
     "files": [],
-    "words": ["scroller", "fingersBusy"]
+    "words": [
+      "scroller",
+      "fingersBusy"
+    ]
   },
   "continuous-test": {
-    "files": ["app/src/render/pagerenderer.ts"],
-    "words": ["tile", "buildPages", "clearPages", "renderTile", "pageDrawer", "standIn", "continuous"]
+    "files": [
+      "app/src/render/pagerenderer.ts"
+    ],
+    "words": [
+      "tile",
+      "buildPages",
+      "clearPages",
+      "renderTile",
+      "pageDrawer",
+      "standIn",
+      "continuous"
+    ]
   },
   "zoom-test": {
-    "files": ["app/src/render/pagerenderer.ts"],
-    "words": ["zoom", "rerenderAll", "freeCanvas", "standIn"]
+    "files": [
+      "app/src/render/pagerenderer.ts"
+    ],
+    "words": [
+      "zoom",
+      "rerenderAll",
+      "freeCanvas",
+      "standIn"
+    ]
   },
   "pinch-test": {
     "files": [],
-    "words": ["pinch", "touches", "zoom"]
+    "words": [
+      "pinch",
+      "touches",
+      "zoom"
+    ]
   },
   "cursor-test": {
-    "files": ["app/src/engine/engine.ts"],
-    "words": ["cursor", "audioTime", "followReports", "anchor", "holdAt", "playLatency"]
+    "files": [
+      "app/src/engine/engine.ts"
+    ],
+    "words": [
+      "cursor",
+      "audioTime",
+      "followReports",
+      "anchor",
+      "holdAt",
+      "playLatency"
+    ]
   },
   "selfcheck-test": {
-    "files": ["app/public/worklet/msaudio-worker.js", "app/public/worklet/msaudio-worklet.js", "app/src/engine/engine.ts"],
-    "words": ["underrun", "stutter", "health"]
+    "files": [
+      "app/public/worklet/msaudio-worker.js",
+      "app/public/worklet/msaudio-worklet.js",
+      "app/src/engine/engine.ts"
+    ],
+    "words": [
+      "underrun",
+      "stutter",
+      "health"
+    ]
   },
   "update-restart-test": {
-    "files": ["app/public/sw.js", "app/public/manifest.webmanifest"],
-    "words": ["restart", "reopenAfterUpdate", "updateReady", "quietForUpdate", "serviceWorker", "changeView"]
+    "files": [
+      "app/public/sw.js",
+      "app/public/manifest.webmanifest"
+    ],
+    "words": [
+      "restart",
+      "reopenAfterUpdate",
+      "updateReady",
+      "quietForUpdate",
+      "serviceWorker",
+      "changeView"
+    ]
   },
   "csp-test": {
-    "files": ["app/vite.config.ts", "app/index.html", "app/src/render/pagerenderer.ts"],
-    "words": ["Content-Security-Policy", "ensureImages", "ensureFonts", "contentEditable", "new Worker", "addModule", "fetch\\("]
+    "files": [
+      "app/vite.config.ts",
+      "app/index.html",
+      "app/src/render/pagerenderer.ts"
+    ],
+    "words": [
+      "Content-Security-Policy",
+      "ensureImages",
+      "ensureFonts",
+      "contentEditable",
+      "new Worker",
+      "addModule",
+      "fetch\\("
+    ]
   },
   "layout-shots": {
-    "files": ["app/src/style.css", "app/index.html"],
+    "files": [
+      "app/src/style.css",
+      "app/index.html"
+    ],
     "words": []
   },
   "compare-engines": {
-    "files": ["engine/", "patches/", "third_party/"],
+    "files": [
+      "engine/",
+      "patches/",
+      "third_party/"
+    ],
     "words": []
   },
   "android-settings-test": {
     "phone": true,
     "files": [],
-    "words": ["placeSettings", "focusFullscreen", "requestFullscreen", "underrun", "autoFocus"]
+    "words": [
+      "placeSettings",
+      "focusFullscreen",
+      "requestFullscreen",
+      "underrun",
+      "autoFocus"
+    ]
   },
   "android-background-test": {
     "phone": true,
     "files": [],
-    "words": ["visibilitychange", "keepPlaying", "wakeLock", "audioState"]
+    "words": [
+      "visibilitychange",
+      "keepPlaying",
+      "wakeLock",
+      "audioState"
+    ]
+  },
+  "install-hint-test": {
+    "files": [
+      "app/src/tour.ts"
+    ],
+    "words": [
+      "install",
+      "appleTouch",
+      "CriOS",
+      "for-safari",
+      "tour"
+    ]
   }
 }

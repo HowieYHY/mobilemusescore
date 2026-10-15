@@ -207,7 +207,7 @@ for (const [name, width, height, touch] of sizes) {
     await page.waitForSelector("#tour:not([hidden])");
     let found = false;
     for (let i = 0; i < 20 && !found; i++) {
-        found = (await page.textContent("#tour-title")) === "Settings";
+        found = /settings/i.test(await page.textContent("#tour-title"));
         if (!found) {
             if (!(await page.isVisible(".tour-next"))) break;
             await page.click(".tour-next");

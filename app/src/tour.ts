@@ -4,6 +4,8 @@
 
 export interface TourStep {
     target: () => HTMLElement | null;
+    /** Neighbouring controls the step is also about: the ring goes round them all (those on screen). */
+    also?: () => (HTMLElement | null)[];
     title: string;
     text: string;
 }
@@ -91,7 +93,16 @@ export class Tour {
             card.style.left = `${Math.round((vw - cw) / 2)}px`;
             card.style.top = `${Math.round((vh - ch) / 2)}px`;
         } else {
-            const r = el.getBoundingClientRect();
+            const r = { top: Infinity, left: Infinity, bottom: -Infinity, right: -Infinity };
+            for (const e of [el, ...(step.also?.() ?? [])]) {
+                const b = e && e.getClientRects().length ? e.getBoundingClientRect() : null;
+                if (b) {
+                    r.top = Math.min(r.top, b.top);
+                    r.left = Math.min(r.left, b.left);
+                    r.bottom = Math.max(r.bottom, b.bottom);
+                    r.right = Math.max(r.right, b.right);
+                }
+            }
             const top = Math.max(0, r.top - PAD);
             const left = Math.max(0, r.left - PAD);
             const bottom = Math.min(vh, r.bottom + PAD);

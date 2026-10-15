@@ -2099,6 +2099,9 @@ async function loadBars() {
     ui.section.options[0].disabled = true; // shown before the first section, not a choice
     ui.section.hidden = sections.length === 0;
     ui.goto.hidden = barStarts.length === 0;
+    if (!lastPosition && barStarts.length) {
+        ui.bar.value = String(barStarts[0][0]); // before the first position report: the start
+    }
     showBar(lastPosition);
 }
 
@@ -3412,28 +3415,20 @@ function tourSteps(): TourStep[] {
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first. On Android you can also share a score to PocketScore from the Files app." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
-            { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in and more." },
-            { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
+            { target: el("settings-open"), also: () => [$("help")], title: "Settings and help", text: "The gear has Settings, such as keeping the music playing when you leave the app. Once a score is open, tap ? again to see how to play it, practise your part and write on it." },
             tipStep,
         ];
     }
-    // bottom bar left to right, then the top bar, the tip last: no bouncing between the two
+    // bottom bar left to right, then the top bar, the tip last: no bouncing between the two. Neighbouring
+    // controls share a step (the user found 14 steps too many, 16 Oct 2026)
     return [
         { target: () => ui.viewer, title: "The score", text: "Tap any note to play from there. While stopped, a tap plays just that note. Pinch, or use − and +, to zoom. In a long score, start scrolling and drag the handle that appears at the edge." },
-        { target: el("play"), title: "Play and pause", text: "The blue line shows where you are, and the page follows it." },
-        { target: el("seek"), title: "Move through the score", text: "Drag the slider to jump anywhere. The button on the far left goes back to the start." },
-        { target: el("goto"), title: "Go to a bar or section", text: sections.length
-            ? "Type a bar number and press Go, or pick a section (like the chorus) from the menu beside it. They show where the music is as it plays."
-            : "Type a bar number and press Go to jump there. It shows the bar the music is in as it plays. Scores with section marks (Intro, Verse…) also get a menu of them here." },
-        { target: el("speed-open"), title: "Speed", text: "Practise slower or faster, or type the tempo you want." },
-        { target: el("loop-open"), title: "Loop", text: "Repeat a passage: put the loop markers on the notes where it starts and ends." },
+        { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
+        { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        { target: el("save"), title: "Save", text: "Keeps your notes and mixer changes for this score. If you forget, PocketScore asks before you open another score." },
-        { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
+        { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
-        { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
-        { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in and more." },
-        { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
+        { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app. ? shows this tour again." },
         tipStep,
     ];
 }

@@ -102,7 +102,7 @@ try {
 
     await page.click("#help");
     const score = await walkTour(page, "score", ["The score", "Mixer", "Leave a tip"]);
-    check(score.length === 11 && score.at(-1) === "Leave a tip", `score tour, ${score.length} steps: ${score.join(" / ")}`);
+    check(score.length === 8 && score.at(-1) === "Leave a tip", `score tour, ${score.length} steps: ${score.join(" / ")}`);
 
     // the phone's own Back button
     await page.click("#help");

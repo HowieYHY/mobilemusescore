@@ -74,6 +74,7 @@ for (const [name, width, height, touch] of [["phone", 390, 844, true], ["desktop
         await page.waitForFunction(() => !document.getElementById("goto").hidden, null, { timeout: 20000 }).catch(() => {});
         const info = await page.evaluate(async () => ({ ...(await app.engine.bars()), menu: !document.getElementById("section").hidden }));
         const last = info.bars.at(-1)[0];
+        check((await page.inputValue("#bar")) === String(info.bars[0][0]), `${name} ${short}: the bar field shows bar ${info.bars[0][0]} as soon as the score opens`);
         check(info.menu === info.sections.length > 0, `${name} ${short}: section menu ${info.menu ? "shown" : "hidden"} (${info.sections.length} sections)`);
 
         // a bar in the middle, typed

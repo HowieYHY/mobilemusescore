@@ -20,7 +20,7 @@ const areas = JSON.parse(fs.readFileSync(path.join(root, "scripts/tests.json"), 
 delete areas._about;
 const ledgerPath = path.join(root, "scripts/test-ledger.json");
 const ledger = fs.existsSync(ledgerPath) ? JSON.parse(fs.readFileSync(ledgerPath, "utf8")) : {};
-const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
+const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
 const head = () => git("rev-parse", "--short", "HEAD").trim();
 
 // Files changed since `commit` (committed and not), and the changed lines themselves

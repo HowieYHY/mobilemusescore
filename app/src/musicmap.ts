@@ -9,7 +9,8 @@
 // page, and hides empty staves), so a fraction of the system put a line under one staff's lyrics up
 // to 7 staff spaces off in another view.
 
-export type TimelinePoint = [number, number, number, number, number]; // secs, page, x, y, h
+// secs, page, x, y, h, and secs at 100% speed (engines from 16 Oct 2026; older ones: secs × speed)
+export type TimelinePoint = [number, number, number, number, number, number?];
 export type SystemStaves = [number, number, [number, number, number][]]; // page, y, [staff, top, bottom]
 
 /** A point pinned to the music: [seconds at 100% speed, x beyond the line's ends, fraction down the
@@ -55,10 +56,17 @@ export class MusicMap {
                     break;
                 }
                 xs.push(p[2]);
-                ts.push(p[0] * speed);
+                ts.push(this.at100(p));
             }
             this.systems.push({ page: pts[0][1], y: pts[0][3], h: pts[0][4], xs, ts });
         }
+    }
+
+    // A point's time at 100% speed. Not simply the time × the speed: pauses (fermatas, breath and
+    // section-break pauses) keep their seconds at any speed, so at 50% a note pinned after one landed
+    // up to 3 s of music off (16 Oct 2026). The engine reports it; older engines: × the speed.
+    private at100(p: TimelinePoint) {
+        return p[5] ?? p[0] * this.speed;
     }
 
     get empty() {
@@ -127,17 +135,19 @@ export class MusicMap {
         if (!tl.length) {
             return null;
         }
-        const t = a[0] / this.speed;
+        // in times at 100% speed, as pins are kept
+        const t = a[0];
+        const T = (p: TimelinePoint) => this.at100(p);
         // the last point at or before t (times only grow, so the first playing comes first; of a
         // closing barline and the next line's first note, at the same moment, the note)
         let lo = 0;
         let hi = tl.length - 1;
-        if (t < tl[0][0]) {
+        if (t < T(tl[0])) {
             hi = 0;
         }
         while (lo < hi) {
             const mid = (lo + hi + 1) >> 1;
-            if (tl[mid][0] <= t + 1e-6) {
+            if (T(tl[mid]) <= t + 1e-6) {
                 lo = mid;
             } else {
                 hi = mid - 1;
@@ -146,8 +156,8 @@ export class MusicMap {
         const p = tl[lo];
         const q = tl[lo + 1];
         let x = p[2];
-        if (q && q[1] === p[1] && q[3] === p[3] && q[0] > p[0] && t > p[0]) {
-            x = p[2] + (q[2] - p[2]) * Math.min(1, (t - p[0]) / (q[0] - p[0]));
+        if (q && q[1] === p[1] && q[3] === p[3] && T(q) > T(p) && t > T(p)) {
+            x = p[2] + (q[2] - p[2]) * Math.min(1, (t - T(p)) / (T(q) - T(p)));
         }
         // by its staff where this layout shows it, else by its place in the system
         const st = a[3] !== undefined ? this.staves.get(`${p[1]}|${p[3]}`)?.find((s) => s[0] === a[3]) : undefined;

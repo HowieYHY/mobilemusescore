@@ -1495,6 +1495,34 @@ std::string Session::timelineJson() const
         int page;
         double x, y, h;
         bool barEnd;
+        double secs100; // at 100% speed (see below)
+    };
+
+    // A moment's time at 100% speed, whatever the speed now. The speed divides the music's time
+    // but not pauses (fermatas, breath and section-break pauses: TempoMap::normalize adds their
+    // seconds as they are), so the time at another speed isn't the time at 100% scaled: up to 3 s
+    // off in a test score, which moved notes pinned to the music (issue found 16 Oct 2026).
+    const TempoMap* tempos = score->tempomap();
+    const double speed = tempos->tempoMultiplier().val;
+    auto at100 = [&](int utick, double secs) {
+#ifdef MSS_MUSESCORE_4_7
+        if (std::abs(speed - 1.0) < 1e-9) {
+            return secs;
+        }
+        double pauses = 0; // the pauses passed on the way to it, repeats unrolled
+        for (const RepeatSegment* rs : playedRepeats(score)) {
+            if (utick < rs->utick) {
+                break;
+            }
+            const int end = std::min(rs->tick + rs->len() - 1, utick - rs->utick + rs->tick);
+            for (auto it = tempos->lower_bound(rs->tick); it != tempos->end() && it->first <= end; ++it) {
+                pauses += it->second.pause;
+            }
+        }
+        return (secs - pauses) * speed + pauses;
+#else
+        return secs * speed;
+#endif
     };
     std::vector<Point> points;
 
@@ -1516,8 +1544,10 @@ std::string Session::timelineJson() const
         const double x = canvasX - spatium - page->pos().x();
         const double y = system->staffCanvasYpage(0) - 3.0 * spatium;
         const double h = bottomY + 6.0 * spatium;
-        points.push_back({ std::round(uticksToSecs(score, utick) * 10000.0) / 10000.0, pageIdx,
-                           std::round(x), std::round(y), std::round(h), barEnd });
+        const double secs = uticksToSecs(score, utick);
+        points.push_back({ std::round(secs * 10000.0) / 10000.0, pageIdx,
+                           std::round(x), std::round(y), std::round(h), barEnd,
+                           std::round(at100(utick, secs) * 10000.0) / 10000.0 });
     };
 
     for (const RepeatSegment* rs : playedRepeats(score)) {
@@ -1557,7 +1587,7 @@ std::string Session::timelineJson() const
             out += ",";
         }
         first = false;
-        out += "[" + num(p.secs) + "," + std::to_string(p.page) + "," + num(p.x) + "," + num(p.y) + "," + num(p.h) + "]";
+        out += "[" + num(p.secs) + "," + std::to_string(p.page) + "," + num(p.x) + "," + num(p.y) + "," + num(p.h) + "," + num(p.secs100) + "]";
     }
     return out + "]";
 }

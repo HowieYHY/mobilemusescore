@@ -93,9 +93,14 @@
       "staves",
       "setLayout",
       "timeline",
-      "setMode"
+      "setMode",
+      "at100",
+      "secs100",
+      "speed"
     ],
-    "blocked": "needs 'I am move it edited.mscz' (its layout), not on this PC"
+    "args": [
+      "real test musescores/GODS_NUS RESONANCE_FINAL_CHORAL INTRO.mscz"
+    ]
   },
   "no-change-test": {
     "files": [
@@ -282,7 +287,7 @@
     "onlyOnChange": true,
     "args": [
       "build/eng-old",
-      "build/eng-new"
+      "build/eng-new2"
     ],
     "_note": "build/eng-old: the published engine (build/ghpages/engine), build/eng-new: the new build, each as core/mscore.{mjs,wasm} + audio/msaudio.mjs"
   },

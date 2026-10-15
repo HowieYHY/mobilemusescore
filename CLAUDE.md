@@ -236,6 +236,13 @@ build, tests, status) before working here.
   publish an engine lacking a function the app calls; after an engine change, build it on the PC
   that publishes and compare it with the live one (`compare-engines.mjs`).
 
+- **The speed doesn't stretch pauses.** Notes are pinned to the music by their time at 100% speed,
+  worked out as the time now × the speed; but MuseScore adds fermata, breath and section-break pauses
+  as plain seconds at any speed, so at 50% a note after a pause landed on other music (up to 3 s off
+  in GODS; found when notes-views-test ran on a score with pauses, 16 Oct 2026). Rule: never convert
+  times between speeds by scaling; the engine's timeline gives each point's time at 100% (6th value).
+  Run tests that involve the speed on a score with pauses.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

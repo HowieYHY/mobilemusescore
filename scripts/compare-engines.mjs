@@ -17,7 +17,8 @@ for (const s of scores) {
         for (const mode of ["page", "continuous_h", "continuous_v"]) {
             const si = JSON.parse(e.callStr("mss_set_view_mode", mode));
             for (let i = 0; i < si.pages.length; i++) r.pages.push(e.callStr("mss_render_page", i));
-            r.timeline[mode] = e.callStr("mss_timeline");
+            // the first five values of each point (newer engines add the time at 100% speed)
+            r.timeline[mode] = JSON.stringify(JSON.parse(e.callStr("mss_timeline")).map((pt) => pt.slice(0, 5)));
             r.staves[mode] = e.core._mss_staves ? e.callStr("mss_staves") : null;
         }
         e.callStr("mss_set_view_mode", "page");

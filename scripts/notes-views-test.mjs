@@ -189,7 +189,9 @@ for (const mode of ["continuous_h", "continuous_v"]) {
     await page.waitForTimeout(1500);
     const speed = await page.evaluate(() => document.getElementById("speed-value").textContent);
     const after = (await shownStrokes("page")).find((p) => p.id === circleId);
-    check(!!after && near(before, after, 1), `at ${speed} speed the circle stays where it was`);
+    const later = await (async () => { await page.waitForTimeout(3000); return (await shownStrokes("page")).find((p) => p.id === circleId); })();
+    const fmt = (p) => (p ? `page ${p.page + 1} ${p.x.toFixed(0)},${p.y.toFixed(0)}` : "gone");
+    check(!!after && near(before, after, 1), `at ${speed} speed the circle stays where it was (before ${fmt(before)}, after ${fmt(after)}, 3 s later ${fmt(later)})`);
     for (let i = 0; i < 10; i++) {
         await page.click("#speed-up");
         await page.waitForTimeout(40);

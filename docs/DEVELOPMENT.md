@@ -30,6 +30,45 @@ nusresonance.com since 10 Oct 2026; focus mode (#17) is live since 1.0.5, passes
 (`android-focus-test.mjs`) and was closed by the user on 10 Oct 2026, with the iPad and iPhone checks
 below still to do.
 
+### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
+
+> **Temporary.** These are guesses made without the phone connected. Once the tests below are done,
+> delete this whole section and keep only what the tests taught (as a lesson in CLAUDE.md, or a
+> fact under *How it works*).
+
+The user's Android phone shows the "sound stuttered" notice (the yellow box) in **Page view at normal
+zoom**, on scores that used to play smoothly. The sound engine itself (`app/public/worklet/`) hasn't
+changed since 1.0.9, so the cause is probably something that runs on the page while playing. Guesses,
+most likely first:
+
+1. **Automatic focus 4 s into playback (since 1.0.7).** The bars slide away (240 ms animation moving
+   the whole score layer), then the layout changes (bars gone, taller viewer) and more of the next
+   page comes into view to be drawn, all in one burst while the queue is still the starting ~340 ms
+   (it only grows after a gap). One gap is enough for the notice. The Android focus check
+   (`android-focus-test.mjs`) looked at the screen, not at sound gaps.
+2. **An update installing in the background.** On install, `sw.js` reads back and SHA-1-hashes every
+   cached file (~60 MB with the sound font) to keep unchanged ones. If the phone picked up 1.0.14 on
+   15 Oct while playing, that load ran alongside the music. Once per update only, so it fits
+   "it just happened" but not "it keeps happening".
+3. **Page changes.** The next page is drawn when the music nears it. Present long before the
+   versions that played well, so least likely.
+4. (Ruled out for this case) The sharper tiled drawing of 1.0.10 (6fe343e): it mainly changed the
+   continuous views, and this was Page view at normal zoom.
+
+**Tests to run** (phone on USB, `ATTACH=1 node scripts/android-test.mjs` or a local build on its own
+address):
+- Read `app.engine.health` right after the notice appears: when each gap came, the engine load, and
+  whether a "slow frame" came just before it.
+- Ask when it stutters: ~4 s after Play (bars sliding away), at page changes, or throughout.
+- Focus before Play (tap ⛶ first, then Play, hands off): if the gaps go, it is guess 1.
+- Same score in 1.0.9 and 1.0.14 as separate local builds: if 1.0.9 is smooth, bisect the commits
+  between them.
+- Note battery saver, heat and charging, which slow the CPU on their own.
+
+**Likely fix if guess 1 holds:** don't start focus by itself in the first seconds of playback (or
+until the queue has grown), and fill a bigger queue on Play, as seeks already refill before playing
+(`PRIME_FRAMES`). Measure gaps on the phone before and after.
+
 ### Still to check by hand on an iPad and an iPhone
 
 These can't be automated from Windows (see CLAUDE.md, *iPhone*). The user will do them in a later

@@ -45,7 +45,8 @@ No app store needed.
   (The app itself is downloaded from GitHub's website hosting, which sees visits like any website.
   PocketScore has no accounts, ads or tracking.)
 - **The music pauses when you leave the app** (another app, home screen, screen locked).
-  Tap Play when you're back.
+  Tap Play when you're back. To keep it playing instead, turn on **Keep playing when I leave
+  PocketScore** in **Settings** (the gear at the top).
 - **It updates itself, even if you never close it.** With internet, it looks for a new version when
   you open it, when you come back to it, and every 30 minutes. If a score is open, it restarts into
   the new version at a quiet moment: when you switch away, or after 20 seconds of not touching it
@@ -78,7 +79,8 @@ No app store needed.
 | Move quickly through a long score | Start scrolling, then drag the handle that appears at the right edge (along the bottom in *Continuous (horizontal)*). It shows the page, or in the continuous views the time in the music, and fades away when you stop |
 | Change the layout | Menu at the top right: *Page view*, *Page by page* or *Continuous* |
 | Read one page at a time | Choose *Page by page*: each page fills the screen whole; swipe left or right (or use the arrow keys) to turn one page. The page turns by itself as the music reaches the next one. You can zoom in (pinch, or **+**), but never out past the whole page; zoomed in, drag to move around the page, and keep swiping past its edge to turn. In notes mode, use two fingers |
-| Read with nothing in the way | Tap **⛶** (Focus) at the top, beside **?** |
+| Read with nothing in the way | Tap **⛶** (Focus) at the top |
+| Change how PocketScore works | Tap the **gear** (Settings) at the top. See [Settings](#settings) |
 | Close a panel | Tap **Done**, or your phone's **Back** |
 
 A blue line shows where you are, and the page follows it.
@@ -97,15 +99,17 @@ A blue line shows where you are, and the page follows it.
   other unknown files; it says so if a file isn't a score.
 - PocketScore opens `.mscz` and `.mscx` files. Not PDF, MusicXML or MIDI.
 - Opening another score stops the music.
-- If you scroll away while it plays, the page waits a moment before following the music again.
+- If you scroll away while it plays, the page waits a moment before following the music again. To
+  turn the page yourself instead, turn off **Follow the music** in Settings.
 - **Focus** hides everything but the music and a play button. On Android, a computer or an iPad it also
   goes full screen (no browser bars); an iPhone's Safari doesn't allow that, so there it hides
   PocketScore's own bars. Tapping a note still plays from it. To bring the controls back, tap anywhere
   off the music (a margin, the title, the white space between staves or lines, around the page), or
   use your phone's **Back** or **Esc**.
 - **Focus also starts by itself** when you leave the screen alone: after 4 seconds while the music
-  plays, 10 seconds while it's stopped. Not while a panel (mixer, speed, loop) or notes are open. It
-  hides PocketScore's bars but doesn't go full screen (browsers only allow that after your own tap).
+  plays, 10 seconds while it's stopped (both can be changed, or this turned off, in Settings). Not
+  while a panel (mixer, speed, loop, settings) or notes are open. It hides PocketScore's bars but
+  doesn't go full screen (browsers only allow that after your own tap).
 
 </details>
 
@@ -141,7 +145,7 @@ Tap **Mixer**.
 | Hear only some parts | **S** (solo), on one or more parts |
 | Change a part's instrument | Tap the sound under its name (e.g. *Grand Piano*) |
 | Change several parts at once | In that list, tap **Several parts** |
-| Hear a click | Unmute **Metronome** at the bottom (it's muted every time a score opens) |
+| Hear a click | Unmute **Metronome** at the bottom (it's muted every time a score opens, unless you turn on **Metronome on when a score opens** in Settings) |
 | Room echo | Tap **Reverb** at the top |
 | Overall volume | **Master** |
 
@@ -203,6 +207,24 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 - If the device's storage is full, PocketScore tells you the changes could not be saved.
 
 </details>
+
+### Settings
+Tap the **gear** at the top. Each setting works straight away and is kept on this device, for every
+score. Until you change them, PocketScore works as described above.
+
+| Setting | What it does |
+| --- | --- |
+| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On iPhone and iPad the system may still stop it |
+| **Metronome on when a score opens** | Every score opens with the click on. Off: it starts muted |
+| **Tap a note to hear it** | While stopped, a tap on a note plays it. Off: the tap only moves to that note |
+| **Start focus by itself** | Hides the bars when you leave the screen alone |
+| **Wait while playing** / **while stopped** | How long before focus starts by itself (4 and 10 seconds at first) |
+| **Full screen with the Focus button** | The phone's or browser's own bars go too. Not on iPhone, which doesn't allow it |
+| **Open scores in** | The view every score opens in: *Page view*, *Page by page* or *Continuous* |
+| **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
+| **Turn pages early** | In *Page by page*, the next page comes up when the music reaches a page's last line, so you can read ahead. A page of only one line still turns at its end |
+| **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
+| **Dark page** | Light music on a dark page, for dim rooms. Your notes show in matching colours (a black pen shows light); they change back when you turn it off |
 
 ---
 

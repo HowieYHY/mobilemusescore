@@ -337,7 +337,7 @@ body:has(#empty:not([hidden])) .zoom { display: none; }
 /* Focus (issue #17): only the music and a play button. The bars and any open panel are hidden, not
    closed, and come back as they were; tapping off the staves leaves (handled in main.ts). */
 body:has(#empty:not([hidden])) #focus-toggle { display: none; }
-.focus .topbar, .focus .status, .focus .notesbar, .focus .palette,
+.focus .topbar, .focus .status, .focus .notesbar, .focus .palette, .focus .settings,
 .focus .zoom, .focus .mixer, .focus .practice { display: none !important; }
 .focus .pages { padding: calc(8px + var(--safe-t)) 8px calc(96px + var(--safe-b)); }
 .focus .transport {
@@ -1033,7 +1033,7 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 }
 
 /* the tour and its invitation are PocketScore's own help, not part of the website's preview */
-.embedded #help, .embedded #tour-invite, .embedded #install-ios { display: none; }
+.embedded #help, .embedded #tour-invite, .embedded #install-ios, .embedded #settings-open, .embedded .settings { display: none; }
 
 /* ---------------------------------------------------------------- motion */
 
@@ -1041,7 +1041,7 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
    They are still shown and hidden with the `hidden` attribute; @starting-style animates the
    showing, and `display … allow-discrete` keeps a panel on screen while it fades out. Browsers
    without these simply show and hide at once, as before. */
-.mixer, .practice, .sounds, .notesbar, .palette, .ask, .ask::backdrop {
+.mixer, .practice, .sounds, .notesbar, .palette, .settings, .ask, .ask::backdrop {
   transition:
     opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
@@ -1058,10 +1058,10 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 @starting-style {
   .sounds:not([hidden]) { opacity: 0; transform: translateX(18px); }
 }
-/* the notes bar drops from the top bar */
-.notesbar[hidden] { opacity: 0; transform: translateY(-8px); }
+/* the notes bar and the settings drop from the top bar */
+.notesbar[hidden], .settings[hidden] { opacity: 0; transform: translateY(-8px); }
 @starting-style {
-  .notesbar:not([hidden]) { opacity: 0; transform: translateY(-8px); }
+  .notesbar:not([hidden]), .settings:not([hidden]) { opacity: 0; transform: translateY(-8px); }
 }
 /* the colour palette and the question box grow from a little smaller */
 .palette[hidden] { opacity: 0; transform: scale(0.96); }
@@ -1075,5 +1075,110 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   .ask[open]::backdrop { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mixer, .practice, .sounds, .notesbar, .palette, .ask, .ask::backdrop { transition: none; }
+  .mixer, .practice, .sounds, .notesbar, .palette, .settings, .ask, .ask::backdrop { transition: none; }
 }
+
+/* ---------------------------------------------------------------- settings */
+
+/* Hangs from the top bar (where the gear is), above the score; scrolls inside when the screen is short */
+.settings {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--topbar-h, 56px);
+  max-height: calc(100% - var(--topbar-h, 56px) - var(--transport-h, calc(66px + var(--bar-b))) - 8px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 8px 22px rgba(16, 24, 36, 0.2);
+  z-index: 8;
+}
+.settings-body { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 6px; }
+.set-group {
+  margin: 0;
+  padding: 26px 14px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.set-group:first-child { padding-top: 14px; }
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--panel-line);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.set-row.sub { padding-left: 30px; min-height: 48px; }
+.set-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.set-name { font-size: 15px; line-height: 1.3; }
+.set-hint { font-size: 13px; line-height: 1.35; color: var(--ink-2); }
+.set-row.off { cursor: default; }
+.set-row.off .set-name { color: var(--ink-2); }
+.set-foot { margin: 12px 14px 8px; font-size: 13px; color: var(--ink-2); }
+
+/* the switch, as in the notes bar but on the light panel */
+.set-row input[type=checkbox] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 42px;
+  height: 26px;
+  margin: 0;
+  border-radius: 13px;
+  background: #848d97; /* 3.2:1 on the panel, as controls need */
+  cursor: pointer;
+  transition: background 0.15s ease-out;
+}
+.set-row input[type=checkbox]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 36, 0.3);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.set-row input[type=checkbox]:checked { background: var(--accent); }
+.set-row input[type=checkbox]:checked::after { transform: translateX(16px); }
+.set-row input:disabled, .set-row select:disabled { opacity: 0.45; cursor: default; }
+.set-row input:focus-visible, .set-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.set-row select {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  min-height: 40px;
+  max-width: 55%;
+  padding: 0 30px 0 10px;
+  border: 1px solid #c4c9cf;
+  border-radius: 8px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%231d232b'/%3E%3C/svg%3E") no-repeat right 10px center;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+#settings-open[aria-expanded="true"] { background: var(--chrome-2); }
+@media (min-width: 760px) {
+  .settings { left: auto; right: 12px; width: 400px; border-radius: 0 0 10px 10px; overflow: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .set-row input[type=checkbox], .set-row input[type=checkbox]::after { transition: none; }
+}
+
+/* Dark page (Settings): the score is drawn in dark colours (pagerenderer.ts) and the notes follow
+   (annotations.ts); the highlighter lightens instead of darkening */
+.dark-page .page { background: rgb(31, 31, 31); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+/* around the pages too, once a score is open (the start screen keeps its light background) */
+.dark-page .viewer:not(:has(#empty:not([hidden]))) { background: #12171e; }
+.dark-page .cursor { background: rgba(91, 156, 242, 0.6); }
+.dark-page .ink path.highlighter { mix-blend-mode: screen; stroke-opacity: 0.45; }
+.dark-page .annotating[data-tool="text"] .tnote .tbody { border-color: rgba(255, 255, 255, 0.3); }

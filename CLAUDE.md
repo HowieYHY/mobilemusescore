@@ -26,10 +26,16 @@ build, tests, status) before working here.
 - The README must say plainly that notes stay on the device and are not in the file, so people the
   score is shared with won't see them.
 - The mixer works as soon as a score is open (sounds load on open, not on Play). The metronome
-  starts muted and unmuting it turns the clicks on. Opening a score stops playback.
+  starts muted (unless Settings' *Metronome on when a score opens*) and unmuting it turns the clicks
+  on. Opening a score stops playback.
 - Text is sized by dragging the text box corner (no text size buttons).
 - The music pauses when the app is left (another app, home screen, screen locked), and the README
-  says so; nothing plays on unseen.
+  says so; nothing plays on unseen. The one exception is Settings' *Keep playing when I leave
+  PocketScore*, off by default (the user asked for it, 15 Oct 2026: people listen on the go).
+- **Settings** (the gear in the top bar) hold behaviour some readers want different: one set for the
+  whole app, kept on the device, each default being how PocketScore behaved before (the user's
+  plan, 15 Oct 2026). A setting the device can't do is shown off with "Not available…", never
+  hidden or left as a switch that does nothing.
 - No on-screen playback diagnostics (removed once Android was smooth); use `app.engine.stats`.
 - On phones the score's name sits on its own row above the top buttons.
 - **Don't clutter the UI, especially on mobile.** New controls that most people won't need every time

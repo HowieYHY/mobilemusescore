@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (11 Oct 2026, version 1.0.14)
+## Current status (15 Oct 2026, version 1.0.15)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -28,7 +28,12 @@ was measured over USB (see *Tests*). Open issues: #3 (design, open to contributo
 (possibly shipping to the App Store and Google Play). The RESO website's preview (#2, #14) is live on
 nusresonance.com since 10 Oct 2026; focus mode (#17) is live since 1.0.5, passes on the Pixel 9a
 (`android-focus-test.mjs`) and was closed by the user on 10 Oct 2026, with the iPad and iPhone checks
-below still to do.
+below still to do. Settings (the gear) arrived in 1.0.15.
+
+**Waiting for the user's testing on their devices** (each has its own section below):
+1. Android sound stutters in Page view: tests with the phone on USB.
+2. Settings (1.0.15) on Android, iPhone and iPad.
+3. Focus, motion and updating with a score open, by hand on an iPad and an iPhone.
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
 
@@ -68,6 +73,27 @@ address):
 **Likely fix if guess 1 holds:** don't start focus by itself in the first seconds of playback (or
 until the queue has grown), and fill a bigger queue on Play, as seeks already refill before playing
 (`PRIME_FRAMES`). Measure gaps on the phone before and after.
+
+### Still to check on devices: Settings (1.0.15)
+
+Tested only in Chromium on Windows (`settings-test.mjs`). Background playback and the screen lock
+behave differently on real devices, so these need the user's phone and iPad. First make sure the
+start screen shows 1.0.15 or later.
+
+| What | Devices | How | Expected |
+| --- | --- | --- | --- |
+| Keep playing when I leave PocketScore | Android, iPhone, iPad (installed app and browser) | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
+| Keep playing off (default) | All | Play, leave the app, come back | Paused, with the message, as before |
+| Keep the screen on while playing | Android, iPhone, iPad | Set the screen to dim after 30 s, turn the setting on, play a long score without touching | The screen stays on while playing, and dims as usual once paused. Where the browser can't, the setting shows "Not available in this browser." |
+| Full screen with the Focus button | Android, iPad; iPhone | Turn it off, tap ⛶; turn it on, tap ⛶ | Off: only PocketScore's bars go. On: the browser's or phone's bars go too. On iPhone it shows off with "Not available on this device." |
+| Start focus by itself and its waits | Any | Turn it off: no focus after waiting. On with 2 s while playing: focus about 2 s after the last touch | As set |
+| Open scores in | Any | Choose Page by page, then open a score; then Continuous | The score opens straight in that view |
+| Turn pages early | Any, Page by page | Turn it on, play through a page change | The next page shows when the music reaches the last line of a page |
+| Follow the music off | Any | Play past the bottom of the screen | The score stays where it is |
+| Metronome on when a score opens | Any | Turn it on, open a score, play | Clicks from the start; Save stays dark |
+| Tap a note to hear it off | Any | While stopped, tap a note | The line moves there, no sound |
+| Dark page | Any, in a dim room | Turn it on with notes on the score | Light music on dark paper, the area around the pages dark too, notes readable (a black pen shows light, highlighter still visible) |
+| Settings panel | Phone, iPad both ways | Open the gear, scroll to the end, close with Done, the gear and Back | Fits between the bars, every setting reachable, Back closes it without leaving the app |
 
 ### Still to check by hand on an iPad and an iPhone
 
@@ -114,10 +140,11 @@ session. First make sure the start screen shows 1.0.8 or later.
 | Sound per part | Any MS Basic preset, grouped as desktop's mixer menu (`MS_BASIC_PRESET_CATEGORIES`, "Choose automatically" first, "Expr." presets hidden, names as `audioSourceName`). Engine: `mss_sounds`, `mss_set_track_sound` -> `IPlayback::setInputParams`. The choice is kept in `localStorage` per score and reapplied when playback is ready. *Several parts* (a small button by the sound list's title, so the list stays uncluttered) shows chips for every part and All parts; a sound picked goes to all chosen parts, and *Each part's sound in the score* restores them. |
 | Notes mode taps | With *Draw with finger* off, a finger's tap on a note plays it and moves the playback (`Annotations.fingerTapIsFree`), except with the Text tool, whose taps make text boxes. |
 | Back button | Mixer, sound list, colour palette and notes mode each add a history entry, so Android's Back closes them instead of leaving the app. |
+| Settings | The gear in the top bar's icon group opens a panel hanging from the top bar (`.settings`, one panel at a time with the bottom sheets via `openSheet`, Back closes it). `settings.ts` keeps one set for the whole app in `localStorage` (`pocketscore.settings`; the Reso preview keeps nothing and uses the defaults, which are the behaviour before Settings existed). Keep playing (skips the pause on `visibilitychange`); metronome on at open; tap a note to hear it (`seekAt`'s `playNote`); focus by itself on/off and its two waits; full screen with the Focus button (shown off and "not available" without the Fullscreen API: iPhone); the view scores open in (`openScore` lays out straight in it via `changeView`, after `clearPages`); follow the music; turn pages early (Page by page: on a page's last line, from the timeline's system tops in `pageLines`, the next page shows; not for a one-line page); keep the screen on while playing (Screen Wake Lock, asked for again on coming back; shown off where the browser has none); dark page (lightness turned over in `pagerenderer.ts`'s `darkRgb`, hue kept, paper rgb(31,31,31); notes shown in the same colours, the highlighter blended with `screen`). `settings-test.mjs`. |
 | Save | One **Save** in the top bar for everything changed on a score: notes (`annotations.ts`) and mixer (`mixerstore.ts`), in `localStorage` per score (SHA-256 of the file). Nothing is saved until then; a draft is kept on every change, so closing the app loses nothing and the changes come back next time, still unsaved, with a message (iOS home-screen apps get no `beforeunload`). The only question: opening another score with unsaved changes (Save / Don't save / Cancel). Ctrl/Cmd+S. Notes saved by 0.2.x are read as saved; 0.2.1 saved mixers and 0.2.0 sound choices are carried over. A part's sound is stored only when it isn't the score's own. The score's saved master volume is read (`mss_master_volume`). |
 | Mixer before Play | The audio engine starts when a score opens (the `AudioContext` starts suspended until a tap; Play or tapping a note resumes it), so the sounds load straight away. The mixer works from the moment the score is open: the engine sets each part's volume, reverb and mute/solo from the score at load (no longer when the sounds are added), so changes made before the sounds arrive are kept. Sound choices made or restored before then are applied once the sounds are loaded. |
-| Metronome | Its mixer strip is muted whenever a score opens (`Session::load` resets it; desktop's metronome is off by default), and its on/off is not kept in saved settings; unmuting it turns the clicks on in the playback model (`setMetronome`), muting turns them off. |
-| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. |
+| Metronome | Its mixer strip is muted whenever a score opens (`Session::load` resets it; desktop's metronome is off by default), and its on/off is not kept in saved settings; unmuting it turns the clicks on in the playback model (`setMetronome`), muting turns them off. Settings' *Metronome on when a score opens* unmutes it after the mixer is restored; since its on/off isn't kept, Save stays dark. |
+| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. With Settings' *Keep playing* on, it doesn't pause (not checked on a phone yet; iOS may stop the sound anyway, which the *Interruptions* handler then reports). |
 | Saved sounds on reopening | The `playbackReady` handler waits for the opened score's saved settings to be restored (`mixLoading`). Before, when the audio was already running, the sounds could become ready while saved settings were being put back part by part, and the sound choices queued after that were never applied (parts back on the score's sound, e.g. 6 of 9 voices of GODS on MS Basic). `reopen-test.mjs` (SLOW=1 makes the restore slow, as on a phone) lost them in 4 of 6 reopenings before, 0 after. |
 | Screen fit | The app is pinned to the screen's edges (`body { position: fixed; inset: 0 }`) instead of `100dvh`, which was stale after an installed app restarted for an update (Android: bottom bar buried) and short of the screen (iPad: gap at the bottom). The bottom bar keeps the larger of its padding and the home-indicator space, not both. In the iPhone/iPad home-screen app the status bar is `black` (not `black-translucent`): with translucent, iOS 26 started the page under the status bar but kept it one status bar short (window 812 of 874 px on an iPhone) and left a light strip under the bottom bar that no CSS reaches. |
 | Cursor at barlines | A bar's end point (on the barline, at the same moment as the next bar's first note) is left out of the timeline when the next bar is on the same line, so the cursor glides from the last note of a bar to the first of the next instead of stopping at the barline and jumping. |
@@ -188,6 +215,8 @@ exported audio file.
 | Several parts' sound at once and back (`sounds-multi-test.mjs`) | Chromium | pass |
 | Self-check (`selfcheck-test.mjs`): a gap caused on purpose is detected, logged, told once, the queue grows, no further gaps | Chromium | pass |
 | Notes-mode taps (`notes-tap-test.mjs`): finger draws a dot with Draw with finger on; plays the note with it off (pen, highlighter, eraser), not with Text | Chromium | pass |
+| Settings (`settings-test.mjs`): the panel at phone, iPad and desktop sizes (under the top bar, above the bottom bar, every setting reachable), defaults as before, kept after a reload, Done / gear / Back close it, one panel at a time, tour step; then each setting's effect (leaving the app with Keep playing off and on, screen lock held and let go, tap to hear on and off, focus by itself off and after the chosen wait, follow off and on, early page turn off and on, dark paper and light ink in the drawing and a pen stroke); every score opened in each of the four views with the metronome on and Save dark | Chromium, 7 scores | pass |
+| Known failures, not yet looked into (15 Oct 2026, the same with and without Settings): `mobile-test` (Back closes the palette / leaves notes mode / closes the mixer), `notes-test` (choosing a colour closes the palette; Done hides the toolbar), `focus-test` (the mixer still shows in focus). All are checks that a panel has gone, perhaps made at once while it still fades out (0.22 s, since 1.0.7). `pageturn-test`, `notes-views-test` and `scroller-test` default to `I am move it edited.mscz`, which isn't on every PC: pass a score (`notes-views-test` needs that score's layout) | Chromium | open |
 
 ### Not supported or not yet checked
 
@@ -371,6 +400,7 @@ node scripts/no-change-test.mjs <folder>     # Save stays dark when nothing chan
 node scripts/sounds-multi-test.mjs <score>   # several parts' sound at once
 node scripts/selfcheck-test.mjs <score>      # playback self-check after a gap
 node scripts/notes-tap-test.mjs <score>      # finger taps in notes mode
+node scripts/settings-test.mjs [folder]      # Settings: the panel at three sizes and what each setting does
 [CANVAS_MB=256] [PHONE=<url>] node scripts/zoom-test.mjs [score]   # pages never blank while zooming
 node scripts/tap-precision-test.mjs [folder] [pages]   # tapping noteheads picks them; line and markers drawn there
 # app/public/picker-test.html: try six Open filters on a device (issue #7)

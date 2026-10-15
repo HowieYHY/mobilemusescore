@@ -2,10 +2,11 @@
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
-import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
+import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer, paperColor } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 import { Tour, type TourStep } from "./tour";
+import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -72,6 +73,9 @@ const ui = {
     loopBand: $("loop-band"),
     installRow: $("install-row"),
     install: $<HTMLButtonElement>("install"),
+    settings: $("settings"),
+    settingsOpen: $<HTMLButtonElement>("settings-open"),
+    settingsClose: $<HTMLButtonElement>("settings-close"),
 };
 
 declare const __APP_VERSION__: string;
@@ -88,6 +92,9 @@ const EMBED_ORIGINS = ((import.meta.env.VITE_EMBED_ORIGINS as string | undefined
 if (embedded) {
     document.documentElement.classList.add("embedded");
 }
+// The reader's settings (the gear); a preview keeps nothing, so it plays with the defaults
+const settings: Settings = loadSettings(!embedded);
+document.documentElement.classList.toggle("dark-page", settings.darkPage);
 $("version").textContent = "PocketScore " + __APP_VERSION__;
 
 const engine = new Engine();
@@ -286,11 +293,9 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y
 const standInRect = (c: HTMLCanvasElement): Rect => ({ x: +c.dataset.x!, y: +c.dataset.y!, w: +c.dataset.w!, h: +c.dataset.h! });
 const standInsOf = (i: number) => [...state.pageEls[i]?.querySelectorAll<HTMLCanvasElement>(":scope > canvas.stale") ?? []];
 
-// standIns: the pages' current drawings, shown stretched while each tile is
-// redrawn at a new size (zoom), so no page goes blank meanwhile
-function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
+// Removes the pages, freeing their drawings except those in `keep`
+function clearPages(keep = new Set<HTMLCanvasElement>()) {
     observer.disconnect(); // the old pages would report "out of view" as they go
-    const keep = new Set([...standIns?.values() ?? []].flat());
     ui.pages.querySelectorAll("canvas").forEach((c) => keep.has(c) || freeCanvas(c));
     ui.pages.innerHTML = "";
     notes.detachAll();
@@ -298,6 +303,12 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
     state.rendered.clear();
     tiles.clear();
     jobs.clear();
+}
+
+// standIns: the pages' current drawings, shown stretched while each tile is
+// redrawn at a new size (zoom), so no page goes blank meanwhile
+function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
+    clearPages(new Set([...standIns?.values() ?? []].flat()));
     const score = state.score;
     if (!score) {
         return;
@@ -485,9 +496,9 @@ async function renderTile(key: string) {
             roomMakers.shift()?.();
             continue;
         }
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = paperColor(settings.darkPage);
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        jobs.set(key, { gen, tile, canvas, draw: pageDrawer(ctx, ops, s, tile.whole ? undefined : tile) });
+        jobs.set(key, { gen, tile, canvas, draw: pageDrawer(ctx, ops, s, tile.whole ? undefined : tile, settings.darkPage) });
         void drawJobs();
         return;
     }
@@ -808,10 +819,10 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         const audioReady = engine.audioRunning && state.playbackReady;
         if (!audioReady && !state.playing) {
             // the first tap starts audio (it must start from a tap on iOS); the note sounds once it's ready
-            pendingPreview = tap;
+            pendingPreview = settings.tapToHear ? tap : null;
             void startAudioFromTap();
         }
-        const c = await engine.seekAt(tap.page, tap.x, tap.y, tap.radius, audioReady);
+        const c = await engine.seekAt(tap.page, tap.x, tap.y, tap.radius, audioReady && settings.tapToHear);
         if (c) {
             state.followUntil = 0;
         }
@@ -1056,22 +1067,31 @@ function showCursor(c: CursorInfo | null) {
 
     // checking the view means reading layout, so a few times a second is enough
     const now = performance.now();
-    if (state.playing && now > state.followUntil && now - lastFollowCheck > 200) {
+    if (state.playing && settings.follow && now > state.followUntil && now - lastFollowCheck > 200) {
         lastFollowCheck = now;
-        followCursor(pageEl);
+        followCursor(pageEl, c);
     }
 }
 
 // Follow in one step when the cursor nears the edge of the view
-function followCursor(pageEl: HTMLElement) {
+function followCursor(pageEl: HTMLElement, c: CursorInfo) {
     if (!cursorEl) {
         return;
     }
     if (pageTurn()) {
         const i = Number(pageEl.dataset.index);
-        if (i !== turnedTo()) {
-            turnTo(i); // the music reached another page
+        // Turn pages early (Settings): on the page's last line the next page comes up. Not on a page
+        // of one line, which would then never be seen.
+        const lines = pageLines.get(i);
+        const early = settings.earlyTurn && i + 1 < state.pageEls.length && !!lines && lines.count > 1
+            && c.y! + c.h! / 2 >= lines.lastTop;
+        const want = early ? i + 1 : i;
+        if (want !== turnedTo()) {
+            turnTo(want); // the music reached another page
             return;
+        }
+        if (early) {
+            return; // the music is still on the page before: leave the next one in view
         }
     }
     const v = ui.viewer.getBoundingClientRect();
@@ -1094,10 +1114,20 @@ function followCursor(pageEl: HTMLElement) {
 type TimelinePoint = [number, number, number, number, number]; // secs, page, x, y, h
 let timeline: TimelinePoint[] = [];
 const anchor = { secs: 0, clock: 0 };
+// each page's lines (systems): how many, and where the last one starts (page units)
+const pageLines = new Map<number, { count: number; lastTop: number }>();
 
 async function loadTimeline() {
     const [tl, staves] = await Promise.all([engine.timeline(), engine.staves()]);
     timeline = tl;
+    pageLines.clear();
+    const tops = new Map<number, Set<number>>();
+    for (const [, page, , y] of tl) {
+        (tops.get(page) ?? tops.set(page, new Set()).get(page)!).add(Math.round(y));
+    }
+    for (const [page, ys] of tops) {
+        pageLines.set(page, { count: ys.size, lastTop: Math.max(...ys) });
+    }
     // notes are pinned to the music through it and the staves (they show in every view); its times
     // follow the speed
     notes.setLayout(timeline, practice.speed, state.score?.spatium ?? 100, staves);
@@ -1224,11 +1254,14 @@ engine.on("seeked", (e: { secs?: number }) => {
 });
 
 // Leaving PocketScore (another app, the home screen, locking the screen) pauses
-// the music, so it doesn't play on unseen; coming back says so.
+// the music, so it doesn't play on unseen; coming back says so. Unless the reader
+// chose Keep playing (Settings), for listening with the screen off.
 let pausedOnLeaving = false;
 document.addEventListener("visibilitychange", () => {
+    lastFrame = 0; // no frames while away: not a slow frame
+    void updateWakeLock();
     if (document.visibilityState === "hidden") {
-        if (state.playing) {
+        if (state.playing && !settings.keepPlaying) {
             pausedOnLeaving = true;
             void engine.pause();
         }
@@ -1305,7 +1338,39 @@ engine.on("status", (s) => {
     }
     ui.play.innerHTML = state.playing ? ICON_PAUSE : ICON_PLAY;
     ui.play.setAttribute("aria-label", state.playing ? "Pause" : "Play");
+    void updateWakeLock();
 });
+
+// Keep the screen on while playing (Settings). The browser lets the lock go whenever the app is
+// left, so it is asked for again on coming back.
+const canWakeLock = "wakeLock" in navigator;
+let wakeLock: { release(): Promise<void> } | null = null;
+let wakeLockAsking = false;
+async function updateWakeLock() {
+    const want = canWakeLock && settings.keepAwake && state.playing && document.visibilityState === "visible";
+    if (want && !wakeLock && !wakeLockAsking) {
+        wakeLockAsking = true;
+        try {
+            const lock = await (navigator as any).wakeLock.request("screen");
+            lock.addEventListener("release", () => {
+                if (wakeLock === lock) {
+                    wakeLock = null;
+                }
+            });
+            wakeLock = lock;
+        } catch {
+            // refused (battery saver, or not allowed here): the screen behaves as usual
+            return;
+        } finally {
+            wakeLockAsking = false;
+        }
+        void updateWakeLock(); // the music may have stopped while asking
+    } else if (!want && wakeLock) {
+        const lock = wakeLock;
+        wakeLock = null;
+        lock.release().catch(() => {});
+    }
+}
 
 // ---------------------------------------------------------------- transport
 
@@ -1768,7 +1833,7 @@ async function enterFocus(fullscreen = true) {
     // full screen only from the Focus button: browsers allow it just after the reader's own tap
     const root = document.documentElement as any;
     const request = root.requestFullscreen || root.webkitRequestFullscreen;
-    if (fullscreen && request && !embedded && !document.fullscreenElement) {
+    if (fullscreen && settings.focusFullscreen && request && !embedded && !document.fullscreenElement) {
         focusFullscreen = true;
         Promise.resolve(request.call(root, { navigationUI: "hide" })).catch(() => (focusFullscreen = false));
     }
@@ -1827,21 +1892,20 @@ function leaveFocus() {
     scheduleAutoFocus();
 }
 
-// Focus also starts by itself when the reader leaves the screen alone: after 4 s while the music
-// plays (like a video player's controls), 10 s while stopped (time to reach the mixer or speed).
+// Focus also starts by itself when the reader leaves the screen alone: by default after 4 s while the
+// music plays (like a video player's controls), 10 s while stopped (time to reach the mixer or speed);
+// both, and whether it starts by itself at all, are in Settings.
 // Not while something is in use: a panel, notes, the tour or a question. Without the reader's tap it
 // can't go full screen, so it hides PocketScore's own bars only.
-const AUTO_FOCUS_PLAYING_MS = 4000;
-const AUTO_FOCUS_STOPPED_MS = 10000;
 let autoFocusTimer = 0;
 function scheduleAutoFocus() {
     clearTimeout(autoFocusTimer);
     // Not under test automation (navigator.webdriver, never set for a reader), where pauses longer
     // than 4 s would hide the controls the tests tap next; focus-test.mjs turns it on.
-    if (!state.score || state.focus || embedded || (navigator.webdriver && !(window as any).app?.testAutoFocus)) {
+    if (!state.score || state.focus || embedded || !settings.autoFocus || (navigator.webdriver && !(window as any).app?.testAutoFocus)) {
         return;
     }
-    autoFocusTimer = window.setTimeout(autoFocus, state.playing ? AUTO_FOCUS_PLAYING_MS : AUTO_FOCUS_STOPPED_MS);
+    autoFocusTimer = window.setTimeout(autoFocus, 1000 * (state.playing ? settings.focusPlayingSecs : settings.focusStoppedSecs));
 }
 function autoFocus() {
     if (!state.score || state.focus) {
@@ -2143,7 +2207,7 @@ function closeLoop() {
 // Opening one while another is open takes over its Back entry: closing the
 // other through history first happened later and closed the new one instead
 function openSheet(close: () => void) {
-    const others = [closeSounds, closeMixer, closeSpeed, closeLoop].filter((c) => c !== close);
+    const others = [closeSounds, closeMixer, closeSpeed, closeLoop, closeSettings].filter((c) => c !== close);
     let reuse = false;
     for (let i = layers.length - 1; i >= 0; i--) {
         if (others.includes(layers[i])) {
@@ -2177,6 +2241,85 @@ ui.loopClose.onclick = () => closeLayer(closeLoop);
 new ResizeObserver(() => {
     document.documentElement.style.setProperty("--transport-h", $("transport").offsetHeight + "px");
 }).observe($("transport"));
+// and the settings hang from the top bar (two rows on phones, the status bar)
+new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--topbar-h", document.querySelector<HTMLElement>(".topbar")!.offsetHeight + "px");
+}).observe(document.querySelector(".topbar")!);
+
+// ---------------------------------------------------------------- settings
+
+// The gear: one set of settings for the whole app, kept on this device. Each applies at once; those
+// about opening a score apply to the next one opened. One panel at a time, like the bottom sheets.
+function closeSettings() {
+    ui.settings.hidden = true;
+    ui.settingsOpen.setAttribute("aria-expanded", "false");
+}
+ui.settingsOpen.onclick = () => {
+    if (!ui.settings.hidden) {
+        closeLayer(closeSettings);
+        return;
+    }
+    showSettings();
+    ui.settings.hidden = false;
+    ui.settingsOpen.setAttribute("aria-expanded", "true");
+    openSheet(closeSettings);
+};
+ui.settingsClose.onclick = () => closeLayer(closeSettings);
+
+// What this device can't do is shown switched off, saying so (not hidden, not a switch that does nothing)
+const rootEl = document.documentElement as any;
+const unavailable: Partial<Record<keyof Settings, boolean>> = {
+    focusFullscreen: !(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen), // iPhone
+    keepAwake: !canWakeLock,
+};
+const settingInputs = [...ui.settings.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-set]")];
+
+function showSettings() {
+    for (const el of settingInputs) {
+        const k = el.dataset.set as keyof Settings;
+        const off = !!unavailable[k];
+        const needs = el.dataset.needs as keyof Settings | undefined;
+        const disabled = off || (!!needs && !settings[needs]);
+        if (el instanceof HTMLInputElement) {
+            el.checked = !off && settings[k] as boolean;
+        } else {
+            el.value = String(settings[k]);
+        }
+        el.disabled = disabled;
+        const row = el.closest(".set-row")!;
+        row.classList.toggle("off", disabled);
+        const hint = row.querySelector<HTMLElement>(".set-hint[data-unavailable]");
+        if (hint && off) {
+            hint.textContent = hint.dataset.unavailable!;
+        }
+    }
+    ui.settings.querySelectorAll<HTMLElement>(".apple-only").forEach((e) => (e.hidden = !appleTouch));
+}
+
+for (const el of settingInputs) {
+    el.addEventListener("change", () => {
+        const k = el.dataset.set as keyof Settings;
+        (settings as any)[k] = el instanceof HTMLInputElement ? el.checked
+            : typeof DEFAULTS[k] === "number" ? Number(el.value) : el.value;
+        saveSettings(settings, !embedded);
+        showSettings(); // a setting can switch others on or off
+        if (k === "autoFocus" || k === "focusPlayingSecs" || k === "focusStoppedSecs") {
+            scheduleAutoFocus();
+        } else if (k === "keepAwake") {
+            void updateWakeLock();
+        } else if (k === "darkPage") {
+            applyDarkPage();
+        }
+    });
+}
+
+function applyDarkPage() {
+    document.documentElement.classList.toggle("dark-page", settings.darkPage);
+    notes.setDark(settings.darkPage);
+    if (state.score) {
+        rerenderAll(true); // the current drawings stand in until each is redrawn
+    }
+}
 
 // ---------------------------------------------------------------- mixer panel
 
@@ -2533,15 +2676,33 @@ async function openScore(name: string, data: ArrayBuffer) {
     setNotesActive(false);
     notes.open(key, "page");
     ui.notesToggle.disabled = false;
-    buildPages();
-    void loadTimeline();
+    // the view chosen in Settings: laid out straight in it, without drawing Page view first
+    const startView = settings.startView;
+    if (startView === "page") {
+        buildPages();
+        void loadTimeline();
+    } else {
+        clearPages(); // the last score's pages go now; changeView below builds this one's
+    }
     void loadTempos();
     ui.viewer.scrollTop = 0;
     ui.viewer.scrollLeft = 0;
+    if (startView !== "page") {
+        ui.viewMode.value = startView;
+        await changeView();
+    }
 
     // the mixer works from the start: its values come from the score, and the
     // sounds load now rather than on the first Play
     const mixRestored = await loadMix();
+    if (settings.metronomeOn) {
+        // the metronome's on/off isn't part of the saved mixer, so this changes nothing to save
+        const m = state.tracks.find((t) => t.metronome);
+        if (m?.mute) {
+            await engine.setMute(m.key, false);
+            state.tracks = await engine.tracks();
+        }
+    }
     mixRestoreDone(mixRestored);
     restoredNotice = notes.restoredDraft || mixRestored;
     ui.mixerToggle.disabled = false;
@@ -2553,7 +2714,8 @@ async function openScore(name: string, data: ArrayBuffer) {
     void engine.startAudio().catch(() => {}); // errors are shown by the engine
 }
 
-ui.viewMode.onchange = async () => {
+ui.viewMode.onchange = () => changeView();
+async function changeView() {
     const was = shownView;
     const view = ui.viewMode.value;
     shownView = view;
@@ -2581,7 +2743,7 @@ ui.viewMode.onchange = async () => {
     } else if (was === "page_turn" && view === "page") {
         state.pageEls[keepPage]?.scrollIntoView({ block: "start" });
     }
-};
+}
 let shownView = "page";
 let zoomBeforeTurn = 1;
 let turnFitted = true; // page by page at the whole-page zoom (kept that way when the screen changes)
@@ -2844,9 +3006,9 @@ async function reopenAfterUpdate() {
     if (!state.score) {
         return;
     }
-    if (keep.view !== "page" && [...ui.viewMode.options].some((o) => o.value === keep.view)) {
-        ui.viewMode.value = keep.view;
-        await (ui.viewMode.onchange as any)?.(new Event("change"));
+    if (keep.view !== ui.viewMode.value && [...ui.viewMode.options].some((o) => o.value === keep.view)) {
+        ui.viewMode.value = keep.view; // as it was, whatever view Settings opens scores in
+        await changeView();
     }
     if (keep.speed !== 1) {
         showPractice(await engine.setSpeed(keep.speed, 0));
@@ -2969,6 +3131,7 @@ async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
 // ---------------------------------------------------------------- notes
 
 const notes = new Annotations(ui.pages, ui.viewer, () => updateNotesBar(), (msg) => setStatus(msg, "error", 6000));
+notes.setDark(settings.darkPage);
 
 const COLOR_NAMES: Record<string, string> = {
     "#000000": "Black", "#ffffff": "White", "#d62828": "Red", "#1d5fd1": "Blue", "#2a9d4b": "Green", "#f2c200": "Yellow",
@@ -3130,7 +3293,7 @@ ui.notesClear.onclick = async () => {
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
+(window as any).app = { engine, state, settings, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
     // update-restart-test.mjs: an update can't be produced on demand there
     markUpdateReady: () => (updateReady = true), restartForUpdate };
 
@@ -3173,6 +3336,7 @@ function tourSteps(): TourStep[] {
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first. On Android you can also share a score to PocketScore from the Files app." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
+            { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in, a dark page and more." },
             { target: el("help"), title: "More once a score is open", text: "Open a score, then tap ? again to see how to play it, practise your part and write on it." },
             tipStep,
         ];
@@ -3189,6 +3353,7 @@ function tourSteps(): TourStep[] {
         { target: el("notes-toggle"), title: "Write on the score", text: "Pen, highlighter and text boxes, with a finger or a stylus. Your notes stay on this device, not in the file." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), title: "Focus", text: "Hide everything but the music and a play button, full screen where your device allows. Tap anywhere off the staves to bring the controls back." },
+        { target: el("settings-open"), title: "Settings", text: "Make PocketScore work your way: keep playing when you leave the app, when focus starts, the view scores open in, a dark page and more." },
         { target: el("help"), title: "Help is here", text: "Tap ? any time to see this tour again." },
         tipStep,
     ];

@@ -1,0 +1,430 @@
+// Settings (the gear in the top bar). Checks, at phone, iPad and desktop sizes:
+//   - the gear is on the start screen, the panel opens below the top bar, fits between the bars,
+//     closes with Done, the gear and the phone's Back, and shows the defaults (today's behaviour),
+//   - each switch and choice is kept after a reload; a setting that needs another is greyed out,
+//   - the tour has a Settings step,
+// then, on one size, what each setting does:
+//   - Keep playing: leaving the app pauses by default, keeps playing when on,
+//   - Metronome on when a score opens: unmuted, and Save stays dark,
+//   - Tap a note to hear it: off, a tap moves without sounding the note,
+//   - Start focus by itself: off never starts; on, after the chosen wait,
+//   - Open scores in: every view,
+//   - Follow the music: off, the view stays put while the music plays,
+//   - Turn pages early: in Page by page, the next page shows while the last line plays,
+//   - Keep the screen on: the screen lock is asked for while playing and let go on pause,
+//   - Dark page: dark paper and light ink, in the drawing and the notes,
+// and with every score in "real test musescores", each view as the opening view. Screenshots in
+// build/settings.
+//
+// Needs the dev server: (cd app && npx vite --port 5180)
+// Usage: node scripts/settings-test.mjs [folder or score]
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(path.join(root, "app/package.json"));
+const { chromium } = require("playwright");
+
+const arg = path.resolve(process.argv[2] || path.join(root, "real test musescores"));
+const scores = fs.statSync(arg).isDirectory()
+    ? fs.readdirSync(arg).filter((f) => /\.mscz$/i.test(f)).map((f) => path.join(arg, f))
+    : [arg];
+const main = scores.find((s) => /I am move it/.test(s)) || scores[0];
+const url = process.env.APP_URL || "http://localhost:5180/";
+const outDir = path.join(root, "build/settings");
+fs.mkdirSync(outDir, { recursive: true });
+
+let failures = 0;
+const check = (ok, what) => {
+    console.log(`${ok ? "PASS" : "FAIL"}  ${what}`);
+    if (!ok) failures++;
+};
+
+const browser = await chromium.launch();
+
+// The screen lock, recorded (headless Chromium has none to give)
+const fakeWakeLock = () => {
+    window.__wakeLocks = { asked: 0, held: 0 };
+    Object.defineProperty(navigator, "wakeLock", {
+        configurable: true,
+        value: {
+            request: async () => {
+                window.__wakeLocks.asked++;
+                window.__wakeLocks.held++;
+                const handlers = [];
+                return {
+                    addEventListener: (_t, f) => handlers.push(f),
+                    release: async () => { window.__wakeLocks.held--; handlers.forEach((f) => f()); },
+                };
+            },
+        },
+    });
+};
+
+async function newPage(width, height, touch) {
+    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, isMobile: touch, hasTouch: touch });
+    await context.addInitScript(fakeWakeLock);
+    const page = await context.newPage();
+    page.on("pageerror", (e) => console.log("page error:", e.message));
+    return { context, page };
+}
+
+const ready = (page) => page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
+
+// Opens a score and waits for it: the last score's state still says ready, so its pages are marked
+// and the ready flag lowered first (opening lowers it too), and only new pages and a new ready count
+async function openScore(page, file) {
+    await page.evaluate(() => {
+        app.state.pageEls.forEach((el) => (el.dataset.old = "1"));
+        app.state.playbackReady = false;
+    });
+    await page.setInputFiles("#file-input", file);
+    await page.waitForFunction(() => app.state.playbackReady && app.state.pageEls.length > 0
+        && !app.state.pageEls[0].dataset.old && document.querySelector(".page canvas"), null, { timeout: 180000 });
+}
+
+const setSetting = (page, k, v) => page.evaluate(([k, v]) => {
+    const el = document.querySelector(`[data-set="${k}"]`);
+    if (el.type === "checkbox") el.checked = v; else el.value = String(v);
+    el.dispatchEvent(new Event("change"));
+}, [k, v]);
+
+// ---------------------------------------------------------------- the panel, at every size
+
+const sizes = [
+    ["phone", 390, 844, true],
+    ["ipad-air", 820, 1180, true],
+    ["desktop", 1280, 800, false],
+];
+for (const [name, width, height, touch] of sizes) {
+    const { context, page } = await newPage(width, height, touch);
+    const tap = async (sel) => (touch ? page.tap(sel) : page.click(sel));
+    await page.goto(url);
+    await ready(page);
+    check(await page.isVisible("#settings-open"), `${name}: the gear is on the start screen`);
+    await tap("#settings-open");
+    await page.waitForSelector("#settings:not([hidden])");
+    await page.waitForTimeout(300);
+    const box = await page.evaluate(() => {
+        const r = document.getElementById("settings").getBoundingClientRect();
+        const top = document.querySelector(".topbar").getBoundingClientRect();
+        const bottom = document.getElementById("transport").getBoundingClientRect();
+        const body = document.querySelector(".settings-body");
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, barBottom: top.bottom, transportTop: bottom.top,
+            scrolls: body.scrollHeight > body.clientHeight, overflowX: document.documentElement.scrollWidth > innerWidth };
+    });
+    check(Math.abs(box.top - box.barBottom) < 1.5, `${name}: the panel hangs from the top bar (${Math.round(box.top)} vs ${Math.round(box.barBottom)})`);
+    check(box.bottom <= box.transportTop + 0.5, `${name}: and stops above the bottom bar (${Math.round(box.bottom)} vs ${Math.round(box.transportTop)})`);
+    check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
+    const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
+        `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
+    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true earlyTurn=false keepAwake=false darkPage=false",
+        `${name}: defaults are today's behaviour (${defaults})`);
+    // every control is reachable: scroll to the last one and check it's on screen
+    const last = page.locator('[data-set="darkPage"]');
+    await last.scrollIntoViewIfNeeded();
+    const lb = await last.boundingBox();
+    check(lb && lb.y >= box.top && lb.y + lb.height <= box.bottom + 0.5, `${name}: the last setting can be reached${box.scrolls ? " (by scrolling)" : ""}`);
+    await page.evaluate(() => (document.querySelector(".settings-body").scrollTop = 0));
+    await page.screenshot({ path: path.join(outDir, `${name}-panel.png`) });
+
+    // a tap on a row flips its switch
+    await (touch ? page.tap(".set-row:has([data-set=keepPlaying]) .set-name") : page.click(".set-row:has([data-set=keepPlaying]) .set-name"));
+    check(await page.evaluate(() => app.settings.keepPlaying), `${name}: tapping a row's name turns it on`);
+    // a setting needing another is greyed out without it
+    await setSetting(page, "autoFocus", false);
+    check(await page.evaluate(() => document.querySelector('[data-set="focusPlayingSecs"]').disabled
+        && document.querySelector('[data-set="focusStoppedSecs"]').disabled), `${name}: the waits are greyed out without Start focus by itself`);
+    await page.screenshot({ path: path.join(outDir, `${name}-panel-changed.png`) });
+    await setSetting(page, "autoFocus", true);
+    await setSetting(page, "startView", "page_turn");
+
+    // closes with Done, with the gear, with Back
+    await tap("#settings-close");
+    await page.waitForTimeout(400);
+    check(await page.evaluate(() => document.getElementById("settings").hidden), `${name}: Done closes it`);
+    await tap("#settings-open");
+    await page.waitForTimeout(300);
+    await tap("#settings-open");
+    await page.waitForTimeout(400);
+    check(await page.evaluate(() => document.getElementById("settings").hidden), `${name}: the gear closes it again`);
+    await tap("#settings-open");
+    await page.waitForTimeout(300);
+    await page.goBack();
+    await page.waitForTimeout(400);
+    check(await page.evaluate(() => document.getElementById("settings").hidden && location.href.startsWith("http")), `${name}: Back closes it and stays in the app`);
+
+    // kept after a reload
+    await page.reload();
+    await ready(page);
+    const kept = await page.evaluate(() => [app.settings.keepPlaying, app.settings.startView]);
+    check(kept[0] === true && kept[1] === "page_turn", `${name}: kept after a reload (${kept})`);
+
+    // with a score open: the panel is one panel at a time with the mixer
+    await page.evaluate(() => localStorage.removeItem("pocketscore.settings"));
+    await page.reload();
+    await ready(page);
+    await openScore(page, main);
+    await tap("#mixer-toggle");
+    await page.waitForSelector("#mixer:not([hidden])");
+    await tap("#settings-open");
+    await page.waitForTimeout(400);
+    check(await page.evaluate(() => document.getElementById("mixer").hidden && !document.getElementById("settings").hidden), `${name}: opening Settings closes the mixer`);
+    await page.screenshot({ path: path.join(outDir, `${name}-panel-score.png`) });
+    await page.goBack();
+    await page.waitForTimeout(400);
+    check(await page.evaluate(() => document.getElementById("settings").hidden && document.getElementById("mixer").hidden), `${name}: and Back then closes Settings`);
+
+    // the tour has a Settings step
+    await tap("#help");
+    await page.waitForSelector("#tour:not([hidden])");
+    let found = false;
+    for (let i = 0; i < 20 && !found; i++) {
+        found = (await page.textContent("#tour-title")) === "Settings";
+        if (!found) {
+            if (!(await page.isVisible(".tour-next"))) break;
+            await page.click(".tour-next");
+            await page.waitForTimeout(150);
+        }
+    }
+    check(found, `${name}: the tour has a Settings step`);
+    await context.close();
+}
+
+// ---------------------------------------------------------------- what each setting does
+
+{
+    const { context, page } = await newPage(390, 844, true);
+    await page.goto(url);
+    await ready(page);
+    await openScore(page, main);
+    const hide = (hidden) => page.evaluate((hidden) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (hidden ? "hidden" : "visible") });
+        Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+        document.dispatchEvent(new Event("visibilitychange"));
+    }, hidden);
+    const play = async () => {
+        await page.evaluate(() => app.engine.play());
+        await page.waitForFunction(() => app.state.playing, null, { timeout: 20000 });
+    };
+    const pause = async () => {
+        await page.evaluate(() => app.engine.pause());
+        await page.waitForFunction(() => !app.state.playing, null, { timeout: 20000 });
+    };
+
+    // Keep playing
+    await setSetting(page, "keepPlaying", false);
+    await play();
+    await hide(true);
+    await page.waitForTimeout(800);
+    check(!(await page.evaluate(() => app.state.playing)), "keep playing off: leaving the app pauses");
+    await hide(false);
+    await setSetting(page, "keepPlaying", true);
+    await play();
+    await hide(true);
+    await page.waitForTimeout(1500);
+    check(await page.evaluate(() => app.state.playing), "keep playing on: the music goes on while away");
+    await hide(false);
+    await pause();
+
+    // Keep the screen on
+    await setSetting(page, "keepAwake", true);
+    await play();
+    await page.waitForTimeout(300);
+    const held = await page.evaluate(() => ({ ...window.__wakeLocks }));
+    await pause();
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => ({ ...window.__wakeLocks }));
+    check(held.held === 1 && after.held === 0, `keep the screen on: held while playing (${held.held}), let go on pause (${after.held})`);
+    await setSetting(page, "keepAwake", false);
+    await play();
+    await page.waitForTimeout(300);
+    check((await page.evaluate(() => window.__wakeLocks.asked)) === after.asked, "keep the screen on off: not asked for");
+    await pause();
+
+    // Tap a note to hear it
+    await page.evaluate(() => {
+        const orig = app.engine.seekAt.bind(app.engine);
+        window.__seekAt = [];
+        app.engine.seekAt = (...a) => { window.__seekAt.push(a[4]); return orig(...a); };
+    });
+    const tapNote = async () => {
+        const pt = await page.evaluate(async () => {
+            const tl = await app.engine.timeline();
+            const [, pg, x, y, h] = tl[2];
+            const r = document.querySelector(`.page[data-index="${pg}"]`).getBoundingClientRect();
+            const k = (96 * app.state.zoom) / 1200;
+            return { x: r.left + (x + 50) * k, y: r.top + (y + h / 2) * k };
+        });
+        await page.evaluate(() => document.querySelector(".viewer").scrollTo(0, 0));
+        await page.touchscreen.tap(pt.x, pt.y);
+        await page.waitForTimeout(400);
+    };
+    await tapNote();
+    await setSetting(page, "tapToHear", false);
+    await tapNote();
+    const plays = await page.evaluate(() => window.__seekAt);
+    check(plays.length === 2 && plays[0] === true && plays[1] === false, `tap a note to hear it: sounds when on, not when off (${plays})`);
+    await setSetting(page, "tapToHear", true);
+
+    // Start focus by itself
+    await page.evaluate(() => (app.testAutoFocus = true));
+    await setSetting(page, "autoFocus", false);
+    await page.mouse.move(5, 300);
+    await page.waitForTimeout(11000);
+    check(!(await page.evaluate(() => app.state.focus)), "start focus by itself off: no focus after 11 s stopped");
+    await setSetting(page, "autoFocus", true);
+    await setSetting(page, "focusStoppedSecs", 5);
+    const t0 = Date.now();
+    await page.waitForFunction(() => app.state.focus, null, { timeout: 15000 }).catch(() => {});
+    const waited = (Date.now() - t0) / 1000;
+    check(waited > 4 && waited < 7.5, `start focus by itself: after the chosen 5 s stopped (${waited.toFixed(1)} s)`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+    await page.evaluate(() => (app.testAutoFocus = false));
+
+    // Follow the music: off, the view stays where it is. From just before page 2, which starts
+    // below the screen, for long enough to reach it.
+    const page2 = await page.evaluate(async () => (await app.engine.timeline()).find((p) => p[1] === 1)[0]);
+    const runFrom = async (follow) => {
+        await setSetting(page, "follow", follow);
+        await page.evaluate((s) => app.engine.seek(s), Math.max(0, page2 - 1.5));
+        await page.evaluate(() => document.querySelector(".viewer").scrollTo(0, 0));
+        await page.waitForTimeout(400);
+        await play();
+        await page.waitForTimeout(4000);
+        const r = await page.evaluate(() => ({ top: document.querySelector(".viewer").scrollTop, page: app.cursorAt(app.state.position)?.page }));
+        await pause();
+        return r;
+    };
+    const stayed = await runFrom(false);
+    const moved = await runFrom(true);
+    check(stayed.page === 1 && stayed.top === 0 && moved.page === 1 && moved.top > 0,
+        `follow the music: with the music on page 2, off stays (${stayed.top}), on follows (${Math.round(moved.top)})`);
+
+    // Turn pages early, in Page by page
+    await page.evaluate(() => { const v = document.getElementById("view-mode"); v.value = "page_turn"; v.dispatchEvent(new Event("change")); });
+    await page.waitForFunction(() => document.body.classList.contains("page-turn") && app.state.pageEls.length > 1, null, { timeout: 60000 });
+    await page.waitForTimeout(800);
+    const shownPage = () => page.evaluate(() => {
+        const v = document.querySelector(".viewer");
+        const slot = app.state.pageEls[0].parentElement.offsetWidth;
+        return Math.round(v.scrollLeft / slot);
+    });
+    // the start of page 0's last line, and its second line (not the last)
+    const lines = await page.evaluate(async () => {
+        const tl = await app.engine.timeline();
+        const p0 = tl.filter((p) => p[1] === 0);
+        const tops = [...new Set(p0.map((p) => p[3]))].sort((a, b) => a - b);
+        const at = (top) => p0.find((p) => p[3] === top)[0];
+        return { count: tops.length, last: at(tops[tops.length - 1]), first: at(tops[0]) };
+    });
+    for (const early of [false, true]) {
+        await setSetting(page, "earlyTurn", early);
+        await page.evaluate(() => document.querySelector(".viewer").scrollTo({ left: 0, behavior: "instant" }));
+        await page.evaluate((s) => app.engine.seek(s), Math.max(0, lines.last - 0.5));
+        await page.waitForTimeout(300);
+        await play();
+        await page.waitForTimeout(1600);
+        const st = await page.evaluate(() => app.state.position);
+        const shown = await shownPage();
+        const cur = await page.evaluate(() => app.cursorAt(app.state.position)?.page);
+        await pause();
+        check(cur === 0 && shown === (early ? 1 : 0),
+            `turn pages early ${early ? "on" : "off"}: on page 0's last line (at ${st.toFixed(1)} s), page ${shown} shows`);
+    }
+    await page.screenshot({ path: path.join(outDir, "early-turn.png") });
+    await setSetting(page, "earlyTurn", false);
+
+    // Dark page: the drawing and the notes
+    await page.evaluate(() => { const v = document.getElementById("view-mode"); v.value = "page"; v.dispatchEvent(new Event("change")); });
+    await page.waitForFunction(() => !document.body.classList.contains("page-turn") && document.querySelector(".page canvas"), null, { timeout: 60000 });
+    await page.evaluate(() => document.querySelector(".viewer").scrollTo(0, 0));
+    await setSetting(page, "darkPage", true);
+    await page.waitForFunction(() => {
+        const c = document.querySelector('.page[data-index="0"] .tile canvas');
+        if (!c) return false;
+        const d = c.getContext("2d").getImageData(2, 2, 1, 1).data;
+        return d[0] < 60;
+    }, null, { timeout: 30000 }).catch(() => {});
+    const dark = await page.evaluate(() => {
+        const c = document.querySelector('.page[data-index="0"] .tile canvas');
+        const ctx = c.getContext("2d");
+        const corner = [...ctx.getImageData(2, 2, 1, 1).data];
+        // the lightest pixel of the drawing: the ink
+        const d = ctx.getImageData(0, 0, c.width, Math.min(c.height, 1200)).data;
+        let max = 0;
+        for (let i = 0; i < d.length; i += 4) max = Math.max(max, d[i] + d[i + 1] + d[i + 2]);
+        return { corner, inkSum: max, cls: document.documentElement.classList.contains("dark-page") };
+    });
+    check(dark.cls && dark.corner[0] < 40 && dark.inkSum > 600, `dark page: dark paper (${dark.corner.slice(0, 3)}) and light ink (sum ${dark.inkSum})`);
+    // a black pen stroke shows light; its stored colour stays black
+    const pen = await page.evaluate(() => {
+        const svg = document.querySelector('.page[data-index="0"] .ink');
+        app.notes.setActive(true);
+        return !!svg;
+    });
+    const r = await page.evaluate(() => document.querySelector('.page[data-index="0"]').getBoundingClientRect());
+    await page.evaluate(() => app.notes.setFingerDraws(true));
+    await page.mouse.move(r.x + 60, r.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(r.x + 160, r.y + 220, { steps: 5 });
+    await page.mouse.up();
+    const stroke = await page.evaluate(() => {
+        const p = document.querySelector('.page[data-index="0"] .ink path.pen');
+        return p && p.getAttribute("stroke");
+    });
+    check(pen && stroke && stroke !== "#000000" && /rgb\((2[0-9]{2}),/.test(stroke), `dark page: a black pen stroke is drawn light (${stroke})`);
+    await page.evaluate(() => app.notes.setActive(false));
+    await page.screenshot({ path: path.join(outDir, "dark-page.png") });
+    await page.evaluate(() => app.notes.discard());
+    await setSetting(page, "darkPage", false);
+    await page.waitForFunction(() => {
+        const c = document.querySelector('.page[data-index="0"] .tile canvas');
+        return c && c.getContext("2d").getImageData(2, 2, 1, 1).data[0] > 200;
+    }, null, { timeout: 30000 }).catch(() => {});
+    check(await page.evaluate(() => document.querySelector('.page[data-index="0"] .tile canvas').getContext("2d").getImageData(2, 2, 1, 1).data[0] > 200),
+        "dark page off: white paper again");
+    await context.close();
+}
+
+// ---------------------------------------------------------------- opening: metronome and views, every score
+
+{
+    const { context, page } = await newPage(390, 844, true);
+    await page.goto(url);
+    await ready(page);
+    await setSetting(page, "metronomeOn", true);
+    for (const file of scores) {
+        const short = path.basename(file).slice(0, 24);
+        for (const view of ["page", "page_turn", "continuous_h", "continuous_v"]) {
+            await setSetting(page, "startView", view);
+            await openScore(page, file);
+            await page.waitForTimeout(300);
+            const got = await page.evaluate(() => ({
+                view: document.getElementById("view-mode").value,
+                turn: document.body.classList.contains("page-turn"),
+                pages: app.state.pageEls.length,
+                drawn: document.querySelectorAll(".page canvas").length,
+                metronome: app.state.tracks.find((t) => t.metronome)?.mute,
+                save: document.getElementById("save").disabled,
+                position: app.state.position,
+            }));
+            const engineOk = view.startsWith("continuous") ? got.pages === 1 : got.pages >= 1;
+            check(got.view === view && got.turn === (view === "page_turn") && engineOk && got.drawn > 0,
+                `${short}: opens in ${view} (${got.pages} page(s), ${got.drawn} drawn)`);
+            if (view === "page") {
+                check(got.metronome === false && got.save, `${short}: metronome on when it opens, Save stays dark`);
+                await page.screenshot({ path: path.join(outDir, `open-${short.replace(/[^\w]+/g, "_")}.png`) });
+            }
+        }
+    }
+    await context.close();
+}
+
+await browser.close();
+console.log(failures ? `\n${failures} FAILED` : "\nall passed");
+process.exit(failures ? 1 : 0);

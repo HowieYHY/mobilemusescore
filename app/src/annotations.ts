@@ -7,6 +7,7 @@
 // stylus is seen), and two fingers then scroll.
 
 import { MusicMap, type Anchor, type SystemStaves, type TimelinePoint } from "./musicmap";
+import { darkCss } from "./render/pagerenderer";
 
 export type Tool = "pen" | "highlighter" | "text" | "eraser";
 
@@ -124,6 +125,8 @@ export class Annotations {
     private views = new Map<number, PageView>();
     private undoStack: Undo[] = [];
     private saveTimer = 0;
+    /** Dark page (Settings): pen and text shown in its colours; the stored colours don't change. */
+    private dark = false;
     /** Notes save by themselves: "" (nothing written yet), "saving", "saved" or "failed". */
     /** The saved notes (normalised JSON), to tell whether there are unsaved changes. */
     private savedJson = "";
@@ -524,7 +527,7 @@ export class Annotations {
             const t = this.pageNotes(Number(pageEl.dataset.index)).texts.find((n) => n.id === box.dataset.id);
             if (t) {
                 t.color = c;
-                box.style.color = c;
+                box.style.color = this.inkColor(c, "text");
                 this.save();
             }
         }
@@ -583,6 +586,18 @@ export class Annotations {
         this.views.clear();
     }
 
+    setDark(on: boolean) {
+        if (on !== this.dark) {
+            this.dark = on;
+            this.renderAll();
+        }
+    }
+
+    // A colour as shown: the highlighter keeps its own (on a dark page it lightens instead of darkening)
+    private inkColor(c: string, tool: Tool) {
+        return this.dark && tool !== "highlighter" ? darkCss(c) : c;
+    }
+
     private renderAll() {
         for (const i of this.views.keys()) {
             this.renderPage(i);
@@ -634,7 +649,7 @@ export class Annotations {
         box.dataset.page = String(o.page);
         box.style.left = (o.x / this.views.get(page)!.w * 100) + "%";
         box.style.top = (o.y / this.views.get(page)!.h * 100) + "%";
-        box.style.color = o.item.color;
+        box.style.color = this.inkColor(o.item.color, "text");
         box.style.fontSize = (o.item.size * ppu) + "px";
         const body = document.createElement("div");
         body.className = "tbody";
@@ -646,7 +661,7 @@ export class Annotations {
     private strokeEl(s: Stroke): SVGPathElement {
         const path = document.createElementNS(SVG, "path");
         path.setAttribute("d", pathD(s.pts));
-        path.setAttribute("stroke", s.color);
+        path.setAttribute("stroke", this.inkColor(s.color, s.tool));
         path.setAttribute("stroke-width", String(s.width));
         path.setAttribute("class", s.tool);
         path.dataset.id = s.id;
@@ -659,7 +674,7 @@ export class Annotations {
         box.dataset.id = t.id;
         box.style.left = (t.x / this.views.get(page)!.w * 100) + "%";
         box.style.top = (t.y / this.views.get(page)!.h * 100) + "%";
-        box.style.color = t.color;
+        box.style.color = this.inkColor(t.color, "text");
         box.style.fontSize = (t.size * ppu) + "px";
 
         const body = document.createElement("div");

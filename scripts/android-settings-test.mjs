@@ -44,6 +44,9 @@ const check = (ok, what) => {
 
 console.log("device:", sh("getprop", "ro.product.model").trim(), "Android", sh("getprop", "ro.build.version.release").trim());
 // the test page as a tab of its own, in front, before connecting (a busy background tab can stall it)
+// the phone reaches this PC's test copy through a reverse port (else it shows its old offline copy)
+const port = new URL(url).port;
+if (/^(localhost|127\.0\.0\.1)$/.test(new URL(url).hostname) && port) adb("reverse", `tcp:${port}`, `tcp:${port}`);
 sh("am", "start", "-a", "android.intent.action.VIEW", "-d", url, "com.android.chrome");
 adb("forward", "tcp:9222", "localabstract:chrome_devtools_remote");
 for (let i = 0; i < 30; i++) {
@@ -76,7 +79,21 @@ const audio = () => page.evaluate(() => ({ playing: app.state.playing, clock: ap
 
 try {
     await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
-    console.log("test copy:", await page.evaluate(() => document.getElementById("version").textContent));
+    // the phone keeps the last build it saw at this address (its offline copy): this build, or start afresh
+    // (this address is the test's own: the reader's installed app is not touched)
+    const want = JSON.parse(fs.readFileSync(path.join(root, "app/package.json"), "utf8")).version;
+    const version = () => page.evaluate(() => document.getElementById("version").textContent);
+    if (!(await version()).endsWith(want)) {
+        console.log(`  the phone had ${await version()} at this address; clearing its offline copy`);
+        await page.evaluate(async () => {
+            for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+            for (const k of await caches.keys()) await caches.delete(k);
+        });
+        await page.reload();
+        await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
+    }
+    console.log("test copy:", await version());
+    check((await version()).endsWith(want), `the phone runs this build (${want})`);
     const b64 = fs.readFileSync(scorePath).toString("base64");
     await page.evaluate(async ({ name, b64 }) => {
         const bin = atob(b64);

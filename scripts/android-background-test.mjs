@@ -31,6 +31,9 @@ for (let i = 0; i < 150 && !sh("dumpsys", "window").includes("isKeyguardShowing=
     if (i === 0) console.log("waiting for the phone to be unlocked…");
     await sleep(2000);
 }
+// the phone reaches this PC's test copy through a reverse port (else it shows its old offline copy)
+const port = new URL(url).port;
+if (/^(localhost|127\.0\.0\.1)$/.test(new URL(url).hostname) && port) adb("reverse", `tcp:${port}`, `tcp:${port}`);
 sh("am", "start", "-a", "android.intent.action.VIEW", "-d", url, "com.android.chrome");
 adb("forward", "tcp:9223", "localabstract:chrome_devtools_remote");
 let target;
@@ -75,7 +78,19 @@ const audio = () => run(`({ playing: app.state.playing, clock: app.engine.audioT
 
 try {
     await until(`document.getElementById("status").textContent.startsWith("Ready")`, 180000);
-    console.log("test copy:", await run(`document.getElementById("version").textContent`));
+    // the phone keeps the last build it saw at this address: this build, or start afresh (the test's own address)
+    const want = JSON.parse(fs.readFileSync(path.join(root, "app/package.json"), "utf8")).version;
+    const version = () => run(`document.getElementById("version").textContent`);
+    if (!(await version()).endsWith(want)) {
+        console.log(`  the phone had ${await version()} at this address; clearing its offline copy`);
+        await run(`(async () => { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+            for (const k of await caches.keys()) await caches.delete(k); })()`);
+        await send("Page.reload", { ignoreCache: true });
+        await sleep(3000);
+        await until(`document.getElementById("status")?.textContent.startsWith("Ready")`, 180000);
+    }
+    console.log("test copy:", await version());
+    check((await version()).endsWith(want), `the phone runs this build (${want})`);
     const b64 = fs.readFileSync(scorePath).toString("base64");
     await run(`(async () => { const bin = atob("${b64}"); const b = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); await app.openScore(${JSON.stringify(path.basename(scorePath))}, b.buffer); })()`);

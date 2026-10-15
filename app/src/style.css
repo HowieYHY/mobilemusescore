@@ -1085,8 +1085,7 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   position: fixed;
   left: 0;
   right: 0;
-  top: var(--topbar-h, 56px);
-  max-height: calc(100% - var(--topbar-h, 56px) - var(--transport-h, calc(66px + var(--bar-b))) - 8px);
+  top: 56px; /* until placeSettings (main.ts) puts it right under the top bar, down to the bottom bar */
   display: flex;
   flex-direction: column;
   background: var(--panel);

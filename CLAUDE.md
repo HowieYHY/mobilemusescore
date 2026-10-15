@@ -196,6 +196,13 @@ build, tests, status) before working here.
   still exists when it runs, and restores are tested by switching views immediately
   (`update-restart-test.mjs`).
 
+- **A size observer doesn't see padding change.** The Settings panel was placed under the top bar from
+  a `ResizeObserver` on it (content box). On Android the status bar's room is padding on the bar, so
+  when it changed nothing was reported, and the panel hung ~60 px below the bar with the score
+  showing between (user's screenshot, 1.0.15); a deliberate 8 px gap above the bottom bar looked
+  like a mistake too. Rule: place a panel between the bars by measuring them when it opens (and on
+  resize, `box: "border-box"`), and test by changing `--safe-t` while it is closed and while open.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

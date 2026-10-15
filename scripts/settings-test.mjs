@@ -117,7 +117,8 @@ for (const [name, width, height, touch] of sizes) {
             scrolls: body.scrollHeight > body.clientHeight, overflowX: document.documentElement.scrollWidth > innerWidth };
     });
     check(Math.abs(box.top - box.barBottom) < 1.5, `${name}: the panel hangs from the top bar (${Math.round(box.top)} vs ${Math.round(box.barBottom)})`);
-    check(box.bottom <= box.transportTop + 0.5, `${name}: and stops above the bottom bar (${Math.round(box.bottom)} vs ${Math.round(box.transportTop)})`);
+    check(box.scrolls ? Math.abs(box.bottom - box.transportTop) < 1.5 : box.bottom <= box.transportTop + 0.5,
+        `${name}: and ${box.scrolls ? "reaches the bottom bar, no gap" : "stops above the bottom bar"} (${Math.round(box.bottom)} vs ${Math.round(box.transportTop)})`);
     check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
     const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
         `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
@@ -130,6 +131,31 @@ for (const [name, width, height, touch] of sizes) {
     check(lb && lb.y >= box.top && lb.y + lb.height <= box.bottom + 0.5, `${name}: the last setting can be reached${box.scrolls ? " (by scrolling)" : ""}`);
     await page.evaluate(() => (document.querySelector(".settings-body").scrollTop = 0));
     await page.screenshot({ path: path.join(outDir, `${name}-panel.png`) });
+
+    // The status bar's room changing (Android: padding on the top bar, which reports no new size by
+    // itself) must not leave a gap: once while closed, once while open
+    const gapAfter = async (safeTop) => {
+        await page.evaluate((v) => document.documentElement.style.setProperty("--safe-t", v), safeTop);
+        await page.waitForTimeout(250);
+        return page.evaluate(() => {
+            const r = document.getElementById("settings").getBoundingClientRect();
+            return { top: r.top - document.querySelector(".topbar").getBoundingClientRect().bottom,
+                bottom: document.getElementById("transport").getBoundingClientRect().top - r.bottom };
+        });
+    };
+    const whileOpen = await gapAfter("59px");
+    check(Math.abs(whileOpen.top) < 1.5, `${name}: the status bar's room growing while open: still under the top bar (gap ${whileOpen.top.toFixed(1)})`);
+    await tap("#settings-close");
+    await page.waitForTimeout(350);
+    await page.evaluate(() => document.documentElement.style.setProperty("--safe-t", "0px"));
+    await page.waitForTimeout(250);
+    await tap("#settings-open");
+    await page.waitForTimeout(350);
+    const reopened = await gapAfter("0px");
+    check(Math.abs(reopened.top) < 1.5 && (!box.scrolls || Math.abs(reopened.bottom) < 1.5),
+        `${name}: and after it shrank while closed (gaps ${reopened.top.toFixed(1)} top, ${reopened.bottom.toFixed(1)} bottom)`);
+    await page.evaluate(() => document.documentElement.style.removeProperty("--safe-t"));
+    await page.waitForTimeout(250);
 
     // a tap on a row flips its switch
     await (touch ? page.tap(".set-row:has([data-set=keepPlaying]) .set-name") : page.click(".set-row:has([data-set=keepPlaying]) .set-name"));

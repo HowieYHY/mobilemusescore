@@ -1873,6 +1873,7 @@ function leaveFocus() {
     const wasFocused = document.documentElement.classList.contains("focus");
     state.focus = false;
     document.documentElement.classList.remove("focus");
+    placeSettings(); // an open panel comes back between the bars
     if (wasFocused) {
         glideViewer(before);
         if (!reduceMotion.matches) {
@@ -2241,10 +2242,6 @@ ui.loopClose.onclick = () => closeLayer(closeLoop);
 new ResizeObserver(() => {
     document.documentElement.style.setProperty("--transport-h", $("transport").offsetHeight + "px");
 }).observe($("transport"));
-// and the settings hang from the top bar (two rows on phones, the status bar)
-new ResizeObserver(() => {
-    document.documentElement.style.setProperty("--topbar-h", document.querySelector<HTMLElement>(".topbar")!.offsetHeight + "px");
-}).observe(document.querySelector(".topbar")!);
 
 // ---------------------------------------------------------------- settings
 
@@ -2254,6 +2251,25 @@ function closeSettings() {
     ui.settings.hidden = true;
     ui.settingsOpen.setAttribute("aria-expanded", "false");
 }
+// The panel fills the space between the two bars exactly, measured where they are now. A size kept
+// from earlier went stale on Android: the status bar's room is padding on the top bar, and a
+// change of it alone reports no new size, so the panel hung ~60 px below the bar (seen 15 Oct 2026).
+// Layout offsets, not the screen box: the bars may be sliding back in after focus.
+function placeSettings() {
+    if (ui.settings.hidden) {
+        return;
+    }
+    const bar = document.querySelector<HTMLElement>(".topbar")!;
+    const top = bar.offsetTop + bar.offsetHeight;
+    const bottom = $("transport").offsetTop;
+    ui.settings.style.top = top + "px";
+    ui.settings.style.maxHeight = Math.max(120, bottom - top) + "px";
+}
+for (const el of [document.querySelector<HTMLElement>(".topbar")!, $("transport")]) {
+    new ResizeObserver(placeSettings).observe(el, { box: "border-box" });
+}
+window.addEventListener("resize", placeSettings);
+window.visualViewport?.addEventListener("resize", placeSettings);
 ui.settingsOpen.onclick = () => {
     if (!ui.settings.hidden) {
         closeLayer(closeSettings);
@@ -2261,6 +2277,7 @@ ui.settingsOpen.onclick = () => {
     }
     showSettings();
     ui.settings.hidden = false;
+    placeSettings();
     ui.settingsOpen.setAttribute("aria-expanded", "true");
     openSheet(closeSettings);
 };

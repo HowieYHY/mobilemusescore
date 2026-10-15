@@ -10,8 +10,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-BtwDn_Ce.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CHQP6VeH.css">
+  <script type="module" crossorigin src="./assets/index-B942TDym.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DEQOGsMV.css">
 </head>
 <body>
   <header class="topbar">
@@ -26,6 +26,7 @@
     <div class="title" id="score-title">PocketScore</div>
     <div class="bar-end">
     <button class="bar-icon" id="focus-toggle" aria-label="Focus: show only the music" title="Focus: show only the music"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="bar-icon" id="settings-open" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="settings"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M9.94 4.89L10.2 2.57H13.8L14.06 4.89L15.56 5.52L17.4 4.06L19.94 6.6L18.48 8.44L19.11 9.94L21.43 10.2V13.8L19.11 14.06L18.48 15.56L19.94 17.4L17.4 19.94L15.56 18.48L14.06 19.11L13.8 21.43H10.2L9.94 19.11L8.44 18.48L6.6 19.94L4.06 17.4L5.52 15.56L4.89 14.06L2.57 13.8V10.2L4.89 9.94L5.52 8.44L4.06 6.6L6.6 4.06L8.44 5.52Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></button>
     <button class="bar-icon" id="help" aria-label="How to use PocketScore" title="How to use PocketScore"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.9.7c0 1.6-2.5 2.1-2.5 3.7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="17" r="1.15" fill="currentColor"/></svg></button>
     <a class="tip-icon" id="tip-heart" href="https://buy.stripe.com/3cI00jg1L7X3f1c8Zgd7q00" target="_blank" rel="noopener noreferrer" aria-label="Tip PocketScore" title="Tip PocketScore"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.7 3.8 4.5 7.1 4.5c2 0 3.6 1.1 4.9 2.9 1.3-1.8 2.9-2.9 4.9-2.9 3.3 0 5.5 3.2 4.3 6.6-1.7 4.8-9.2 9.4-9.2 9.4z" fill="currentColor"/></svg></a>
     </div>
@@ -128,6 +129,88 @@
         <button class="sounds-many" id="sounds-many" aria-expanded="false" hidden>Several parts</button>
       </div>
       <div class="sounds-body" id="sounds-body"></div>
+    </div>
+  </section>
+
+  <!-- Settings (the gear): one set for the whole app, kept on this device; main.ts applies each at once -->
+  <section class="settings" id="settings" hidden aria-labelledby="settings-title">
+    <div class="mixer-head">
+      <strong id="settings-title">Settings</strong>
+      <button class="btn small" id="settings-close">Done</button>
+    </div>
+    <div class="settings-body">
+      <h3 class="set-group">Playback</h3>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Keep playing when I leave PocketScore</span><span class="set-hint">The music goes on in another app, on the home screen or with the screen locked.<span class="apple-only" hidden> On iPhone and iPad the system may still stop it.</span></span></span>
+        <input type="checkbox" role="switch" data-set="keepPlaying">
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Metronome on when a score opens</span><span class="set-hint">Otherwise it starts muted; turn it on in the Mixer.</span></span>
+        <input type="checkbox" role="switch" data-set="metronomeOn">
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Tap a note to hear it</span><span class="set-hint">While the music is stopped. When off, a tap only moves to that note.</span></span>
+        <input type="checkbox" role="switch" data-set="tapToHear">
+      </label>
+
+      <h3 class="set-group">Focus</h3>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Start focus by itself</span><span class="set-hint">Hides the bars when you leave the screen alone.</span></span>
+        <input type="checkbox" role="switch" data-set="autoFocus">
+      </label>
+      <label class="set-row sub">
+        <span class="set-text"><span class="set-name">Wait while playing</span></span>
+        <select data-set="focusPlayingSecs" data-needs="autoFocus">
+          <option value="2">2 seconds</option>
+          <option value="4">4 seconds</option>
+          <option value="8">8 seconds</option>
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+        </select>
+      </label>
+      <label class="set-row sub">
+        <span class="set-text"><span class="set-name">Wait while stopped</span></span>
+        <select data-set="focusStoppedSecs" data-needs="autoFocus">
+          <option value="5">5 seconds</option>
+          <option value="10">10 seconds</option>
+          <option value="20">20 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="60">1 minute</option>
+        </select>
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Full screen with the Focus button</span><span class="set-hint" data-unavailable="Not available on this device.">The phone's or browser's own bars go too.</span></span>
+        <input type="checkbox" role="switch" data-set="focusFullscreen">
+      </label>
+
+      <h3 class="set-group">View</h3>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Open scores in</span></span>
+        <select data-set="startView">
+          <option value="page">Page view</option>
+          <option value="page_turn">Page by page</option>
+          <option value="continuous_h">Continuous (vertical)</option>
+          <option value="continuous_v">Continuous (horizontal)</option>
+        </select>
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Follow the music</span><span class="set-hint">The score moves along as it plays.</span></span>
+        <input type="checkbox" role="switch" data-set="follow">
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Turn pages early</span><span class="set-hint">In Page by page, the next page comes up when the music reaches a page's last line.</span></span>
+        <input type="checkbox" role="switch" data-set="earlyTurn" data-needs="follow">
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Keep the screen on while playing</span><span class="set-hint" data-unavailable="Not available in this browser.">So it doesn't dim or lock in the middle of a piece.</span></span>
+        <input type="checkbox" role="switch" data-set="keepAwake">
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Dark page</span><span class="set-hint">Light music on a dark page, for dim rooms. Your notes change with it.</span></span>
+        <input type="checkbox" role="switch" data-set="darkPage">
+      </label>
+
+      <p class="set-foot">Settings are kept on this device, for every score.</p>
     </div>
   </section>
 

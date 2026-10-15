@@ -203,6 +203,16 @@ build, tests, status) before working here.
   like a mistake too. Rule: place a panel between the bars by measuring them when it opens (and on
   resize, `box: "border-box"`), and test by changing `--safe-t` while it is closed and while open.
 
+- **Android paints the strip under the gesture bar from the installed app's manifest.** It was light
+  grey on the Pixel. Measured over USB (15 Oct 2026): the page ends above the gesture bar
+  (`innerHeight` 841 of 924, safe area bottom 0), and the installed WebAPK (read from its
+  `AndroidManifest.xml`) stores `backgroundColor = #e9ecef`, the strip's exact colour; changing the
+  page's own background did nothing. Chrome keeps the manifest as it was at install and refreshes
+  it only by updating the WebAPK (by itself after about a day, or `chrome://webapks`, *Request
+  update*). Rule: `background_color` and `theme_color` in the manifest are the colours around the
+  app on Android; change them knowing installed copies follow late, and check what the installed
+  copy holds (`adb pull` its APK) before guessing.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

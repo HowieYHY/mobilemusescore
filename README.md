@@ -222,7 +222,6 @@ score. Until you change them, PocketScore works as described above.
 | **Full screen with the Focus button** | The phone's or browser's own bars go too. Not on iPhone, which doesn't allow it |
 | **Open scores in** | The view every score opens in: *Page view*, *Page by page* or *Continuous* |
 | **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
-| **Turn pages early** | In *Page by page*, the next page comes up when the music reaches a page's last line, so you can read ahead. A page of only one line still turns at its end |
 | **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
 
 ---

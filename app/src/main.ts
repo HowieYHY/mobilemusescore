@@ -1068,29 +1068,20 @@ function showCursor(c: CursorInfo | null) {
     const now = performance.now();
     if (state.playing && settings.follow && now > state.followUntil && now - lastFollowCheck > 200) {
         lastFollowCheck = now;
-        followCursor(pageEl, c);
+        followCursor(pageEl);
     }
 }
 
 // Follow in one step when the cursor nears the edge of the view
-function followCursor(pageEl: HTMLElement, c: CursorInfo) {
+function followCursor(pageEl: HTMLElement) {
     if (!cursorEl) {
         return;
     }
     if (pageTurn()) {
         const i = Number(pageEl.dataset.index);
-        // Turn pages early (Settings): on the page's last line the next page comes up. Not on a page
-        // of one line, which would then never be seen.
-        const lines = pageLines.get(i);
-        const early = settings.earlyTurn && i + 1 < state.pageEls.length && !!lines && lines.count > 1
-            && c.y! + c.h! / 2 >= lines.lastTop;
-        const want = early ? i + 1 : i;
-        if (want !== turnedTo()) {
-            turnTo(want); // the music reached another page
+        if (i !== turnedTo()) {
+            turnTo(i); // the music reached another page
             return;
-        }
-        if (early) {
-            return; // the music is still on the page before: leave the next one in view
         }
     }
     const v = ui.viewer.getBoundingClientRect();
@@ -1113,20 +1104,10 @@ function followCursor(pageEl: HTMLElement, c: CursorInfo) {
 type TimelinePoint = [number, number, number, number, number]; // secs, page, x, y, h
 let timeline: TimelinePoint[] = [];
 const anchor = { secs: 0, clock: 0 };
-// each page's lines (systems): how many, and where the last one starts (page units)
-const pageLines = new Map<number, { count: number; lastTop: number }>();
 
 async function loadTimeline() {
     const [tl, staves] = await Promise.all([engine.timeline(), engine.staves()]);
     timeline = tl;
-    pageLines.clear();
-    const tops = new Map<number, Set<number>>();
-    for (const [, page, , y] of tl) {
-        (tops.get(page) ?? tops.set(page, new Set()).get(page)!).add(Math.round(y));
-    }
-    for (const [page, ys] of tops) {
-        pageLines.set(page, { count: ys.size, lastTop: Math.max(...ys) });
-    }
     // notes are pinned to the music through it and the staves (they show in every view); its times
     // follow the speed
     notes.setLayout(timeline, practice.speed, state.score?.spatium ?? 100, staves);

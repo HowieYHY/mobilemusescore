@@ -14,7 +14,6 @@ export interface Settings {
     focusFullscreen: boolean;  // the Focus button also goes full screen
     startView: StartView;      // the view a score opens in
     follow: boolean;           // the view follows the music
-    earlyTurn: boolean;        // page by page: the next page comes up on a page's last line
     keepAwake: boolean;        // the screen stays on while playing
 }
 
@@ -28,7 +27,6 @@ export const DEFAULTS: Readonly<Settings> = {
     focusFullscreen: true,
     startView: "page",
     follow: true,
-    earlyTurn: false,
     keepAwake: false,
 };
 

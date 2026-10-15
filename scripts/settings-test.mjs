@@ -10,7 +10,6 @@
 //   - Start focus by itself: off never starts; on, after the chosen wait,
 //   - Open scores in: every view,
 //   - Follow the music: off, the view stays put while the music plays,
-//   - Turn pages early: in Page by page, the next page shows while the last line plays,
 //   - Keep the screen on: the screen lock is asked for while playing and let go on pause,
 // and with every score in "real test musescores", each view as the opening view. Screenshots in
 // build/settings.
@@ -121,7 +120,7 @@ for (const [name, width, height, touch] of sizes) {
     check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
     const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
         `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
-    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true earlyTurn=false keepAwake=false",
+    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true keepAwake=false",
         `${name}: defaults are today's behaviour (${defaults})`);
     // every control is reachable: scroll to the last one and check it's on screen
     const last = page.locator('[data-set="keepAwake"]');
@@ -330,39 +329,6 @@ for (const [name, width, height, touch] of sizes) {
     check(stayed.page === 1 && stayed.top === 0 && moved.page === 1 && moved.top > 0,
         `follow the music: with the music on page 2, off stays (${stayed.top}), on follows (${Math.round(moved.top)})`);
 
-    // Turn pages early, in Page by page
-    await page.evaluate(() => { const v = document.getElementById("view-mode"); v.value = "page_turn"; v.dispatchEvent(new Event("change")); });
-    await page.waitForFunction(() => document.body.classList.contains("page-turn") && app.state.pageEls.length > 1, null, { timeout: 60000 });
-    await page.waitForTimeout(800);
-    const shownPage = () => page.evaluate(() => {
-        const v = document.querySelector(".viewer");
-        const slot = app.state.pageEls[0].parentElement.offsetWidth;
-        return Math.round(v.scrollLeft / slot);
-    });
-    // the start of page 0's last line, and its second line (not the last)
-    const lines = await page.evaluate(async () => {
-        const tl = await app.engine.timeline();
-        const p0 = tl.filter((p) => p[1] === 0);
-        const tops = [...new Set(p0.map((p) => p[3]))].sort((a, b) => a - b);
-        const at = (top) => p0.find((p) => p[3] === top)[0];
-        return { count: tops.length, last: at(tops[tops.length - 1]), first: at(tops[0]) };
-    });
-    for (const early of [false, true]) {
-        await setSetting(page, "earlyTurn", early);
-        await page.evaluate(() => document.querySelector(".viewer").scrollTo({ left: 0, behavior: "instant" }));
-        await page.evaluate((s) => app.engine.seek(s), Math.max(0, lines.last - 0.5));
-        await page.waitForTimeout(300);
-        await play();
-        await page.waitForTimeout(1600);
-        const st = await page.evaluate(() => app.state.position);
-        const shown = await shownPage();
-        const cur = await page.evaluate(() => app.cursorAt(app.state.position)?.page);
-        await pause();
-        check(cur === 0 && shown === (early ? 1 : 0),
-            `turn pages early ${early ? "on" : "off"}: on page 0's last line (at ${st.toFixed(1)} s), page ${shown} shows`);
-    }
-    await page.screenshot({ path: path.join(outDir, "early-turn.png") });
-    await setSetting(page, "earlyTurn", false);
 
     await context.close();
 }

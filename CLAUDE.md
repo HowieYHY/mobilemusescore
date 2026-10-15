@@ -37,7 +37,9 @@ build, tests, status) before working here.
   plan, 15 Oct 2026). A setting the device can't do is shown off with "Not available…", never
   hidden or left as a switch that does nothing.
 - No on-screen playback diagnostics (removed once Android was smooth); use `app.engine.stats`.
-- On phones the score's name sits on its own row above the top buttons.
+- On phones, and on tablets up to 1100 px wide (iPad portrait), the score's name sits on its own row
+  above the top buttons, with only the small icons beside it, and wraps to a second line rather than
+  being cut: longish names must show in full (the user, 16 Oct 2026).
 - **Don't clutter the UI, especially on mobile.** New controls that most people won't need every time
   go behind a small button or link (e.g. the sound list's *Several parts*), not as permanent rows.
 - **Commits are made as `HowieYHY <177769334+HowieYHY@users.noreply.github.com>`** on every machine

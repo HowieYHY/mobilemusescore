@@ -1,7 +1,7 @@
 // Settings on a real Android phone (USB debugging), in the phone's own Chrome, on a local build at
 // its own address (so the reader's notes and settings in the installed app are never touched). Plays
 // quietly (master volume down, not saved). Checks:
-//   - the Settings panel meets both bars on the real screen,
+//   - Settings is a page of its own over the whole screen (phones), left with Back,
 //   - Keep the screen on: Android's own power report shows a screen wake lock while playing, and
 //     none after pausing,
 //   - Full screen with the Focus button: on, the page goes full screen; off, it doesn't,
@@ -91,14 +91,13 @@ try {
     // ---- the panel on the real screen
     await tap("#settings-open");
     await sleep(700);
-    const gaps = await page.evaluate(() => {
+    const full = await page.evaluate(() => {
         const r = document.getElementById("settings").getBoundingClientRect();
-        return { top: r.top - document.querySelector(".topbar").getBoundingClientRect().bottom,
-            bottom: document.getElementById("transport").getBoundingClientRect().top - r.bottom };
+        return { top: r.top, bottom: r.bottom, h: innerHeight };
     });
     shot("panel");
-    check(Math.abs(gaps.top) < 1.5 && Math.abs(gaps.bottom) < 1.5, `panel meets both bars (gaps ${gaps.top.toFixed(1)} / ${gaps.bottom.toFixed(1)} px)`);
-    await tap("#settings-close");
+    check(full.top <= 0.5 && Math.abs(full.bottom - full.h) < 1.5, `Settings is a page over the whole screen (${full.top.toFixed(1)}-${full.bottom.toFixed(1)} of ${full.h})`);
+    await tap("#settings-back");
     await sleep(500);
 
     // ---- keep the screen on

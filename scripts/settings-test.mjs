@@ -114,9 +114,23 @@ for (const [name, width, height, touch] of sizes) {
         return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, barBottom: top.bottom, transportTop: bottom.top,
             scrolls: body.scrollHeight > body.clientHeight, overflowX: document.documentElement.scrollWidth > innerWidth };
     });
-    check(Math.abs(box.top - box.barBottom) < 1.5, `${name}: the panel hangs from the top bar (${Math.round(box.top)} vs ${Math.round(box.barBottom)})`);
-    check(box.scrolls ? Math.abs(box.bottom - box.transportTop) < 1.5 : box.bottom <= box.transportTop + 0.5,
-        `${name}: and ${box.scrolls ? "reaches the bottom bar, no gap" : "stops above the bottom bar"} (${Math.round(box.bottom)} vs ${Math.round(box.transportTop)})`);
+    // phones: a page of its own over the whole screen, left with Back; wider screens: a panel
+    // between the bars, closed with Done
+    const phone = width <= 600;
+    const closeSel = phone ? "#settings-back" : "#settings-close";
+    if (phone) {
+        const covers = await page.evaluate(() => ["#play", "#seek", "#score-title", "#viewer"].every((sel) => {
+            const r = document.querySelector(sel).getBoundingClientRect();
+            const hit = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
+            return !!hit?.closest("#settings");
+        }));
+        check(box.top <= 0.5 && Math.abs(box.bottom - height) < 1.5 && covers, `${name}: Settings is a page of its own, over the whole screen (${Math.round(box.top)}-${Math.round(box.bottom)}; score, playback and top bar hidden: ${covers})`);
+        check(await page.isVisible("#settings-back") && !(await page.isVisible("#settings-close")), `${name}: with Back at the top, no Done`);
+    } else {
+        check(Math.abs(box.top - box.barBottom) < 1.5, `${name}: the panel hangs from the top bar (${Math.round(box.top)} vs ${Math.round(box.barBottom)})`);
+        check(box.scrolls ? Math.abs(box.bottom - box.transportTop) < 1.5 : box.bottom <= box.transportTop + 0.5,
+            `${name}: and ${box.scrolls ? "reaches the bottom bar, no gap" : "stops above the bottom bar"} (${Math.round(box.bottom)} vs ${Math.round(box.transportTop)})`);
+    }
     check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
     const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
         `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
@@ -142,16 +156,24 @@ for (const [name, width, height, touch] of sizes) {
         });
     };
     const whileOpen = await gapAfter("59px");
-    check(Math.abs(whileOpen.top) < 1.5, `${name}: the status bar's room growing while open: still under the top bar (gap ${whileOpen.top.toFixed(1)})`);
-    await tap("#settings-close");
+    if (phone) {
+        // the page's header makes room for the status bar
+        const head = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector("#settings .mixer-head")).paddingTop));
+        check(head >= 59, `${name}: the page's header makes room for the status bar (padding ${head} px)`);
+    } else {
+        check(Math.abs(whileOpen.top) < 1.5, `${name}: the status bar's room growing while open: still under the top bar (gap ${whileOpen.top.toFixed(1)})`);
+    }
+    await tap(closeSel);
     await page.waitForTimeout(350);
     await page.evaluate(() => document.documentElement.style.setProperty("--safe-t", "0px"));
     await page.waitForTimeout(250);
     await tap("#settings-open");
     await page.waitForTimeout(350);
     const reopened = await gapAfter("0px");
-    check(Math.abs(reopened.top) < 1.5 && (!box.scrolls || Math.abs(reopened.bottom) < 1.5),
-        `${name}: and after it shrank while closed (gaps ${reopened.top.toFixed(1)} top, ${reopened.bottom.toFixed(1)} bottom)`);
+    if (!phone) {
+        check(Math.abs(reopened.top) < 1.5 && (!box.scrolls || Math.abs(reopened.bottom) < 1.5),
+            `${name}: and after it shrank while closed (gaps ${reopened.top.toFixed(1)} top, ${reopened.bottom.toFixed(1)} bottom)`);
+    }
     await page.evaluate(() => document.documentElement.style.removeProperty("--safe-t"));
     await page.waitForTimeout(250);
 
@@ -166,15 +188,17 @@ for (const [name, width, height, touch] of sizes) {
     await setSetting(page, "autoFocus", true);
     await setSetting(page, "startView", "page_turn");
 
-    // closes with Done, with the gear, with Back
-    await tap("#settings-close");
+    // closes with Done (phones: Back at the top), with the gear (not on phones: the page covers it), with the phone's Back
+    await tap(closeSel);
     await page.waitForTimeout(400);
-    check(await page.evaluate(() => document.getElementById("settings").hidden), `${name}: Done closes it`);
-    await tap("#settings-open");
-    await page.waitForTimeout(300);
-    await tap("#settings-open");
-    await page.waitForTimeout(400);
-    check(await page.evaluate(() => document.getElementById("settings").hidden), `${name}: the gear closes it again`);
+    check(await page.evaluate(() => document.getElementById("settings").hidden), `${name}: ${phone ? "Back at the top" : "Done"} closes it`);
+    if (!phone) {
+        await tap("#settings-open");
+        await page.waitForTimeout(300);
+        await tap("#settings-open");
+        await page.waitForTimeout(400);
+        check(await page.evaluate(() => document.getElementById("settings").hidden), `${name}: the gear closes it again`);
+    }
     await tap("#settings-open");
     await page.waitForTimeout(300);
     await page.goBack();

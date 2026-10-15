@@ -1227,6 +1227,21 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   cursor: pointer;
 }
 #settings-open[aria-expanded="true"] { background: var(--chrome-2); }
+.settings-back { display: none; }
+/* Phones: a page of its own over the whole screen (no score or playback showing round it), with Back
+   at the top left like any phone page; it slides in from the side */
+@media (max-width: 600px) {
+  .settings { inset: 0; top: 0 !important; max-height: none !important; z-index: 30; box-shadow: none; padding-bottom: var(--safe-b); }
+  .settings .mixer-head { padding-top: calc(8px + var(--safe-t)); padding-bottom: 8px; padding-left: 8px; gap: 10px; }
+  .settings .mixer-head strong { font-size: 17px; }
+  .settings-body { flex: 1; }
+  .settings-back { display: inline-flex; }
+  #settings-close { display: none; }
+  .settings[hidden] { transform: translateX(24px); }
+  @starting-style {
+    .settings:not([hidden]) { transform: translateX(24px); }
+  }
+}
 @media (min-width: 760px) {
   .settings { left: auto; right: 12px; width: 400px; border-radius: 0 0 10px 10px; overflow: hidden; }
 }

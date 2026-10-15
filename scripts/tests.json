@@ -1,5 +1,5 @@
 {
-  "_about": "What each test covers, for scripts/tests.mjs: a settled test (3 passes in a row) runs again only when a change touches its files or a changed line matches one of its words (regular expressions, case-insensitive), or the user reports a problem in its area. phone: needs the Android phone on USB.",
+  "_about": "What each test covers, for scripts/tests.mjs: a settled test (3 passes in a row) runs again only when a change touches its files or a changed line matches one of its words (regular expressions, case-insensitive), or the user reports a problem in its area. phone: needs the Android phone on USB. known: failures it has had since before 15 Oct (a run with only these counts as a pass). args: what to pass it. onlyOnChange: run only when its area changes (not just to settle). blocked: can't run on this PC, and why.",
   "settings-test": {
     "files": [
       "app/src/settings.ts"
@@ -60,6 +60,9 @@
       "openLayer",
       "closeLayer",
       "tour"
+    ],
+    "known": [
+      "bars, zoom and mixer hidden (#mixer)"
     ]
   },
   "notes-test": {
@@ -74,6 +77,10 @@
       "notesbar",
       "tnote",
       "ink\\b"
+    ],
+    "known": [
+      "choosing a colour closes the palette",
+      "Done hides the toolbar"
     ]
   },
   "notes-views-test": {
@@ -87,7 +94,8 @@
       "setLayout",
       "timeline",
       "setMode"
-    ]
+    ],
+    "blocked": "needs 'I am move it edited.mscz' (its layout), not on this PC"
   },
   "no-change-test": {
     "files": [
@@ -119,6 +127,11 @@
       "palette",
       "notes-finger",
       "\\bask\\("
+    ],
+    "known": [
+      "Back closes the palette, notes stay on",
+      "Back again leaves notes mode",
+      "Back closes the mixer"
     ]
   },
   "pageturn-test": {
@@ -133,6 +146,9 @@
       "keepOnPage",
       "followCursor",
       "fitPageZoom"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "scroller-test": {
@@ -140,6 +156,9 @@
     "words": [
       "scroller",
       "fingersBusy"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "continuous-test": {
@@ -154,6 +173,9 @@
       "pageDrawer",
       "standIn",
       "continuous"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "zoom-test": {
@@ -165,6 +187,9 @@
       "rerenderAll",
       "freeCanvas",
       "standIn"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "pinch-test": {
@@ -173,6 +198,9 @@
       "pinch",
       "touches",
       "zoom"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "cursor-test": {
@@ -186,6 +214,9 @@
       "anchor",
       "holdAt",
       "playLatency"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "selfcheck-test": {
@@ -198,6 +229,9 @@
       "underrun",
       "stutter",
       "health"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
     ]
   },
   "update-restart-test": {
@@ -228,7 +262,8 @@
       "new Worker",
       "addModule",
       "fetch\\("
-    ]
+    ],
+    "needsPreview": true
   },
   "layout-shots": {
     "files": [
@@ -243,7 +278,13 @@
       "patches/",
       "third_party/"
     ],
-    "words": []
+    "words": [],
+    "onlyOnChange": true,
+    "args": [
+      "build/eng-old",
+      "build/eng-new"
+    ],
+    "_note": "build/eng-old: the published engine (build/ghpages/engine), build/eng-new: the new build, each as core/mscore.{mjs,wasm} + audio/msaudio.mjs"
   },
   "android-settings-test": {
     "phone": true,

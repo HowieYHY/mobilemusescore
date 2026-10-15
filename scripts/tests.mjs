@@ -8,10 +8,13 @@
 //   node scripts/tests.mjs record <test> pass [note]   a pass (with only its known failures, if any)
 //   node scripts/tests.mjs record <test> fail [note]   a failure: it is unsettled until it passes SETTLED times again
 //   node scripts/tests.mjs list               every test's state
+//   node scripts/tests.mjs run [tests...]     runs them (default: what `which` lists, that can run here) one after
+//                                             another, logs to build/regress, and records each result (a run whose
+//                                             only failures are the test's known ones counts as a pass)
 
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const SETTLED = 3;
@@ -26,10 +29,10 @@ const head = () => git("rev-parse", "--short", "HEAD").trim();
 // Files changed since `commit` (committed and not), and the changed lines themselves
 function changesSince(commit) {
     const range = commit ? [commit] : ["HEAD"];
-    const files = new Set(git("diff", "--name-only", ...range).split("\n").filter(Boolean));
+    const files = new Set(git("diff", "--name-only", "--ignore-submodules=dirty", ...range).split("\n").filter(Boolean));
     git("ls-files", "--others", "--exclude-standard").split("\n").filter(Boolean).forEach((f) => files.add(f));
     // only the app's and the engine's code counts for words (docs mention them all the time)
-    const lines = git("diff", "-U0", ...range, "--", "app/src", "app/public", "app/index.html", "app/vite.config.ts", "engine", "patches").split("\n")
+    const lines = git("diff", "-U0", "--ignore-submodules=dirty", ...range, "--", "app/src", "app/public", "app/index.html", "app/vite.config.ts", "engine", "patches").split("\n")
         .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l)).map((l) => l.slice(1))
         .filter((l) => !/^\s*(\/\/|\/\*|\*|<!--|#)/.test(l)); // comments change nothing
     return { files: [...files], lines };
@@ -59,6 +62,19 @@ function reason(name, a, since) {
     return null;
 }
 
+// Whether a test should run now, and why (null: no need)
+function toRun(n) {
+    const a = areas[n];
+    const e = ledger[n];
+    if (a.onlyOnChange) {
+        return e?.passCommit ? reason(n, a, e.passCommit) : "never recorded";
+    }
+    if (!e || e.streak < SETTLED) {
+        return e ? `not settled yet (${e.streak} pass${e.streak === 1 ? "" : "es"} in a row${e.last === "fail" ? ", last failed" : ""})` : "never recorded";
+    }
+    return reason(n, a, e.passCommit);
+}
+
 const [cmd, name, result, ...note] = process.argv.slice(2);
 if (cmd === "record") {
     if (!areas[name] || !["pass", "fail"].includes(result)) {
@@ -80,23 +96,58 @@ if (cmd === "record") {
     ledger[name] = e;
     fs.writeFileSync(ledgerPath, JSON.stringify(ledger, null, 2) + "\n");
     console.log(`${name}: ${result}, ${e.streak} in a row${e.streak >= SETTLED ? " (settled)" : ""}`);
+} else if (cmd === "run") {
+    const names = process.argv.slice(3).length ? process.argv.slice(3) : Object.keys(areas).filter((n) => toRun(n));
+    let phone = false;
+    try {
+        phone = /\tdevice\b/.test(execFileSync("adb", ["devices"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+    } catch {
+        // no adb on PATH: the phone tests are skipped
+    }
+    fs.mkdirSync(path.join(root, "build/regress"), { recursive: true });
+    for (const n of names) {
+        const a = areas[n];
+        if (!a) {
+            console.log(`?     ${n}: not in scripts/tests.json`);
+            continue;
+        }
+        if (a.blocked) {
+            console.log(`skip  ${n}: ${a.blocked}`);
+            continue;
+        }
+        if (a.needsPreview && !(await fetch("http://localhost:4173/").then((x) => x.ok, () => false))) {
+            console.log(`skip  ${n}: needs a built copy served at :4173 (cd app && npm run build && npx vite preview --host 127.0.0.1 --port 4173)`);
+            continue;
+        }
+        if (a.phone && !phone) {
+            console.log(`skip  ${n}: needs the Android phone on USB`);
+            continue;
+        }
+        const t0 = Date.now();
+        const r = spawnSync(process.execPath, [path.join(root, "scripts", n + ".mjs"), ...(a.args || [])],
+            { cwd: root, encoding: "utf8", maxBuffer: 256 << 20, timeout: 40 * 60 * 1000 });
+        const out = (r.stdout || "") + (r.stderr || "");
+        fs.writeFileSync(path.join(root, "build/regress", n + ".log"), out);
+        const fails = out.split("\n").filter((l) => /^\s*FAIL\b/.test(l));
+        const unknown = fails.filter((l) => !(a.known || []).some((k) => l.includes(k)));
+        const pass = r.status === 0 || (fails.length > 0 && unknown.length === 0);
+        const mins = ((Date.now() - t0) / 60000).toFixed(1);
+        execFileSync(process.execPath, [fileURLToPath(import.meta.url), "record", n, pass ? "pass" : "fail"], { cwd: root, stdio: "ignore" });
+        console.log(`${pass ? "PASS" : "FAIL"}  ${n} (${mins} min)${fails.length && pass ? `, only its ${fails.length} known failure(s)` : ""}`
+            + (pass ? "" : `: ${(unknown[0] || out.trim().split("\n").slice(-1)[0] || "exit " + r.status).trim().slice(0, 140)}`));
+    }
 } else if (cmd === "which" || cmd === "list") {
     for (const [n, a] of Object.entries(areas)) {
         const e = ledger[n];
-        let why;
-        if (!e || e.streak < SETTLED) {
-            why = e ? `not settled yet (${e.streak} pass${e.streak === 1 ? "" : "es"} in a row${e.last === "fail" ? ", last failed" : ""})` : "never recorded";
-        } else {
-            why = reason(n, a, e.passCommit);
-        }
+        const why = toRun(n);
         if (cmd === "list") {
             console.log(`${n.padEnd(24)} ${e ? `${e.streak} in a row, last ${e.last} ${e.date}` : "no record"}${e?.note ? `  [${e.note}]` : ""}`);
         } else if (why) {
-            console.log(`RUN   ${n.padEnd(24)} ${why}${a.phone ? "  (phone on USB)" : ""}`);
+            console.log(`RUN   ${n.padEnd(24)} ${why}${a.phone ? "  (phone on USB)" : ""}${a.blocked ? `  (blocked: ${a.blocked})` : ""}`);
         }
     }
     if (cmd === "which") {
-        const skip = Object.keys(areas).filter((n) => ledger[n]?.streak >= SETTLED && !reason(n, areas[n], ledger[n].passCommit));
+        const skip = Object.keys(areas).filter((n) => !toRun(n));
         if (skip.length) {
             console.log(`skip  ${skip.join(", ")} (settled, nothing in their area changed)`);
         }

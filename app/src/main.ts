@@ -2330,6 +2330,10 @@ function placeSettings() {
     if (ui.settings.hidden) {
         return;
     }
+    if (matchMedia("(max-width: 600px)").matches) {
+        ui.settings.style.top = ui.settings.style.maxHeight = ""; // phones: the whole screen
+        return;
+    }
     const bar = document.querySelector<HTMLElement>(".topbar")!;
     const top = bar.offsetTop + bar.offsetHeight;
     const bottom = $("transport").offsetTop;
@@ -2353,6 +2357,7 @@ ui.settingsOpen.onclick = () => {
     openSheet(closeSettings);
 };
 ui.settingsClose.onclick = () => closeLayer(closeSettings);
+$("settings-back").onclick = () => closeLayer(closeSettings);
 
 // What this device can't do is shown switched off, saying so (not hidden, not a switch that does nothing)
 const rootEl = document.documentElement as any;

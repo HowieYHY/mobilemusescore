@@ -19,21 +19,26 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (15 Oct 2026, version 1.0.18)
+## Current status (16 Oct 2026, version 1.0.18)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
-was measured over USB (see *Tests*). Open issues: #3 (design, open to contributors) and #18
-(possibly shipping to the App Store and Google Play). The RESO website's preview (#2, #14) is live on
+was measured over USB (see *Tests*). Open issues: #3 (design, open to contributors), #18
+(possibly shipping to the App Store and Google Play), #26 (search by bar and section title) and #27
+(check for possible weaknesses). The RESO website's preview (#2, #14) is live on
 nusresonance.com since 10 Oct 2026; focus mode (#17) is live since 1.0.5, passes on the Pixel 9a
-(`android-focus-test.mjs`) and was closed by the user on 10 Oct 2026, with the iPad and iPhone checks
-below still to do. Settings (the gear) arrived in 1.0.15.
+(`android-focus-test.mjs`) and was closed by the user on 10 Oct 2026. The hand checks on an iPad and an
+iPhone (focus by the button and by itself, taps in focus, leaving it, panel motion, updating with a
+score open) passed (the user, 16 Oct 2026). Settings (the gear) arrived in 1.0.15 and passed on
+Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark page was removed in
+1.0.18 at the user's request.
 
-**Waiting for the user's testing on their devices** (each has its own section below):
-1. Android sound stutters in Page view: tests with the phone on USB.
-2. Settings (1.0.15): passed on Android (measured over USB) and on iPhone and iPad (the user).
-3. Focus, motion and updating with a score open, by hand on an iPad and an iPhone.
+**Still open:**
+1. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
+   happens, the phone on USB before closing the app.
+2. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
+   update the installed app (see the Settings checklist below).
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
 
@@ -103,21 +108,6 @@ start screen shows 1.0.15 or later.
 | Tap a note to hear it off | Any | While stopped, tap a note | The line moves there, no sound |
 | Settings panel | **Android: passed** (gaps 0.0 / 0.2 px). iPad, iPhone: passed (the user, 16 Oct 2026) | Open the gear, scroll to the end, close with Done, the gear and Back | Fits between the bars, every setting reachable, Back closes it without leaving the app (the gaps above and below it were fixed in 1.0.16; confirmed on Android) |
 | Strip under the bottom bar (Android) | Android, installed app | With 1.0.17 on the start screen, look at the strip behind the gesture line | Dark navy like the bar, not light grey. Cause measured on the Pixel (15 Oct 2026): the strip is painted by Android with the installed WebAPK's stored `backgroundColor` (#e9ecef, from the manifest at install on 7 Oct); 1.0.17's manifest says navy. Still grey until Chrome updates the installed app (by itself, or `chrome://webapks`, *Request update*); then it should be navy without reinstalling |
-
-### Still to check by hand on an iPad and an iPhone
-
-These can't be automated from Windows (see CLAUDE.md, *iPhone*). The user will do them in a later
-session. First make sure the start screen shows 1.0.8 or later.
-
-| What | How | Expected |
-| --- | --- | --- |
-| Focus, by the button (iPad) | Open a score, tap ⛶ beside ? | iPad Safari's own bars go too (it allows full screen); only the music and Play remain |
-| Focus, by the button (iPhone) | Same, in Safari and in the home-screen app | Only PocketScore's bars go (an iPhone's Safari has no full screen); nothing else changes |
-| Focus, taps | In focus: tap a note, then a margin or the title | The note plays and focus stays; off the music, the bars slide back |
-| Focus, by itself | Play and don't touch for 4 s; stop and don't touch for 10 s | Focus starts both times, without full screen; never with the mixer open |
-| Leaving focus | Swipe back / the iPad's Esc key | Bars come back, still in PocketScore |
-| Motion | Open and close the mixer, speed, loop, the sound list, notes, the colour palette | Each slides and fades (Safari 17.5+; older ones show and hide at once) |
-| Update with a score open | Needs a newer version published: open a score, then switch to another app and back (or leave it 20 s, stopped) | It restarts into the new version (maybe a second or two of loading when you return: iOS pauses apps in the background) and the score is back at the same place, view, zoom, speed and loop |
 
 ### What works
 

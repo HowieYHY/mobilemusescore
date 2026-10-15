@@ -1,0 +1,165 @@
+{
+  "settings-test": {
+    "streak": 7,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16"
+  },
+  "tour-test": {
+    "streak": 3,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16"
+  },
+  "layout-shots": {
+    "streak": 4,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16",
+    "note": "screenshots: look at them"
+  },
+  "no-change-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16"
+  },
+  "mobile-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16",
+    "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
+  },
+  "focus-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16",
+    "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
+  },
+  "notes-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "3ff2c3a",
+    "passCommit": "3ff2c3a",
+    "date": "2026-10-16",
+    "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar"
+  },
+  "goto-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16"
+  },
+  "csp-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "3ff2c3a",
+    "passCommit": "3ff2c3a",
+    "date": "2026-10-16",
+    "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
+  },
+  "pageturn-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "bdf2efc",
+    "passCommit": "bdf2efc",
+    "date": "2026-10-16",
+    "note": "pass a score: the default 'I am move it edited' isn't on this PC"
+  },
+  "scroller-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "131fa0f",
+    "passCommit": "131fa0f",
+    "date": "2026-10-16",
+    "note": "pass a score: the default 'I am move it edited' isn't on this PC"
+  },
+  "update-restart-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "131fa0f",
+    "passCommit": "131fa0f",
+    "date": "2026-10-16"
+  },
+  "compare-engines": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "82a833f",
+    "passCommit": "82a833f",
+    "date": "2026-10-16",
+    "note": "vs the published engine: all identical (drawings in another order after other scores)"
+  },
+  "android-background-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "2cba87e",
+    "passCommit": "2cba87e",
+    "date": "2026-10-16",
+    "note": "Pixel 9a, 15 Oct"
+  },
+  "android-settings-test": {
+    "streak": 0,
+    "last": "fail",
+    "commit": "2cba87e",
+    "passCommit": null,
+    "date": "2026-10-16",
+    "note": "its leave-the-app checks moved to android-background-test; the rest passed on the Pixel 9a, 15 Oct"
+  },
+  "notes-views-test": {
+    "streak": 0,
+    "last": "fail",
+    "commit": "0fb2232",
+    "passCommit": null,
+    "date": "2026-10-16",
+    "note": "needs 'I am move it edited.mscz' (its layout), not on this PC"
+  },
+  "continuous-test": {
+    "streak": 3,
+    "last": "pass",
+    "commit": "0fb2232",
+    "passCommit": "0fb2232",
+    "date": "2026-10-11",
+    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+  },
+  "zoom-test": {
+    "streak": 3,
+    "last": "pass",
+    "commit": "0fb2232",
+    "passCommit": "0fb2232",
+    "date": "2026-10-11",
+    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+  },
+  "pinch-test": {
+    "streak": 3,
+    "last": "pass",
+    "commit": "0fb2232",
+    "passCommit": "0fb2232",
+    "date": "2026-10-11",
+    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+  },
+  "cursor-test": {
+    "streak": 3,
+    "last": "pass",
+    "commit": "0fb2232",
+    "passCommit": "0fb2232",
+    "date": "2026-10-11",
+    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+  },
+  "selfcheck-test": {
+    "streak": 3,
+    "last": "pass",
+    "commit": "0fb2232",
+    "passCommit": "0fb2232",
+    "date": "2026-10-11",
+    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+  }
+}

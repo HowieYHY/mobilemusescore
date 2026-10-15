@@ -64,6 +64,13 @@ build, tests, status) before working here.
 - **Every new or changed feature updates the tour and the README**, without being asked: a tour step
   (`tour` steps in `main.ts`) for any new control, and the README's user guide. The user's standing
   request (10 Oct 2026).
+- **Settled tests aren't rerun** (the user's rule, 16 Oct 2026). A test that has passed 3 times in
+  a row is settled and runs again only when a change touches its area, or the user reports a
+  problem there. `node scripts/tests.mjs which` lists what to run and why (areas in
+  `scripts/tests.json`: files, and words matched against the changed lines); after each run,
+  `node scripts/tests.mjs record <test> pass|fail` (pass = only its known failures, kept in the
+  ledger's note). Unsettled tests run every round. Keep `tests.json` up to date when a test or the
+  code it covers moves.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 
@@ -221,6 +228,13 @@ build, tests, status) before working here.
   while music plays; `KEYCODE_POWER` turns the screen off. Rule: test anything about leaving the
   app over a plain DevTools connection (`android-background-test.mjs`), and record the screen state
   (`dumpsys power` mWakefulness) with each result.
+
+- **The engine isn't in git, so each PC publishes its own.** 1.0.14 needed the engine's `mss_staves`
+  (notes kept by their staff), built on the other PC; 1.0.13-1.0.19 went out from this PC with its
+  9 Oct engine, so the app quietly fell back and the feature never reached the live site (found
+  16 Oct 2026, comparing exports). Rule: `deploy-pages.sh` runs `check-engine.mjs`, which refuses to
+  publish an engine lacking a function the app calls; after an engine change, build it on the PC
+  that publishes and compare it with the live one (`compare-engines.mjs`).
 
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 

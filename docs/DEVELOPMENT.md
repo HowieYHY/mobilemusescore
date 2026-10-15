@@ -32,7 +32,7 @@ below still to do. Settings (the gear) arrived in 1.0.15.
 
 **Waiting for the user's testing on their devices** (each has its own section below):
 1. Android sound stutters in Page view: tests with the phone on USB.
-2. Settings (1.0.15) on Android, iPhone and iPad.
+2. Settings (1.0.15): passed on Android (measured over USB) and on iPhone and iPad (the user).
 3. Focus, motion and updating with a score open, by hand on an iPad and an iPhone.
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
@@ -85,22 +85,23 @@ until the queue has grown), and fill a bigger queue on Play, as seeks already re
 
 Tested in Chromium on Windows (`settings-test.mjs`), and on the Pixel 9a over USB on 15 Oct 2026
 (`android-settings-test.mjs`, `android-background-test.mjs`): the rows marked *Android: passed* need no
-more checking there. iPhone and iPad still need the user. First make sure the
+more checking there. The user checked the device-specific rows on iPhone and iPad on 16 Oct 2026;
+the rows marked *Any* were tested in Chromium and need only a look on a device. First make sure the
 start screen shows 1.0.15 or later.
 
 | What | Devices | How | Expected |
 | --- | --- | --- | --- |
-| Keep playing when I leave PocketScore | **Android: passed** (home screen and screen off by the power key, 30 s each: page hidden, audio clock ran the whole time, 0 gaps). iPhone, iPad still to do | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
-| Keep playing off (default) | **Android: passed** (home screen pauses; the message on return; the screen off makes the page hidden within 3 s). iPhone, iPad | Play, leave the app, come back | Paused, with the message, as before |
-| Keep the screen on while playing | **Android: passed** (Chrome grants the screen lock while playing; let go on pause). iPhone, iPad | Set the screen to dim after 30 s, turn the setting on, play a long score without touching | The screen stays on while playing, and dims as usual once paused. Where the browser can't, the setting shows "Not available in this browser." |
-| Full screen with the Focus button | **Android: passed** (on: full screen; off: not). iPad; iPhone | Turn it off, tap ⛶; turn it on, tap ⛶ | Off: only PocketScore's bars go. On: the browser's or phone's bars go too. On iPhone it shows off with "Not available on this device." |
+| Keep playing when I leave PocketScore | **Android: passed** (home screen and screen off by the power key, 30 s each: page hidden, audio clock ran the whole time, 0 gaps). iPhone, iPad: passed (the user, 16 Oct 2026) | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
+| Keep playing off (default) | **Android: passed** (home screen pauses; the message on return; the screen off makes the page hidden within 3 s). iPhone, iPad: passed (the user, 16 Oct 2026) | Play, leave the app, come back | Paused, with the message, as before |
+| Keep the screen on while playing | **Android: passed** (Chrome grants the screen lock while playing; let go on pause). iPhone, iPad: passed (the user, 16 Oct 2026) | Set the screen to dim after 30 s, turn the setting on, play a long score without touching | The screen stays on while playing, and dims as usual once paused. Where the browser can't, the setting shows "Not available in this browser." |
+| Full screen with the Focus button | **Android: passed** (on: full screen; off: not). iPad, iPhone: passed (the user, 16 Oct 2026) | Turn it off, tap ⛶; turn it on, tap ⛶ | Off: only PocketScore's bars go. On: the browser's or phone's bars go too. On iPhone it shows off with "Not available on this device." |
 | Start focus by itself and its waits | Any | Turn it off: no focus after waiting. On with 2 s while playing: focus about 2 s after the last touch | As set |
 | Open scores in | Any | Choose Page by page, then open a score; then Continuous | The score opens straight in that view |
 | Turn pages early | Any, Page by page | Turn it on, play through a page change | The next page shows when the music reaches the last line of a page |
 | Follow the music off | Any | Play past the bottom of the screen | The score stays where it is |
 | Metronome on when a score opens | Any | Turn it on, open a score, play | Clicks from the start; Save stays dark |
 | Tap a note to hear it off | Any | While stopped, tap a note | The line moves there, no sound |
-| Settings panel | **Android: passed** (gaps 0.0 / 0.2 px). iPad both ways, iPhone | Open the gear, scroll to the end, close with Done, the gear and Back | Fits between the bars, every setting reachable, Back closes it without leaving the app (the gaps above and below it were fixed in 1.0.16; confirmed on Android) |
+| Settings panel | **Android: passed** (gaps 0.0 / 0.2 px). iPad, iPhone: passed (the user, 16 Oct 2026) | Open the gear, scroll to the end, close with Done, the gear and Back | Fits between the bars, every setting reachable, Back closes it without leaving the app (the gaps above and below it were fixed in 1.0.16; confirmed on Android) |
 | Strip under the bottom bar (Android) | Android, installed app | With 1.0.17 on the start screen, look at the strip behind the gesture line | Dark navy like the bar, not light grey. Cause measured on the Pixel (15 Oct 2026): the strip is painted by Android with the installed WebAPK's stored `backgroundColor` (#e9ecef, from the manifest at install on 7 Oct); 1.0.17's manifest says navy. Still grey until Chrome updates the installed app (by itself, or `chrome://webapks`, *Request update*); then it should be navy without reinstalling |
 
 ### Still to check by hand on an iPad and an iPhone

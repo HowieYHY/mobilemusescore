@@ -28,7 +28,7 @@ export type WorkerRequest =
     | Req<{ cmd: "speed"; multiplier: number; at: number }>
     | Req<{ cmd: "loopMarker"; right: boolean; at: number }>
     | Req<{ cmd: "loop"; on: boolean }>
-    | Req<{ cmd: "practice" | "clearLoop" | "tempos" }>
+    | Req<{ cmd: "practice" | "clearLoop" | "tempos" | "bars" }>
     | Req<{ cmd: "locate"; page: number; x: number; y: number; radius: number }>;
 
 export type WorkerReply =

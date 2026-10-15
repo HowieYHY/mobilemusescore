@@ -184,6 +184,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "tempos":
             result = JSON.parse(callStr("mss_tempos"));
             break;
+        case "bars":
+            result = JSON.parse(callStr("mss_bars"));
+            break;
         case "practice":
             result = JSON.parse(callStr("mss_practice"));
             break;

@@ -371,4 +371,6 @@ export class Engine {
     locate(page: number, x: number, y: number, radius: number): Promise<CursorInfo | null> { return this.request({ cmd: "locate", page, x, y, radius }); }
     /** Tempo changes, repeats unrolled: [secs, quarter-note BPM before the speed]. */
     tempos(): Promise<[number, number][]> { return this.request({ cmd: "tempos" }); }
+    /** Where each printed bar and each section (rehearsal mark) first plays, at the current speed. */
+    bars(): Promise<{ bars: [number, number][]; sections: [number, string, number][] }> { return this.request({ cmd: "bars" }); }
 }

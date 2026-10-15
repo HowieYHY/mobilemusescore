@@ -272,7 +272,14 @@
         <input type="range" id="seek" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
         <div class="loop-band" id="loop-band" hidden></div>
       </div>
-      <div class="times"><span id="time">0:00</span><span id="bar"></span><span id="duration">0:00</span></div>
+      <div class="times"><span id="time">0:00</span>
+        <!-- Jump to a bar or a section (issue #26): the bar shows where the music is and takes a typed
+             number; the sections are the score's rehearsal marks (the menu only when it has some) -->
+        <span class="goto" id="goto" hidden>
+          <label class="bar-num">Bar <input id="bar" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="go" autocomplete="off" aria-label="Bar: type a bar number to go there"></label>
+          <select id="section" aria-label="Go to a section" hidden></select>
+        </span>
+        <span id="duration">0:00</span></div>
     </div>
     <button class="btn round" id="speed-open" aria-label="Speed (100%)" aria-expanded="false" disabled><span class="icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4.5 17a8.5 8.5 0 1 1 15 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 14l4-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="14.5" r="1.6" fill="currentColor"/></svg></span><span class="badge" id="speed-badge" hidden></span></button>
     <button class="btn round" id="loop-open" aria-label="Loop (off)" aria-expanded="false" aria-pressed="false" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M17 3l3 3-3 3M20 6H8.5A4.5 4.5 0 0 0 4 10.5V11M7 21l-3-3 3-3M4 18h11.5a4.5 4.5 0 0 0 4.5-4.5V13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>

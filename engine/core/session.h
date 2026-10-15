@@ -61,6 +61,11 @@ public:
     // Every tempo change, repeats unrolled: [[secs, quarter-note BPM before the
     // speed], ...], so the page can show the tempo at any position
     std::string temposJson() const;
+    // Where each printed bar and each section starts, for jumping to them (issue #26):
+    // {"bars":[[bar, secs], ...], "sections":[[secs, "title", bar], ...]}. Bars as printed (a bar
+    // left out of the count shares its number; the counted one is used), sections are the score's
+    // rehearsal marks; times are each one's first play, at the current speed.
+    std::string barsJson() const;
 
     // Mixer. trackKey identifies an instrument track (see tracksJson()).
     void setTrackVolume(int trackKey, double db);

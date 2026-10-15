@@ -123,5 +123,6 @@ EMSCRIPTEN_KEEPALIVE const char* mss_set_loop(int on) { return ret(Session::inst
 EMSCRIPTEN_KEEPALIVE const char* mss_clear_loop() { return ret(Session::instance()->clearLoop()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_locate(int page, double x, double y, double radius) { return ret(Session::instance()->locateJson(page, x, y, radius)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_tempos() { return ret(Session::instance()->temposJson()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_bars() { return ret(Session::instance()->barsJson()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_practice() { return ret(Session::instance()->practiceJson()); }
 }

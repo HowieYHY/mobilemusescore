@@ -25,7 +25,9 @@ const ui = {
     play: $<HTMLButtonElement>("play"),
     seek: $<HTMLInputElement>("seek"),
     time: $("time"),
-    bar: $("bar"),
+    bar: $<HTMLInputElement>("bar"),
+    goto: $("goto"),
+    section: $<HTMLSelectElement>("section"),
     duration: $("duration"),
     mixerToggle: $<HTMLButtonElement>("mixer-toggle"),
     mixer: $("mixer"),
@@ -1150,7 +1152,7 @@ engine.on("position", (c: CursorInfo) => {
         state.duration = c.duration;
         ui.duration.textContent = fmt(state.duration);
     }
-    ui.bar.textContent = c.measure ? `Bar ${c.measure}` : "";
+    showBar(c);
     const clock = engine.audioTime;
     if (state.playing && clock > 0) {
         followReports(c.secs, clock);
@@ -2040,7 +2042,7 @@ function showPractice(p: PracticeInfo | null) {
     }
     if (speedChanged) {
         // the cursor's and markers' times follow the speed
-        void Promise.all([loadTimeline(), loadTempos()]).then(() => {
+        void Promise.all([loadTimeline(), loadTempos(), loadBars()]).then(() => {
             showPosition(state.position);
             showLoopMarks();
         });
@@ -2083,6 +2085,92 @@ function showLoopMarks() {
 // The tempo at the play position, as desktop's toolbar shows it: quarter notes
 // per minute, with the speed applied. Typing one sets the speed to match.
 let tempos: [number, number][] = [];
+// ---------------------------------------------------------------- go to a bar or a section (issue #26)
+
+// Where each printed bar and section first plays (at the current speed: fetched again when it changes)
+let barStarts: [number, number][] = [];
+let sections: [number, string, number][] = [];
+
+async function loadBars() {
+    const b = await engine.bars();
+    barStarts = b.bars;
+    sections = b.sections;
+    ui.section.replaceChildren(new Option("Section", "", true, false), ...sections.map(([, title], i) => new Option(title, String(i))));
+    ui.section.options[0].disabled = true; // shown before the first section, not a choice
+    ui.section.hidden = sections.length === 0;
+    ui.goto.hidden = barStarts.length === 0;
+    showBar(lastPosition);
+}
+
+let lastPosition: CursorInfo | null = null;
+// The bar and section where the music is, unless the reader is typing or choosing
+function showBar(c: CursorInfo | null) {
+    lastPosition = c;
+    if (c?.measure && document.activeElement !== ui.bar) {
+        ui.bar.value = String(c.measure);
+    }
+    if (c && document.activeElement !== ui.section && sections.length) {
+        let at = -1;
+        sections.forEach(([secs], i) => {
+            if (secs <= c.secs + 1e-3) {
+                at = i;
+            }
+        });
+        ui.section.value = at < 0 ? "" : String(at);
+    }
+}
+
+// Jumps there and brings it into view, also while stopped (the view follows only while playing)
+async function goTo(secs: number) {
+    state.followUntil = 0;
+    await engine.seek(secs);
+    showPosition(secs);
+    const c = lastCursor;
+    if (c?.page !== undefined && state.pageEls[c.page]) {
+        if (pageTurn()) {
+            turnTo(c.page);
+        } else {
+            followCursor(state.pageEls[c.page]);
+        }
+    }
+}
+
+function goToTypedBar() {
+    const n = parseInt(ui.bar.value, 10);
+    ui.bar.blur(); // closes the phone's keyboard
+    if (!barStarts.length || Number.isNaN(n)) {
+        showBar(lastPosition);
+        return;
+    }
+    // that bar, or the nearest one there is (past the end: the last)
+    let best = barStarts[0];
+    for (const b of barStarts) {
+        if (b[0] <= n) {
+            best = b;
+        }
+    }
+    ui.bar.value = String(best[0]);
+    void goTo(best[1]);
+}
+ui.bar.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        goToTypedBar();
+    } else if (e.key === "Escape") {
+        ui.bar.blur();
+    }
+});
+ui.bar.addEventListener("change", goToTypedBar);
+ui.bar.addEventListener("focus", () => ui.bar.select());
+ui.bar.addEventListener("blur", () => setTimeout(() => showBar(lastPosition), 0));
+ui.section.addEventListener("change", () => {
+    const s = sections[Number(ui.section.value)];
+    ui.section.blur();
+    if (s) {
+        void goTo(s[0]);
+    }
+});
+
 async function loadTempos() {
     tempos = await engine.tempos();
     showTempo();
@@ -2672,6 +2760,8 @@ async function openScore(name: string, data: ArrayBuffer) {
         clearPages(); // the last score's pages go now; changeView below builds this one's
     }
     void loadTempos();
+    lastPosition = null;
+    void loadBars();
     ui.viewer.scrollTop = 0;
     ui.viewer.scrollLeft = 0;
     if (startView !== "page") {
@@ -3332,6 +3422,9 @@ function tourSteps(): TourStep[] {
         { target: () => ui.viewer, title: "The score", text: "Tap any note to play from there. While stopped, a tap plays just that note. Pinch, or use − and +, to zoom. In a long score, start scrolling and drag the handle that appears at the edge." },
         { target: el("play"), title: "Play and pause", text: "The blue line shows where you are, and the page follows it." },
         { target: el("seek"), title: "Move through the score", text: "Drag the slider to jump anywhere. The button on the far left goes back to the start." },
+        { target: el("goto"), title: "Go to a bar or section", text: sections.length
+            ? "Type a bar number and press Go, or pick a section (like the chorus) from the menu beside it. They show where the music is as it plays."
+            : "Type a bar number and press Go to jump there. It shows the bar the music is in as it plays. Scores with section marks (Intro, Verse…) also get a menu of them here." },
         { target: el("speed-open"), title: "Speed", text: "Practise slower or faster, or type the tempo you want." },
         { target: el("loop-open"), title: "Loop", text: "Repeat a passage: put the loop markers on the notes where it starts and ends." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },

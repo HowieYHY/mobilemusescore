@@ -73,6 +73,8 @@ No app store needed.
 | Start from a note | Tap the note |
 | Hear one note | While stopped, tap it |
 | Jump around | Drag the position slider |
+| Go to a bar | Tap the bar number under the slider, type the bar, and press **Go** (or Enter). Bars are numbered as printed on the score |
+| Go to a section | Pick it from the menu beside the bar number (*Intro*, *Verse 1*, *Chorus*…). It only appears when the score has section marks (MuseScore's rehearsal marks) |
 | Back to the start | Tap **⏮** |
 | Zoom | Pinch, or use **−** and **+** |
 | Scroll | Drag with one or two fingers |

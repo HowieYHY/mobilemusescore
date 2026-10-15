@@ -11,6 +11,7 @@
 #include <cmath>
 #include <functional>
 #include <map>
+#include <set>
 #include <sstream>
 #include <type_traits>
 
@@ -37,6 +38,7 @@
 #include "playback/qml/MuseScore/Playback/msbasicpresetscategories.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/part.h"
+#include "engraving/dom/rehearsalmark.h"
 #include "engraving/dom/repeatlist.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/staff.h"
@@ -1209,6 +1211,61 @@ void Session::applyLoop()
     m_audio->setLoop(uticksToSecs(score, m_loopIn), uticksToSecs(score, m_loopOut));
 }
 
+std::string Session::barsJson() const
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "{\"bars\":[],\"sections\":[]}";
+    }
+    // a raw tick's first play, in played seconds (with repeats, the first pass through it)
+    auto firstPlay = [&](int tick, double& secs) {
+        for (const RepeatSegment* rs : playedRepeats(score)) {
+            if (tick >= rs->tick && tick < rs->tick + rs->len()) {
+                secs = uticksToSecs(score, tick + rs->utick - rs->tick);
+                return true;
+            }
+        }
+        return false;
+    };
+    struct Bar { double secs; bool counted; };
+    std::map<int, Bar> bars; // printed number -> where it starts
+    std::string sections;
+    std::set<std::pair<int, std::string>> seen; // a mark shown on several staves is one section
+    for (const Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        double secs = 0;
+        if (!firstPlay(m->tick().ticks(), secs)) {
+            continue;
+        }
+        const int no = m->no() + 1;
+        auto it = bars.find(no);
+        if (it == bars.end()) {
+            bars[no] = { secs, !m->irregular() };
+        } else if (!it->second.counted && !m->irregular()) {
+            it->second = { secs, true }; // the bar the number belongs to, not a pickup before it
+        }
+        for (const Segment* s = m->first(); s; s = s->next()) {
+            for (const EngravingItem* e : s->annotations()) {
+                if (!e->isRehearsalMark()) {
+                    continue;
+                }
+                std::string text = toRehearsalMark(e)->plainText().simplified().toStdString();
+                if (text.empty() || !seen.insert({ s->tick().ticks(), text }).second) {
+                    continue;
+                }
+                double at = 0;
+                if (firstPlay(s->tick().ticks(), at)) {
+                    sections += std::string(sections.empty() ? "" : ",") + "[" + num(at) + "," + jsonStr(text) + "," + std::to_string(no) + "]";
+                }
+            }
+        }
+    }
+    std::string s = "{\"bars\":[";
+    for (const auto& [no, bar] : bars) {
+        s += std::string(s.back() == '[' ? "" : ",") + "[" + std::to_string(no) + "," + num(bar.secs) + "]";
+    }
+    return s + "],\"sections\":[" + sections + "]}";
+}
+
 std::string Session::practiceJson() const
 {
     const Score* score = m_project ? m_project->masterScore() : nullptr;
@@ -1580,7 +1637,7 @@ std::string Session::cursorJson(double secs) const
         return head + "}";
     }
 
-    head += ",\"measure\":" + std::to_string(measure->measureIndex() + 1);
+    head += ",\"measure\":" + std::to_string(measure->no() + 1); // as printed, like the loop's bars and typed bars
 
     for (const Segment* s = measure->first(SegmentType::ChordRest); s;) {
         const Fraction segmentStartTick = s->tick();

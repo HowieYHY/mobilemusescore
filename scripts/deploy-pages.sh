@@ -6,6 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WT="$ROOT/build/ghpages"
 
 [ -f "$ROOT/app/dist/index.html" ] || { echo "app/dist missing: run 'npm run build' in app/ first"; exit 1; }
+# the engine isn't in git: refuse to publish one that lacks what the app calls
+node "$ROOT/scripts/check-engine.mjs" "$ROOT/app/dist"
 
 git -C "$ROOT" worktree prune
 if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then

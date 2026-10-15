@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (15 Oct 2026, version 1.0.16)
+## Current status (15 Oct 2026, version 1.0.17)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -93,7 +93,8 @@ start screen shows 1.0.15 or later.
 | Metronome on when a score opens | Any | Turn it on, open a score, play | Clicks from the start; Save stays dark |
 | Tap a note to hear it off | Any | While stopped, tap a note | The line moves there, no sound |
 | Dark page | Any, in a dim room | Turn it on with notes on the score | Light music on dark paper, the area around the pages dark too, notes readable (a black pen shows light, highlighter still visible) |
-| Settings panel | Phone, iPad both ways | Open the gear, scroll to the end, close with Done, the gear and Back | Fits between the bars, every setting reachable, Back closes it without leaving the app |
+| Settings panel | Phone, iPad both ways | Open the gear, scroll to the end, close with Done, the gear and Back | Fits between the bars, every setting reachable, Back closes it without leaving the app (the gaps above and below it were fixed in 1.0.16; confirmed on Android) |
+| Strip under the bottom bar (Android) | Android, installed app | With 1.0.17 on the start screen, look at the strip behind the gesture line | Dark navy like the bar, not light grey. On 1.0.16 it was exactly the page's light background (#e9ecef, also the manifest's `background_color`); 1.0.17 makes both navy (the score area keeps the light grey). If it is still light, the colour comes from the manifest, which Chrome re-reads only when it updates the installed app (can take a day): check again later before trying anything else, then add a lesson to CLAUDE.md with what it was |
 
 ### Still to check by hand on an iPad and an iPhone
 

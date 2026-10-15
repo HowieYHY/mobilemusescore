@@ -42,7 +42,9 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  /* the bars' colour, as html's: on Android the strip under the gesture bar took the page's light
+     background (seen 15 Oct 2026); the score area has the light one */
+  background: var(--chrome);
 }
 
 ::selection { background: rgba(30, 106, 208, 0.25); }
@@ -183,6 +185,7 @@ body {
 
 .viewer {
   flex: 1;
+  background: var(--bg);
   /* the app keeps the reader's place itself; the browser's scroll anchoring
      moved the score when a page's drawing was put in (random small jumps) */
   overflow-anchor: none;

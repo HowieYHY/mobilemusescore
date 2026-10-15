@@ -48,9 +48,11 @@ export async function ensureFonts(ops: Op[], base: string): Promise<void> {
 
 const images = new Map<string, HTMLImageElement>(); // data URL -> decoded image
 
-// Decodes the pictures a page needs before drawing it.
+// Decodes the pictures a page needs before drawing it. Only pictures inside the score (data URLs):
+// an address elsewhere in a doctored score would tell that server the score was opened (issue #27).
+const embedded = (src: unknown) => typeof src === "string" && /^data:image\//i.test(src);
 export async function ensureImages(ops: Op[]): Promise<void> {
-    await Promise.all(ops.filter((op) => op[0] === "img" && op[5] && !images.has(op[5])).map(async (op) => {
+    await Promise.all(ops.filter((op) => op[0] === "img" && embedded(op[5]) && !images.has(op[5])).map(async (op) => {
         const img = new Image();
         img.src = op[5];
         try {

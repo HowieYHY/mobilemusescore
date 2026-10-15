@@ -8,6 +8,14 @@
 
 import { MusicMap, type Anchor, type SystemStaves, type TimelinePoint } from "./musicmap";
 
+// Text boxes take plain text only, so pasted formatting or pictures never enter one (issue #27);
+// browsers without "plaintext-only" fall back to "true" (the text is still saved as plain text)
+const editable = (() => {
+    const probe = document.createElement("div");
+    probe.contentEditable = "plaintext-only";
+    return probe.contentEditable === "plaintext-only" ? "plaintext-only" : "true";
+})();
+
 export type Tool = "pen" | "highlighter" | "text" | "eraser";
 
 // `a`: the music under each point (null where there is none), filled in by the layout it was written in
@@ -462,7 +470,7 @@ export class Annotations {
         this.active = on;
         this.pagesEl.classList.toggle("annotating", on);
         for (const v of this.views.values()) {
-            v.texts.querySelectorAll<HTMLElement>(".tbody").forEach((b) => (b.contentEditable = on ? "true" : "false"));
+            v.texts.querySelectorAll<HTMLElement>(".tbody").forEach((b) => (b.contentEditable = on ? editable : "false"));
         }
         if (!on) {
             this.deselect();
@@ -665,7 +673,7 @@ export class Annotations {
         const body = document.createElement("div");
         body.className = "tbody";
         body.textContent = t.text;
-        body.contentEditable = this.active ? "true" : "false";
+        body.contentEditable = this.active ? editable : "false";
         body.spellcheck = false;
         // highlighted (frame, move and delete buttons) only while being edited
         body.addEventListener("focus", () => box.classList.add("sel"));

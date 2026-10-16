@@ -25,8 +25,12 @@ export class Engine {
     private clock = { t: 0, perf: 0, raw: 0, set: false };
     /** Gaps in the sound while playing (the device fell behind). */
     underruns = 0;
-    /** The loudest sample played in the last ~100 ms (0 = silence), for tests and diagnosis. */
+    /**
+     * The loudest sample played in the last ~100 ms (0 = silence), for tests and diagnosis, and when
+     * it came (performance.now()): with the audio thread stopped no report comes and the level is old.
+     */
     level = 0;
+    levelAt = 0;
     private playing = false;
     private silentSince = 0;
     private silenceNoted = false;
@@ -234,6 +238,7 @@ export class Engine {
             return;
         }
         this.level = peak;
+        this.levelAt = performance.now();
         // Silent for seconds while playing (issue #28: the clock ran on, no sound):
         // noted once per silent stretch, with whether the page was in view
         if (this.playing && peak === 0) {

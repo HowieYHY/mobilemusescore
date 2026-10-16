@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (17 Oct 2026, version 1.0.22)
+## Current status (17 Oct 2026, version 1.0.23)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -36,15 +36,14 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
 1.0.18 at the user's request.
 
 **Still open:**
-1. **#28: with *Keep playing* on, the sound stops after leaving the app while playback carries on**
-   (the user, 16 Oct 2026, Android). The 15 Oct phone test passed because it only checked the audio
-   clock and gaps for 30 s; a worklet fed silence has neither. Since 1.0.22 the worklet reports the
-   level it plays (`app.engine.level`), `app.engine.health` notes leaving, coming back and any 3 s of
-   silence while playing (with the page's visibility), and `android-background-test.mjs` listens
-   while away (`AWAY`, default 120 s). Next: run it with the phone on USB; if it doesn't reproduce,
-   ask how long the user was away and whether in the installed app, and read `app.engine.health`
-   from the phone right after it happens (`ATTACH=1`). A `silence` note with the queue full means
-   the engine rendered silence; gaps instead mean Android stopped the audio worker.
+1. **#28: with *Keep playing* on, the sound stopped after leaving the app while playback carried
+   on** (the user, 16 Oct 2026, Android). Cause, measured on the Pixel 9a on 17 Oct 2026: about
+   2 minutes after leaving to the home screen, Android froze all of Chrome's processes (Web Audio
+   alone is not media playback to Android). Fixed in 1.0.23 by a silent `<audio>` element playing
+   alongside (see *Leaving the app*); `android-background-test.mjs` passed with it (no Chrome
+   process frozen, media notification up, full clock and sound, 2 min each on the home screen and
+   with the screen off, and 5 min on the home screen). Waiting for the user to confirm in the
+   installed app.
 2. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
 3. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
@@ -106,7 +105,7 @@ start screen shows 1.0.15 or later.
 
 | What | Devices | How | Expected |
 | --- | --- | --- | --- |
-| Keep playing when I leave PocketScore | **Android: reopened, #28.** A 30 s check passed on 15 Oct (home screen and screen off by the power key: page hidden, audio clock ran the whole time, 0 gaps), but on the user's phone the sound stopped while playback ran on; the test now listens to the level for 120 s. iPhone, iPad: passed (the user, 16 Oct 2026) | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
+| Keep playing when I leave PocketScore | **Android: passed with the #28 fix** (17 Oct, `android-background-test.mjs`: home screen and screen off 2 min each, home screen 3.5 min to the score's end; no Chrome process frozen, Chrome's media notification up, full clock, sound heard throughout, 0 gaps; the notification's pause and play work). Before the fix Android froze Chrome ~2 min after leaving. The user still to confirm in the installed app. iPhone, iPad: passed (the user, 16 Oct 2026) | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
 | Keep playing off (default) | **Android: passed** (home screen pauses; the message on return; the screen off makes the page hidden within 3 s). iPhone, iPad: passed (the user, 16 Oct 2026) | Play, leave the app, come back | Paused, with the message, as before |
 | Keep the screen on while playing | **Android: passed** (Chrome grants the screen lock while playing; let go on pause). iPhone, iPad: passed (the user, 16 Oct 2026) | Set the screen to dim after 30 s, turn the setting on, play a long score without touching | The screen stays on while playing, and dims as usual once paused. Where the browser can't, the setting shows "Not available in this browser." |
 | Full screen with the Focus button | **Android: passed** (on: full screen; off: not). iPad, iPhone: passed (the user, 16 Oct 2026) | Turn it off, tap ⛶; turn it on, tap ⛶ | Off: only PocketScore's bars go. On: the browser's or phone's bars go too. On iPhone it shows off with "Not available on this device." |
@@ -155,7 +154,7 @@ start screen shows 1.0.15 or later.
 | Save | One **Save** in the top bar for everything changed on a score: notes (`annotations.ts`) and mixer (`mixerstore.ts`), in `localStorage` per score (SHA-256 of the file). Nothing is saved until then; a draft is kept on every change, so closing the app loses nothing and the changes come back next time, still unsaved, with a message (iOS home-screen apps get no `beforeunload`). The only question: opening another score with unsaved changes (Save / Don't save / Cancel). Ctrl/Cmd+S. Notes saved by 0.2.x are read as saved; 0.2.1 saved mixers and 0.2.0 sound choices are carried over. A part's sound is stored only when it isn't the score's own. The score's saved master volume is read (`mss_master_volume`). |
 | Mixer before Play | The audio engine starts when a score opens (the `AudioContext` starts suspended until a tap; Play or tapping a note resumes it), so the sounds load straight away. The mixer works from the moment the score is open: the engine sets each part's volume, reverb and mute/solo from the score at load (no longer when the sounds are added), so changes made before the sounds arrive are kept. Sound choices made or restored before then are applied once the sounds are loaded. |
 | Metronome | Its mixer strip is muted whenever a score opens (`Session::load` resets it; desktop's metronome is off by default), and its on/off is not kept in saved settings; unmuting it turns the clicks on in the playback model (`setMetronome`), muting turns them off. Settings' *Metronome on when a score opens* unmutes it after the mixer is restored; since its on/off isn't kept, Save stays dark. |
-| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. With Settings' *Keep playing* on, it doesn't pause (iOS may stop the sound anyway, which the *Interruptions* handler then reports; on Android the sound stopped while the clock ran on, #28). |
+| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. With Settings' *Keep playing* on, it doesn't pause (iOS may stop the sound anyway, which the *Interruptions* handler then reports). On Android, while playing with *Keep playing* on, a silent looping `<audio>` element (a 10 s 8-bit WAV made in the page, `media-src blob:`) plays alongside, with Media Session title and play/pause (`updateKeepAlive`): without it Android froze Chrome ~2 min after the app was left and the sound stopped (#28). Not on iOS, where Keep playing already passed. |
 | Saved sounds on reopening | The `playbackReady` handler waits for the opened score's saved settings to be restored (`mixLoading`). Before, when the audio was already running, the sounds could become ready while saved settings were being put back part by part, and the sound choices queued after that were never applied (parts back on the score's sound, e.g. 6 of 9 voices of GODS on MS Basic). `reopen-test.mjs` (SLOW=1 makes the restore slow, as on a phone) lost them in 4 of 6 reopenings before, 0 after. |
 | Screen fit | The app is pinned to the screen's edges (`body { position: fixed; inset: 0 }`) instead of `100dvh`, which was stale after an installed app restarted for an update (Android: bottom bar buried) and short of the screen (iPad: gap at the bottom). The bottom bar keeps the larger of its padding and the home-indicator space, not both. In the iPhone/iPad home-screen app the status bar is `black` (not `black-translucent`): with translucent, iOS 26 started the page under the status bar but kept it one status bar short (window 812 of 874 px on an iPhone) and left a light strip under the bottom bar that no CSS reaches. |
 | Cursor at barlines | A bar's end point (on the barline, at the same moment as the next bar's first note) is left out of the timeline when the next bar is on the same line, so the cursor glides from the last note of a bar to the first of the next instead of stopping at the barline and jumping. |
@@ -418,7 +417,7 @@ node scripts/compare-engines.mjs <old> <new>  # two engine builds: page drawings
 node scripts/goto-test.mjs [folder]          # go to a bar or section (issue #26)
 node scripts/csp-test.mjs [folder]           # built copy (vite preview :4173): nothing refused by the policy; scripts and outside pictures are (Chromium, WebKit; ENGINES=)
 node scripts/android-settings-test.mjs [score]    # USB phone, local build: Settings panel, full screen, sound gaps with focus on/off
-node scripts/android-background-test.mjs [score]  # USB phone: Keep playing (home, screen off), Keep the screen on; plain CDP
+node scripts/android-background-test.mjs [score]  # USB phone: Keep playing (home, screen off: turns the screen off, the phone locks; SCREEN_OFF=0 skips it, AWAY=secs), Keep the screen on; plain CDP
 [CANVAS_MB=256] [PHONE=<url>] node scripts/zoom-test.mjs [score]   # pages never blank while zooming
 node scripts/tap-precision-test.mjs [folder] [pages]   # tapping noteheads picks them; line and markers drawn there
 # app/public/picker-test.html: try six Open filters on a device (issue #7)

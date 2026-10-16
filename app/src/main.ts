@@ -1324,6 +1324,7 @@ engine.on("status", (s) => {
     ui.play.innerHTML = state.playing ? ICON_PAUSE : ICON_PLAY;
     ui.play.setAttribute("aria-label", state.playing ? "Pause" : "Play");
     void updateWakeLock();
+    updateKeepAlive();
 });
 
 // Keep the screen on while playing (Settings). The browser lets the lock go whenever the app is
@@ -1354,6 +1355,50 @@ async function updateWakeLock() {
         const lock = wakeLock;
         wakeLock = null;
         lock.release().catch(() => {});
+    }
+}
+
+// Keep playing on Android (issue #28): Web Audio alone doesn't count as media playback there, so
+// about 2 minutes after the app was left Android froze all of Chrome's processes and the sound
+// stopped (measured on the Pixel 9a, 17 Oct 2026). A silent <audio> element playing alongside makes
+// Chrome show its media notification, whose service keeps Chrome running; the notification's
+// play/pause work too. Only with Keep playing on: otherwise leaving the app pauses anyway.
+const ANDROID = /Android/i.test(navigator.userAgent);
+let keepAlive: HTMLAudioElement | null = null;
+function silentWav(secs: number): string {
+    const rate = 8000; // 8-bit mono: silence is the value 128
+    const n = rate * secs;
+    const b = new Uint8Array(44 + n).fill(128);
+    const v = new DataView(b.buffer);
+    const str = (o: number, s: string) => [...s].forEach((c, i) => (b[o + i] = c.charCodeAt(0)));
+    str(0, "RIFF"); v.setUint32(4, 36 + n, true); str(8, "WAVEfmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    str(36, "data"); v.setUint32(40, n, true);
+    return URL.createObjectURL(new Blob([b], { type: "audio/wav" }));
+}
+function updateKeepAlive() {
+    const want = ANDROID && settings.keepPlaying && state.playing;
+    if (want) {
+        if (!keepAlive) {
+            keepAlive = new Audio(silentWav(10)); // over 5 s, or Chrome takes it for a short sound
+            keepAlive.loop = true;
+        }
+        if ("mediaSession" in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({ title: ui.title.textContent || "PocketScore", artist: "PocketScore" });
+            navigator.mediaSession.setActionHandler("play", () => ui.play.click());
+            navigator.mediaSession.setActionHandler("pause", () => ui.play.click());
+        }
+        // allowed without a tap here: the reader has already tapped in the page
+        keepAlive.play().catch((err) => engine.note("keep playing", `the silent audio didn't start: ${err}`));
+        if ("mediaSession" in navigator) {
+            navigator.mediaSession.playbackState = "playing";
+        }
+    } else if (keepAlive && !keepAlive.paused) {
+        keepAlive.pause();
+        if ("mediaSession" in navigator) {
+            navigator.mediaSession.playbackState = "paused";
+        }
     }
 }
 
@@ -2403,6 +2448,8 @@ for (const el of settingInputs) {
             scheduleAutoFocus();
         } else if (k === "keepAwake") {
             void updateWakeLock();
+        } else if (k === "keepPlaying") {
+            updateKeepAlive();
         }
     });
 }

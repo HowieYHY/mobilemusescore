@@ -243,6 +243,23 @@ build, tests, status) before working here.
   times between speeds by scaling; the engine's timeline gives each point's time at 100% (6th value).
   Run tests that involve the speed on a score with pauses.
 
+- **Android freezes a web app that plays only through Web Audio.** With *Keep playing* on, about
+  2 minutes after the app was left (home screen), Android moved all of Chrome's processes to
+  "cached" and then froze them (`dumpsys activity processes`: `isFrozen=true`). The sound stopped
+  while the AudioContext still said "running", no gap was counted, and on return the clock jumped
+  on: "playback continues but the sound stops" (#28, 17 Oct 2026). The phone test had passed
+  because it watched only the clock and gaps, for 30 s. Fixed by a silent looping `<audio>`
+  element played alongside while *Keep playing* is on (`updateKeepAlive`): Chrome then shows its
+  media notification, whose service keeps Chrome from being frozen. Rule: a check on sound measures
+  the sound played (`app.engine.level`, with its time, since a stopped audio thread sends no new
+  level), tests last longer than the device's own delays, and the cause is looked for in the
+  device's process state before guessing.
+
+- **Say before every phone run whether it turns the screen off.** `android-background-test`
+  presses the power key (the screen-off case), which locks the phone; the user had to unlock it
+  after every run and thought something else was turning it off. Rule: name it each time, and use
+  `SCREEN_OFF=0` once that case has passed.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

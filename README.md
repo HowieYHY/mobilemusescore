@@ -217,7 +217,7 @@ every score. Until you change them, PocketScore works as described above.
 
 | Setting | What it does |
 | --- | --- |
-| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On iPhone and iPad the system may still stop it |
+| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On Android, PocketScore then shows in your notifications while it plays, with play and pause there. On iPhone and iPad the system may still stop it |
 | **Metronome on when a score opens** | Every score opens with the click on. Off: it starts muted |
 | **Tap a note to hear it** | While stopped, a tap on a note plays it. Off: the tap only moves to that note |
 | **Start focus by itself** | Hides the bars when you leave the screen alone |

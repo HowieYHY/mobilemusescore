@@ -13,6 +13,7 @@ const CSP = [
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
+    "media-src 'self' blob:", // the silent audio that keeps Android playing (Keep playing, #28)
     "connect-src 'self'",
     "worker-src 'self' blob:",
     "manifest-src 'self'",

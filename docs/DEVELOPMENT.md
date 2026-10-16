@@ -36,18 +36,27 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
 1.0.18 at the user's request.
 
 **Still open:**
-1. **#28: with *Keep playing* on, the sound stopped after leaving the app while playback carried
-   on** (the user, 16 Oct 2026, Android). Cause, measured on the Pixel 9a on 17 Oct 2026: about
-   2 minutes after leaving to the home screen, Android froze all of Chrome's processes (Web Audio
-   alone is not media playback to Android). Fixed in 1.0.23 by a silent `<audio>` element playing
-   alongside (see *Leaving the app*); `android-background-test.mjs` passed with it (no Chrome
-   process frozen, media notification up, full clock and sound, 2 min each on the home screen and
-   with the screen off, and 3.5 min to the score's end on the home screen). Waiting for the user to
-   confirm in the installed app. Once in four runs (17 Oct), the notification's play after its pause
-   didn't restart the music within 5 s: Chrome had stopped the page's audio, and Play then showed
-   "Starting audio…" for good (fixed in 1.0.24: it waits up to 4 s, then clears the message or says
-   the sound couldn't start). Not reproduced since; `app.engine.health` now logs each audio state
-   change (`audio`), so read it if the notification's play fails again.
+1. **#28: with *Keep playing* on, the sound stops after leaving the app while playback carries on
+   (Android). Still happens in the installed app** (the user, 17 Oct 2026, on 1.0.24).
+   - Found on the Pixel 9a (17 Oct), in a **Chrome tab**: about 2 minutes after leaving to the home
+     screen, Android froze all of Chrome's processes (`dumpsys activity processes`, `isFrozen=true`);
+     Web Audio alone is not media playback to Android. 1.0.23 plays a silent looping `<audio>`
+     alongside (`updateKeepAlive`, see *Leaving the app*), so Chrome shows its media notification;
+     in the tab, `android-background-test.mjs` then passed (no freeze, sound throughout, 2 min home and
+     screen off, 3.5 min home, the notification's pause and play).
+   - **The installed app was never tested**: every phone test runs in a Chrome tab at a local address,
+     so the reader's own data is safe. The installed app runs as its own Android task (a WebAPK) and
+     may be treated differently: its own media notification, process priority, or the silent audio
+     not starting there. Next: test leaving the installed app over USB (it shows in Chrome's DevTools
+     list too; read `app.engine.health`, `dumpsys activity processes` and `dumpsys notification`
+     while it is away, without changing its data), find what differs from the tab, then fix.
+   - The user's rule for the fix (17 Oct): one block of code for every platform and feature, with
+     small changes where one needs them, not code for one platform. `updateKeepAlive` is Android-only
+     today (`ANDROID`); make the fix work the same way everywhere, then check iPhone and iPad again.
+   - Also seen once in four tab runs: the notification's play after its pause didn't restart the
+     music (Chrome had stopped the page's audio), and Play showed "Starting audio…" for good. 1.0.24
+     clears that message (or says the sound couldn't start); the notification's play itself was not
+     fixed. `app.engine.health` logs each audio state change (`audio`).
 2. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
 3. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
@@ -109,7 +118,7 @@ start screen shows 1.0.15 or later.
 
 | What | Devices | How | Expected |
 | --- | --- | --- | --- |
-| Keep playing when I leave PocketScore | **Android: passed with the #28 fix** (17 Oct, `android-background-test.mjs`: home screen and screen off 2 min each, home screen 3.5 min to the score's end; no Chrome process frozen, Chrome's media notification up, full clock, sound heard throughout, 0 gaps; the notification's pause and play work). Before the fix Android froze Chrome ~2 min after leaving. The user still to confirm in the installed app. iPhone, iPad: passed (the user, 16 Oct 2026) | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
+| Keep playing when I leave PocketScore | **Android: passed with the #28 fix** (17 Oct, `android-background-test.mjs`: home screen and screen off 2 min each, home screen 3.5 min to the score's end; no Chrome process frozen, Chrome's media notification up, full clock, sound heard throughout, 0 gaps; the notification's pause and play work). Before the fix Android froze Chrome ~2 min after leaving. **In the installed app it still stops** (the user, 17 Oct, 1.0.24; tests ran in a Chrome tab only). iPhone, iPad: passed (the user, 16 Oct 2026) | Turn it on, play, then switch to another app, go to the home screen, and lock the screen; wait a minute each | The music goes on and stays smooth (no stutter notice when you come back). On iPhone/iPad the system may stop it: if so, coming back should say the device stopped the sound, and the cursor should not run on in silence |
 | Keep playing off (default) | **Android: passed** (home screen pauses; the message on return; the screen off makes the page hidden within 3 s). iPhone, iPad: passed (the user, 16 Oct 2026) | Play, leave the app, come back | Paused, with the message, as before |
 | Keep the screen on while playing | **Android: passed** (Chrome grants the screen lock while playing; let go on pause). iPhone, iPad: passed (the user, 16 Oct 2026) | Set the screen to dim after 30 s, turn the setting on, play a long score without touching | The screen stays on while playing, and dims as usual once paused. Where the browser can't, the setting shows "Not available in this browser." |
 | Full screen with the Focus button | **Android: passed** (on: full screen; off: not). iPad, iPhone: passed (the user, 16 Oct 2026) | Turn it off, tap ⛶; turn it on, tap ⛶ | Off: only PocketScore's bars go. On: the browser's or phone's bars go too. On iPhone it shows off with "Not available on this device." |

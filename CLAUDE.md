@@ -40,6 +40,9 @@ build, tests, status) before working here.
 - On phones, and on tablets up to 1100 px wide (iPad portrait), the score's name sits on its own row
   above the top buttons, with only the small icons beside it, and wraps to a second line rather than
   being cut: longish names must show in full (the user, 16 Oct 2026).
+- **One block of code for every platform and feature** (the user, 17 Oct 2026). Don't write code
+  for one platform or one feature only (e.g. an `ANDROID` check around a fix); make the same code
+  serve phones, tablets and browsers alike, with small changes only where one really needs them.
 - **Don't clutter the UI, especially on mobile.** New controls that most people won't need every time
   go behind a small button or link (e.g. the sound list's *Several parts*), not as permanent rows.
 - **Commits are made as `HowieYHY <177769334+HowieYHY@users.noreply.github.com>`** on every machine
@@ -261,6 +264,12 @@ build, tests, status) before working here.
   background), the message stayed for good (the user saw it on the Pixel, 17 Oct 2026). Rule: a
   "…ing" message ends with what happened (cleared, or "couldn't start, tap again"), with a time
   limit; `selfcheck-test` stops the sound and checks it.
+
+- **A test in a Chrome tab is not a test of the installed app.** The #28 fix passed every run in a
+  Chrome tab, but the music still stopped in the user's installed app (17 Oct 2026): the installed
+  app is its own Android task and can be treated differently. Rule: anything about leaving the
+  app, notifications, the status bar or the home screen is tested in the installed app too (read
+  only, the reader's data untouched), or the result says plainly it was a tab.
 
 - **Say before every phone run whether it turns the screen off.** `android-background-test`
   presses the power key (the screen-off case), which locks the phone; the user had to unlock it

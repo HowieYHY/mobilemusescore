@@ -217,7 +217,7 @@ every score. Until you change them, PocketScore works as described above.
 
 | Setting | What it does |
 | --- | --- |
-| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On Android, PocketScore then shows in your notifications while it plays, with play and pause there. On iPhone and iPad the system may still stop it |
+| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On Android, PocketScore then shows in your notifications while it plays, with play and pause there. **Known problem:** in the installed app on Android the music can still stop a few minutes after you leave it; this is being fixed ([#28](https://github.com/HowieYHY/mobilemusescore/issues/28)). On iPhone and iPad the system may still stop it |
 | **Metronome on when a score opens** | Every score opens with the click on. Off: it starts muted |
 | **Tap a note to hear it** | While stopped, a tap on a note plays it. Off: the tap only moves to that note |
 | **Start focus by itself** | Hides the bars when you leave the screen alone |
@@ -290,6 +290,7 @@ No. PocketScore is for reading, playing and practising. Make changes in MuseScor
 | Drawing scrolls the page (or it won't scroll) | Check **Draw with finger** in the notes bar |
 | Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once |
 | A score won't open | It must be a `.mscz` file saved by MuseScore |
+| The music stops a few minutes after leaving the app, with **Keep playing** on (Android) | A known problem, being fixed ([#28](https://github.com/HowieYHY/mobilemusescore/issues/28)). Until then, keep PocketScore on screen while you listen |
 | A light strip under the bottom bar (iPhone or iPad, added to the home screen before version 1.0.3) | It's only cosmetic. To remove it, open PocketScore in Safari or Chrome until the start screen says 1.0.3 or later, then add it to your home screen again. **The new icon starts without your notes and settings** (each icon keeps its own), so keep the old one until you no longer need them |
 
 **Report a problem:** [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or message

@@ -7,7 +7,8 @@
 //   {type:"flush"}           drop queued audio (seek, pause, stop); audio the
 //                            worker rendered before it hears of the flush
 //                            carries the old generation and is dropped too
-// To the page: {type:"queued", frames, underruns} about every 100 ms.
+// To the page: {type:"queued", frames, underruns, peak} about every 100 ms;
+// peak = the loudest sample played since the last report (0 = silence).
 
 // Audio wanted before the music resumes after a flush (a jump while playing):
 // six of the worker's blocks (~128 ms). The first blocks after a jump take
@@ -28,6 +29,7 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         this.priming = false;
         this.enginePlaying = false;
         this.sinceReport = 0;
+        this.peak = 0;
         this.gen = 0;
         this.in = null;
         this.port.onmessage = (e) => this.onMessage(e.data);
@@ -74,10 +76,15 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             const chunk = this.queue[0];
             const chunkFrames = chunk.length / 2;
             const n = Math.min(frames - i, chunkFrames - this.readPos);
+            let peak = this.peak;
             for (let k = 0; k < n; k++) {
-                left[i + k] = chunk[(this.readPos + k) * 2];
-                right[i + k] = chunk[(this.readPos + k) * 2 + 1];
+                const l = chunk[(this.readPos + k) * 2];
+                const r = chunk[(this.readPos + k) * 2 + 1];
+                left[i + k] = l;
+                right[i + k] = r;
+                peak = Math.max(peak, Math.abs(l), Math.abs(r));
             }
+            this.peak = peak;
             i += n;
             this.readPos += n;
             if (this.readPos >= chunkFrames) {
@@ -112,7 +119,8 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         this.sinceReport += frames;
         if (this.sinceReport >= sampleRate / 10) {
             this.sinceReport = 0;
-            this.port.postMessage({ type: "queued", frames: this.queuedFrames, underruns: this.underruns });
+            this.port.postMessage({ type: "queued", frames: this.queuedFrames, underruns: this.underruns, peak: this.peak });
+            this.peak = 0;
         }
         return true;
     }

@@ -12,3 +12,14 @@ export const adbPath = process.env.ADB || [
 ].find((p) => fs.existsSync(p)) || "adb";
 
 export const adb = (...args) => execFileSync(adbPath, args, { maxBuffer: 64 << 20 });
+
+// Chrome opens its DevTools socket only once it is in front: with Chrome in the background the tab
+// list failed with "other side closed" (17 Oct 2026). Brings it forward (its last tab, no new one)
+// and forwards the socket to localPort.
+export async function chromeDevtools(localPort) {
+    adb("shell", "am", "start", "-n", "com.android.chrome/com.google.android.apps.chrome.Main");
+    for (let i = 0; i < 30 && !adb("shell", "cat", "/proc/net/unix").toString().includes("@chrome_devtools_remote"); i++) {
+        await new Promise((r) => setTimeout(r, 500));
+    }
+    adb("forward", `tcp:${localPort}`, "localabstract:chrome_devtools_remote");
+}

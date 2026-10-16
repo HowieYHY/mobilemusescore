@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { adb } from "./lib/adb.mjs";
+import { adb, chromeDevtools } from "./lib/adb.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
@@ -40,12 +40,16 @@ for (let i = 0; i < 150 && !sh("dumpsys", "window").includes("isKeyguardShowing=
     if (i === 0) console.log("waiting for the phone to be unlocked…");
     await sleep(2000);
 }
+if (!sh("dumpsys", "window").includes("isKeyguardShowing=false")) {
+    console.log("the phone is still locked after 5 minutes: unlock it and run again");
+    process.exit(2);
+}
 // the phone reaches this PC's test copy through a reverse port (else it shows its old offline copy)
 const port = new URL(url).port;
 if (/^(localhost|127\.0\.0\.1)$/.test(new URL(url).hostname) && port) adb("reverse", `tcp:${port}`, `tcp:${port}`);
 // only one tab at the test address, the one this test opens (a leftover one stays hidden and is
 // throttled: it drew once a second and couldn't go full screen)
-adb("forward", "tcp:9224", "localabstract:chrome_devtools_remote");
+await chromeDevtools(9224);
 const list = async () => (await fetch("http://localhost:9224/json/list")).json();
 for (const t of await list()) {
     if (t.type === "page" && t.url.startsWith(url)) await fetch(`http://localhost:9224/json/close/${t.id}`);
@@ -96,7 +100,10 @@ try {
     // the phone keeps the last build it saw at this address: this build, or start afresh
     const want = JSON.parse(fs.readFileSync(path.join(root, "app/package.json"), "utf8")).version;
     const version = () => run(`document.getElementById("version").textContent`);
-    if (!(await version()).endsWith(want)) {
+    // by the script's name, not the version: rebuilds keep the version (17 Oct 2026)
+    const script = fs.readFileSync(path.join(root, "app/dist/index.html"), "utf8").match(/assets\/index-[\w-]+\.js/)[0];
+    const sameBuild = () => run(`!!document.querySelector('script[src*="${script}"]')`);
+    if (!(await sameBuild())) {
         console.log(`  the phone had ${await version()} at this address; clearing its offline copy`);
         await run(`(async () => { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
             for (const k of await caches.keys()) await caches.delete(k); })()`);
@@ -105,7 +112,7 @@ try {
         await until(`document.getElementById("status")?.textContent.startsWith("Ready")`, 180000);
     }
     console.log("test copy:", await version());
-    check((await version()).endsWith(want), `the phone runs this build (${want})`);
+    check((await version()).endsWith(want) && (await sameBuild()), `the phone runs this build (${want}, ${script})`);
     check(await run(`!document.hidden`), "the test tab is the one on screen");
     const b64 = fs.readFileSync(scorePath).toString("base64");
     await run(`(async () => { const bin = atob("${b64}"); const b = new Uint8Array(bin.length);
@@ -159,6 +166,33 @@ try {
         r.health.forEach((h) => console.log(`    ${h.at} ${h.kind}: ${h.detail}`));
         check(r.gaps - g0 === 0, `no sound gaps in 45 s of Page view with focus by itself ${auto ? "on" : "off"}`);
     }
+
+    // every setting away from its default is kept: after a reload, and after an update's reload
+    // (offline copy cleared and fetched again); then the test copy's defaults are put back
+    const changed = await run(`(() => {
+        const out = {};
+        for (const el of document.querySelectorAll("[data-set]")) {
+            const k = el.dataset.set;
+            if (el.type === "checkbox") el.checked = !el.checked;
+            else if (el.tagName === "SELECT") el.value = [...el.options].find((o) => !o.selected).value;
+            else el.value = String(Number(el.value) + 1);
+            el.dispatchEvent(new Event("change"));
+        }
+        for (const k of Object.keys(app.settings)) out[k] = app.settings[k];
+        return out;
+    })()`);
+    const stored = () => run(`({ ...app.settings })`);
+    const same = (s) => Object.keys(changed).filter((k) => s[k] !== changed[k]);
+    for (const [how, prep] of [["a reload", ""], ["an update (offline copy cleared)",
+        `for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k);`]]) {
+        await run(`(async () => { ${prep} })()`);
+        await send("Page.reload", { ignoreCache: true });
+        await sleep(3000);
+        await until(`document.getElementById("status")?.textContent.startsWith("Ready")`, 180000);
+        const off = same(await stored());
+        check(off.length === 0, `every setting changed from its default is kept after ${how}${off.length ? ` (lost: ${off.join(", ")})` : ""} (${Object.keys(changed).length} settings)`);
+    }
+    await run(`localStorage.removeItem("pocketscore.settings")`);
 } finally {
     await run(`app.state?.playing && app.engine.pause()`).catch(() => {});
     await send("Page.close").catch(() => {});

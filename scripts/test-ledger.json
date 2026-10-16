@@ -2,8 +2,8 @@
   "settings-test": {
     "streak": 12,
     "last": "pass",
-    "commit": "372aca7+changes",
-    "passCommit": "372aca7",
+    "commit": "9e7fb9c",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "ran on the code of this commit (Settings page on phones)"
   },
@@ -63,8 +63,8 @@
   "csp-test": {
     "streak": 4,
     "last": "pass",
-    "commit": "372aca7+changes",
-    "passCommit": "372aca7",
+    "commit": "9e7fb9c",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
@@ -102,24 +102,24 @@
   "android-background-test": {
     "streak": 2,
     "last": "pass",
-    "commit": "372aca7+changes",
-    "passCommit": "372aca7",
+    "commit": "9e7fb9c",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "Pixel 9a, 17 Oct: passes with the #28 fix (no Chrome freeze, sound heard, 2 min home + screen off, 3.5 min home, notification pause/play); the 15 Oct pass didn't count, the test then missed #28"
   },
   "android-settings-test": {
     "streak": 2,
     "last": "pass",
-    "commit": "372aca7+changes",
-    "passCommit": "372aca7",
+    "commit": "9e7fb9c",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "Pixel 9a, 17 Oct: all passed, incl. all 10 settings kept after a reload and an update"
   },
   "notes-views-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "f9aadd7+changes",
-    "passCommit": "f9aadd7",
+    "commit": "9e7fb9c+changes",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "needs 'I am move it edited.mscz' (its layout), not on this PC"
   },
@@ -150,16 +150,16 @@
   "cursor-test": {
     "streak": 6,
     "last": "pass",
-    "commit": "372aca7+changes",
-    "passCommit": "372aca7",
+    "commit": "9e7fb9c",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "selfcheck-test": {
     "streak": 6,
     "last": "pass",
-    "commit": "372aca7+changes",
-    "passCommit": "372aca7",
+    "commit": "9e7fb9c",
+    "passCommit": "9e7fb9c",
     "date": "2026-10-16",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },

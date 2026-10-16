@@ -134,7 +134,10 @@ export class Engine {
         this.ctx = ctx;
         void ctx.resume();
         // "suspended" or (Safari) "interrupted" while playing means the device stopped the sound
-        ctx.onstatechange = () => this.emit("audioState", ctx.state);
+        ctx.onstatechange = () => {
+            this.note("audio", `${ctx.state}, page ${document.visibilityState}`);
+            this.emit("audioState", ctx.state);
+        };
 
         this.audioStarting = (async () => {
             this.emit("audioStatus", { text: "Loading MS Basic sound font…" });

@@ -102,16 +102,16 @@
   "android-background-test": {
     "streak": 2,
     "last": "pass",
-    "commit": "9e7fb9c",
-    "passCommit": "9e7fb9c",
+    "commit": "7bc943b+changes",
+    "passCommit": "7bc943b",
     "date": "2026-10-16",
     "note": "Pixel 9a, 17 Oct: passes with the #28 fix (no Chrome freeze, sound heard, 2 min home + screen off, 3.5 min home, notification pause/play); the 15 Oct pass didn't count, the test then missed #28"
   },
   "android-settings-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "9e7fb9c",
-    "passCommit": "9e7fb9c",
+    "commit": "7bc943b+changes",
+    "passCommit": "7bc943b",
     "date": "2026-10-16",
     "note": "Pixel 9a, 17 Oct: all passed, incl. all 10 settings kept after a reload and an update"
   },
@@ -148,18 +148,18 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "9e7fb9c",
-    "passCommit": "9e7fb9c",
+    "commit": "7bc943b+changes",
+    "passCommit": "7bc943b",
     "date": "2026-10-16",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "selfcheck-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "9e7fb9c",
-    "passCommit": "9e7fb9c",
+    "commit": "7bc943b+changes",
+    "passCommit": "7bc943b",
     "date": "2026-10-16",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },

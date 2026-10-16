@@ -73,6 +73,18 @@ check(await page.evaluate(() => document.getElementById("status").hidden), "a la
 check(await page.evaluate(() => app.state.playing), "playback carried on throughout");
 
 const slow = await page.evaluate(() => app.engine.health.filter((h) => h.kind === "slow frame"));
+
+// the device (or Chrome) stops the sound; Play starts it again and "Starting audio…" goes away
+// (it stayed on screen for good before, seen on the Pixel, 17 Oct 2026)
+await page.evaluate(() => app.engine.ctx.suspend());
+await page.waitForFunction(() => !app.state.playing, null, { timeout: 10000 });
+await page.waitForTimeout(500);
+await page.tap("#play");
+await page.waitForFunction(() => app.state.playing, null, { timeout: 10000 }).catch(() => {});
+await page.waitForTimeout(1000);
+const after = await page.evaluate(() => ({ playing: app.state.playing,
+    status: document.getElementById("status").hidden ? "" : document.getElementById("status").textContent }));
+check(after.playing && !/Starting audio/.test(after.status), `Play after the sound was stopped plays, and "Starting audio…" goes (${JSON.stringify(after)})`);
 console.log(`slow frames logged: ${slow.length}${slow.length ? " (" + slow.map((h) => h.detail).join(", ") + ")" : ""}`);
 
 await browser.close();

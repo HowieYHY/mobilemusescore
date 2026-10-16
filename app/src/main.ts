@@ -1447,6 +1447,19 @@ ui.play.onclick = async () => {
             pendingPlay = true;
             return;
         }
+        // The sound was stopped (not yet tapped, or the device or Chrome stopped it): wait until it
+        // runs again, then take the message away; it stayed on screen for good before (17 Oct 2026)
+        const running = await Promise.race([
+            engine.whenRunning().then(() => true, () => false),
+            new Promise<boolean>((r) => setTimeout(() => r(false), 4000)),
+        ]);
+        if (!running) {
+            setStatus("The sound couldn't start. Tap Play again.", "info", 6000);
+            return;
+        }
+        if (ui.status.textContent === "Starting audio…") {
+            setStatus("");
+        }
     }
     state.playing ? engine.pause() : engine.play();
 };

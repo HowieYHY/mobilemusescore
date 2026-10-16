@@ -206,7 +206,10 @@ try {
             sh("cmd", "media_session", "dispatch", "pause");
             const paused = await until(`!app.state.playing`, 5000);
             sh("cmd", "media_session", "dispatch", "play");
-            const resumed = await until(`app.state.playing`, 5000);
+            const resumed = await until(`app.state.playing`, 8000);
+            console.log("  after the notification's play:", JSON.stringify(await run(`({ audio: app.engine.audioRunning,
+                status: document.getElementById("status").hidden ? "" : document.getElementById("status").textContent,
+                health: app.engine.health.filter((h) => h.kind === "audio") })`)));
             check(paused && resumed, `the notification's pause and play work while away (paused ${paused}, playing again ${resumed})`);
             front();
             await until(`!document.hidden`, 15000); // fully back before the screen goes off

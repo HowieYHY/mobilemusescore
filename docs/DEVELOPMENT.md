@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (17 Oct 2026, version 1.0.23)
+## Current status (17 Oct 2026, version 1.0.24)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -42,8 +42,12 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
    alone is not media playback to Android). Fixed in 1.0.23 by a silent `<audio>` element playing
    alongside (see *Leaving the app*); `android-background-test.mjs` passed with it (no Chrome
    process frozen, media notification up, full clock and sound, 2 min each on the home screen and
-   with the screen off, and 5 min on the home screen). Waiting for the user to confirm in the
-   installed app.
+   with the screen off, and 3.5 min to the score's end on the home screen). Waiting for the user to
+   confirm in the installed app. Once in four runs (17 Oct), the notification's play after its pause
+   didn't restart the music within 5 s: Chrome had stopped the page's audio, and Play then showed
+   "Starting audio…" for good (fixed in 1.0.24: it waits up to 4 s, then clears the message or says
+   the sound couldn't start). Not reproduced since; `app.engine.health` now logs each audio state
+   change (`audio`), so read it if the notification's play fails again.
 2. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
 3. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to

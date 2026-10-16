@@ -255,6 +255,13 @@ build, tests, status) before working here.
   level), tests last longer than the device's own delays, and the cause is looked for in the
   device's process state before guessing.
 
+- **A message shown while waiting must be taken away on every path.** Play showed "Starting
+  audio…" whenever the sound was stopped, but only the app's first audio start cleared it; after
+  the device or Chrome stopped the sound (here: the notification's pause, with the app in the
+  background), the message stayed for good (the user saw it on the Pixel, 17 Oct 2026). Rule: a
+  "…ing" message ends with what happened (cleared, or "couldn't start, tap again"), with a time
+  limit; `selfcheck-test` stops the sound and checks it.
+
 - **Say before every phone run whether it turns the screen off.** `android-background-test`
   presses the power key (the screen-off case), which locks the phone; the user had to unlock it
   after every run and thought something else was turning it off. Rule: name it each time, and use

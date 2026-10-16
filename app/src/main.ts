@@ -1242,6 +1242,9 @@ let pausedOnLeaving = false;
 document.addEventListener("visibilitychange", () => {
     lastFrame = 0; // no frames while away: not a slow frame
     void updateWakeLock();
+    if (state.playing) {
+        engine.note(document.visibilityState === "hidden" ? "left" : "back", `audio ${engine.audioRunning ? "running" : "stopped"}, keep playing ${settings.keepPlaying ? "on" : "off"}`);
+    }
     if (document.visibilityState === "hidden") {
         if (state.playing && !settings.keepPlaying) {
             pausedOnLeaving = true;

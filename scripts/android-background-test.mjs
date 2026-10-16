@@ -6,6 +6,8 @@
 //
 //   cd app && npm run build && npx vite preview --host 127.0.0.1 --port 4173
 //   adb reverse tcp:4173 tcp:4173
+// Keep playing checks the sound level actually played while away (app.engine.level), not only the
+// clock: in issue #28 the clock ran on in silence. AWAY=secs sets each stretch (default 120).
 // Usage: node scripts/android-background-test.mjs [score.mscz]
 
 import fs from "node:fs";
@@ -16,6 +18,8 @@ import { adb } from "./lib/adb.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const scorePath = path.resolve(process.argv[2] || path.join(root, "real test musescores/I am move it(howie version).mscz"));
 const url = process.env.APP_URL || "http://localhost:4173/";
+// how long each Keep playing stretch stays away (issue #28: the sound stopped after a while)
+const awaySecs = Number(process.env.AWAY || 120);
 const sh = (...a) => adb("shell", ...a).toString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const front = () => sh("am", "start", "-n", "com.android.chrome/com.google.android.apps.chrome.Main");
@@ -34,6 +38,12 @@ for (let i = 0; i < 150 && !sh("dumpsys", "window").includes("isKeyguardShowing=
 // the phone reaches this PC's test copy through a reverse port (else it shows its old offline copy)
 const port = new URL(url).port;
 if (/^(localhost|127\.0\.0\.1)$/.test(new URL(url).hostname) && port) adb("reverse", `tcp:${port}`, `tcp:${port}`);
+// only one tab at the test address, the one this test opens (a leftover one stays hidden and is
+// throttled: it drew once a second and couldn't go full screen, 16 Oct 2026)
+adb("forward", "tcp:9223", "localabstract:chrome_devtools_remote");
+for (const t of await (await fetch("http://localhost:9223/json/list")).json()) {
+    if (t.type === "page" && t.url.startsWith(url)) await fetch(`http://localhost:9223/json/close/${t.id}`);
+}
 sh("am", "start", "-a", "android.intent.action.VIEW", "-d", url, "com.android.chrome");
 adb("forward", "tcp:9223", "localabstract:chrome_devtools_remote");
 let target;
@@ -74,7 +84,8 @@ const tapPlay = async () => {
     await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 };
 const setSetting = (k, v) => run(`(() => { const el = document.querySelector('[data-set="${k}"]'); el.checked = ${v}; el.dispatchEvent(new Event("change")); })()`);
-const audio = () => run(`({ playing: app.state.playing, clock: app.engine.audioTime, gaps: app.engine.underruns, running: app.engine.audioRunning, hidden: document.hidden })`);
+const audio = () => run(`({ playing: app.state.playing, clock: app.engine.audioTime, gaps: app.engine.underruns, running: app.engine.audioRunning, hidden: document.hidden,
+    level: app.engine.level, silences: app.engine.health.filter((h) => h.kind === "silence").length })`);
 
 try {
     await until(`document.getElementById("status").textContent.startsWith("Ready")`, 180000);
@@ -139,16 +150,25 @@ try {
     await until(`app.state.playing`, 30000);
     await sleep(2000);
     for (const [where, key] of [["the home screen", "KEYCODE_HOME"], ["the screen off", "KEYCODE_POWER"]]) {
+        await run(`app.engine.seek(0)`); // from the start, so the score doesn't end while away
+        await sleep(2000);
         const a = await audio();
         const t = Date.now();
         sh("input", "keyevent", key);
-        await sleep(30000);
+        // the clock running proves nothing on its own (#28): listen to what is played, every 5 s
+        const heard = [];
+        while (Date.now() - t < awaySecs * 1000) {
+            await sleep(5000);
+            heard.push((await audio()).level > 0);
+        }
         const b = await audio();
         b.screen = sh("dumpsys", "power").match(/mWakefulness=(\w+)/)?.[1];
         const ran = b.clock - a.clock;
         const wall = (Date.now() - t) / 1000;
-        console.log(`  ${where}: screen ${b.screen}, hidden ${b.hidden}, playing ${b.playing}, audio running ${b.running}, audio clock ran ${ran.toFixed(1)} s of ${wall.toFixed(1)} s, gaps ${b.gaps - a.gaps}`);
+        const quiet = heard.map((h, i) => (h ? "" : `${(i + 1) * 5}s`)).filter(Boolean);
+        console.log(`  ${where}: screen ${b.screen}, hidden ${b.hidden}, playing ${b.playing}, audio running ${b.running}, audio clock ran ${ran.toFixed(1)} s of ${wall.toFixed(1)} s, gaps ${b.gaps - a.gaps}, silent at ${quiet.join(" ") || "none"}`);
         check(b.hidden && b.playing && ran > wall - 2 && b.gaps === a.gaps, `keep playing on: the music goes on with ${where}, no gaps`);
+        check(heard.at(-1) && b.silences === a.silences, `keep playing on: sound is still heard after ${awaySecs} s with ${where}`);
         if (key === "KEYCODE_HOME") {
             front();
             await until(`!document.hidden`, 15000); // fully back before the screen goes off
@@ -157,6 +177,7 @@ try {
     }
     sh("input", "keyevent", "KEYCODE_WAKEUP");
 } finally {
+    console.log("  health:", JSON.stringify(await run(`app.engine.health`).catch(() => null)));
     await run(`app.state?.playing && app.engine.pause()`).catch(() => {});
     await send("Page.close").catch(() => {});
     ws.close();

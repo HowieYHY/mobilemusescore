@@ -1,10 +1,10 @@
 {
   "settings-test": {
-    "streak": 10,
+    "streak": 11,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "f9aadd7+changes",
+    "passCommit": "f9aadd7",
+    "date": "2026-10-16",
     "note": "ran on the code of this commit (Settings page on phones)"
   },
   "tour-test": {
@@ -61,11 +61,11 @@
     "date": "2026-10-15"
   },
   "csp-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15",
+    "commit": "f9aadd7+changes",
+    "passCommit": "f9aadd7",
+    "date": "2026-10-16",
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
   "pageturn-test": {
@@ -100,27 +100,27 @@
     "note": "vs the published engine: all identical (drawings in another order after other scores)"
   },
   "android-background-test": {
-    "streak": 2,
+    "streak": 1,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
+    "commit": "f9aadd7+changes",
+    "passCommit": "f9aadd7",
     "date": "2026-10-15",
     "note": "Pixel 9a, 15 Oct"
   },
   "android-settings-test": {
     "streak": 0,
     "last": "fail",
-    "commit": "d58d7fb+changes",
+    "commit": "f9aadd7+changes",
     "passCommit": null,
     "date": "2026-10-15",
     "note": "its leave-the-app checks moved to android-background-test; the rest passed on the Pixel 9a, 15 Oct"
   },
   "notes-views-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15",
+    "commit": "f9aadd7+changes",
+    "passCommit": "f9aadd7",
+    "date": "2026-10-16",
     "note": "needs 'I am move it edited.mscz' (its layout), not on this PC"
   },
   "continuous-test": {
@@ -148,19 +148,19 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "f9aadd7+changes",
+    "passCommit": "f9aadd7",
+    "date": "2026-10-16",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "selfcheck-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "f9aadd7+changes",
+    "passCommit": "f9aadd7",
+    "date": "2026-10-16",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "install-hint-test": {

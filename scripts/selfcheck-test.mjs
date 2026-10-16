@@ -43,6 +43,8 @@ await page.waitForTimeout(4000);
 const t0 = await page.evaluate(() => app.engine.stats.targetSecs);
 check(t0 > 0.45, `Android starts with more sound ready (${(t0 * 1000).toFixed(0)} ms)`);
 check(await page.evaluate(() => app.engine.underruns) === 0, "no gaps in steady playback");
+const level = await page.evaluate(() => app.engine.level);
+check(level > 0, `the sound played is measured (level ${level.toFixed(4)}; issue #28)`);
 
 // freeze the engine for longer than the queue: a gap
 await page.evaluate((ms) => app.engine.testStall(ms), Math.round(t0 * 1000) + 400);

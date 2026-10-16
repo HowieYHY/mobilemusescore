@@ -25,6 +25,11 @@ export class Engine {
     private clock = { t: 0, perf: 0, raw: 0, set: false };
     /** Gaps in the sound while playing (the device fell behind). */
     underruns = 0;
+    /** The loudest sample played in the last ~100 ms (0 = silence), for tests and diagnosis. */
+    level = 0;
+    private playing = false;
+    private silentSince = 0;
+    private silenceNoted = false;
     /**
      * Playback self-check: recent problems (gaps in the sound, frames where the
      * page froze), newest last, for diagnosing a device (`app.engine.health`
@@ -141,7 +146,7 @@ export class Engine {
             node.connect(ctx.destination);
             node.port.onmessage = (e) => {
                 if (e.data.type === "queued") {
-                    this.onQueued(e.data.frames);
+                    this.onQueued(e.data.frames, e.data.peak);
                 }
             };
 
@@ -224,9 +229,22 @@ export class Engine {
     // How far the engine is ahead of the speaker: the queued audio plus the
     // device's own output latency. The score engine shifts the cursor and the
     // pause point by this much so they match what is heard.
-    private onQueued(frames: number) {
+    private onQueued(frames: number, peak: number) {
         if (!this.ctx) {
             return;
+        }
+        this.level = peak;
+        // Silent for seconds while playing (issue #28: the clock ran on, no sound):
+        // noted once per silent stretch, with whether the page was in view
+        if (this.playing && peak === 0) {
+            this.silentSince ||= performance.now();
+            if (!this.silenceNoted && performance.now() - this.silentSince > 3000) {
+                this.silenceNoted = true;
+                this.note("silence", `playing but silent for 3 s; queued ${(frames / this.ctx.sampleRate * 1000).toFixed(0)} ms, page ${document.visibilityState}`);
+            }
+        } else {
+            this.silentSince = 0;
+            this.silenceNoted = false;
         }
         this.stats.queuedSecs = frames / this.ctx.sampleRate;
         const out = (this.ctx as any).outputLatency || 0;
@@ -290,6 +308,8 @@ export class Engine {
     // Tell the audio engine whether music is playing: while stopped it keeps
     // only a little audio queued, so tapped notes sound without delay.
     private setPlaying(on: boolean) {
+        this.playing = on;
+        this.silentSince = 0;
         this.audioWorker?.postMessage({ type: "playing", on });
     }
 

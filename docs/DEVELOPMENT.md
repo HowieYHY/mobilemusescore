@@ -24,7 +24,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
-was measured over USB (see *Tests*). Open issues: #28 (below), #3 (design, open to contributors)
+was measured over USB (see *Tests*). Open issues: #28 and #29 (below), #3 (design, open to contributors)
 and #18 (possibly shipping to the App Store and Google Play). #26 (go to a bar or section, 1.0.20) and #27
 (security review and hardening, 1.0.19) were checked on an iPhone and an iPad by the user and closed
 on 16 Oct 2026. The RESO website's preview (#2, #14) is live on
@@ -57,9 +57,11 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
      music (Chrome had stopped the page's audio), and Play showed "Starting audio…" for good. 1.0.24
      clears that message (or says the sound couldn't start); the notification's play itself was not
      fixed. `app.engine.health` logs each audio state change (`audio`).
-2. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
+2. **#29: a sudden sound when leaving the app while playing with *Keep playing* off** (the user,
+   17 Oct 2026, Android, 1.0.24). The music should pause silently. Not looked into yet.
+3. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
-3. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
+4. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
    update the installed app (see the Settings checklist below).
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)

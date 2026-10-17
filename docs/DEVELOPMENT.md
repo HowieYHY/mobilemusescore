@@ -45,7 +45,10 @@ the user and closed on 18 Oct 2026.
 2. **The light strip under Android's gesture bar.** The manifest has said navy (#1e2a3a) since 1.0.17,
    but on 18 Oct 2026 the installed WebAPK (pulled over USB) still stored `backgroundColor`
    -1446673 = #e9ecef, the grey strip (theme #1e2a3a): Chrome hadn't refreshed it, though the user
-   had waited and followed the steps. The page can't paint there (`viewport-fit=cover` is already
+   had waited and followed the steps. `chrome://webapks` (read over DevTools, 18 Oct): Version code 1 (the 7 Oct
+   install), Background color rgba(233,236,239), last update check 17 Oct 03:14 (when the live
+   manifest already said navy), last completion 15 Oct; "Update Status: Succeeded" only means the
+   request was accepted. Chrome checked and chose not to rebuild; it doesn't say why. The page can't paint there (`viewport-fit=cover` is already
    set; the page ends above the gesture bar). Next: read `chrome://webapks` for PocketScore (last
    update check, update status), and after *Request update*, close the app fully and reopen it
    (Chrome updates on a launch). Reinstalling would take the new colours, but say first what it may

@@ -44,8 +44,8 @@ No app store needed.
 - **Nothing is uploaded.** Your scores are opened on your device and never sent anywhere.
   (The app itself is downloaded from GitHub's website hosting, which sees visits like any website.
   PocketScore has no accounts, ads or tracking.)
-- **The music pauses when you leave the app** (another app, home screen, screen locked).
-  Tap Play when you're back. To keep it playing instead, turn on **Keep playing when I leave
+- **The music pauses when you leave the app** (another app, home screen, screen locked), and
+  goes quiet at once. Tap Play when you're back. To keep it playing instead, turn on **Keep playing when I leave
   PocketScore** in **Settings** (the gear at the top).
 - **It updates itself, even if you never close it.** With internet, it looks for a new version when
   you open it, when you come back to it, and every 30 minutes. If a score is open, it restarts into

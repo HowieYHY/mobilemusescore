@@ -19,6 +19,21 @@
       "topbar"
     ]
   },
+  "leave-silence-test": {
+    "files": [
+      "app/public/worklet/msaudio-worklet.js"
+    ],
+    "words": [
+      "fadeOut",
+      "restoreVolume",
+      "visibilitychange",
+      "keepPlaying",
+      "pausedOnLeaving",
+      "leavePause",
+      "flush\\(",
+      "createGain"
+    ]
+  },
   "goto-test": {
     "files": [
       "engine/core/session.cpp",

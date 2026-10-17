@@ -18,6 +18,7 @@ export class Engine {
     private listeners = new Map<string, Set<Listener>>();
     private ctx: AudioContext | null = null;
     private node: AudioWorkletNode | null = null;
+    private out: GainNode | null = null; // between the worklet and the speaker: fades for leaving the app
     private rpcForAudio: MessagePort;
     private audioStarting: Promise<void> | null = null;
     private audioWorker: Worker | null = null;
@@ -150,7 +151,8 @@ export class Engine {
             // AudioWorklet only plays from the queue it is sent.
             const node = new AudioWorkletNode(ctx, "msaudio", { numberOfInputs: 0, outputChannelCount: [2] });
             this.node = node;
-            node.connect(ctx.destination);
+            this.out = ctx.createGain();
+            node.connect(this.out).connect(ctx.destination);
             node.port.onmessage = (e) => {
                 if (e.data.type === "queued") {
                     this.onQueued(e.data.frames, e.data.peak);
@@ -263,6 +265,30 @@ export class Engine {
         }
     }
 
+    // Silence the output at once, before anything else (issue #29): leaving the app while playing
+    // pauses, and nothing more should be heard, neither the cut of the dropped queue nor the
+    // notes' release tails. A 30 ms fade, so the silence itself makes no click.
+    fadeOut() {
+        const g = this.out?.gain;
+        if (!g || !this.ctx) {
+            return;
+        }
+        const now = this.ctx.currentTime;
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(g.value, now);
+        g.linearRampToValueAtTime(0, now + 0.03);
+    }
+
+    /** The output back to full volume (after fadeOut, once the music has stopped). */
+    restoreVolume() {
+        const g = this.out?.gain;
+        if (!g || !this.ctx) {
+            return;
+        }
+        g.cancelScheduledValues(this.ctx.currentTime);
+        g.setValueAtTime(1, this.ctx.currentTime);
+    }
+
     // Drop audio queued ahead of the speaker, so a seek, pause or stop is heard at once
     private flush() {
         this.node?.port.postMessage({ type: "flush" });
@@ -355,7 +381,7 @@ export class Engine {
     page(index: number): Promise<string> { return this.request({ cmd: "page", index }); }
     cursor(secs: number): Promise<CursorInfo> { return this.request({ cmd: "cursor", secs }); }
     tracks(): Promise<TrackInfo[]> { return this.request({ cmd: "tracks" }); }
-    play() { this.setPlaying(true); return this.request({ cmd: "play" }); }
+    play() { this.restoreVolume(); this.setPlaying(true); return this.request({ cmd: "play" }); }
     async pause() { await this.request({ cmd: "pause" }); this.setPlaying(false); this.flush(); }
     async stop() { await this.request({ cmd: "stop" }); this.setPlaying(false); this.flush(); }
     async seek(secs: number) { await this.request({ cmd: "seek", secs }); this.flush(); this.emit("seeked", { secs }); }

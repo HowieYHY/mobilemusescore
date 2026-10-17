@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (17 Oct 2026, version 1.0.24)
+## Current status (17 Oct 2026, version 1.0.25)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -58,7 +58,10 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
      clears that message (or says the sound couldn't start); the notification's play itself was not
      fixed. `app.engine.health` logs each audio state change (`audio`).
 2. **#29: a sudden sound when leaving the app while playing with *Keep playing* off** (the user,
-   17 Oct 2026, Android, 1.0.24). The music should pause silently. Not looked into yet.
+   17 Oct 2026, Android, 1.0.24). Fixed in 1.0.25 (see *Leaving the app*), **still to check on the
+   Android phone, then iPhone and iPad**. Measured in Chromium before the fix: after leaving, the
+   speaker got the cut of the dropped queue and the notes' release tails, up to 3.5 times as loud as
+   the music had been (Cheap Thrills 0.54 vs 0.16).
 3. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
 4. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
@@ -169,7 +172,7 @@ start screen shows 1.0.15 or later.
 | Save | One **Save** in the top bar for everything changed on a score: notes (`annotations.ts`) and mixer (`mixerstore.ts`), in `localStorage` per score (SHA-256 of the file). Nothing is saved until then; a draft is kept on every change, so closing the app loses nothing and the changes come back next time, still unsaved, with a message (iOS home-screen apps get no `beforeunload`). The only question: opening another score with unsaved changes (Save / Don't save / Cancel). Ctrl/Cmd+S. Notes saved by 0.2.x are read as saved; 0.2.1 saved mixers and 0.2.0 sound choices are carried over. A part's sound is stored only when it isn't the score's own. The score's saved master volume is read (`mss_master_volume`). |
 | Mixer before Play | The audio engine starts when a score opens (the `AudioContext` starts suspended until a tap; Play or tapping a note resumes it), so the sounds load straight away. The mixer works from the moment the score is open: the engine sets each part's volume, reverb and mute/solo from the score at load (no longer when the sounds are added), so changes made before the sounds arrive are kept. Sound choices made or restored before then are applied once the sounds are loaded. |
 | Metronome | Its mixer strip is muted whenever a score opens (`Session::load` resets it; desktop's metronome is off by default), and its on/off is not kept in saved settings; unmuting it turns the clicks on in the playback model (`setMetronome`), muting turns them off. Settings' *Metronome on when a score opens* unmutes it after the mixer is restored; since its on/off isn't kept, Save stays dark. |
-| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. With Settings' *Keep playing* on, it doesn't pause (iOS may stop the sound anyway, which the *Interruptions* handler then reports). On Android, while playing with *Keep playing* on, a silent looping `<audio>` element (a 10 s 8-bit WAV made in the page, `media-src blob:`) plays alongside, with Media Session title and play/pause (`updateKeepAlive`): without it Android froze Chrome ~2 min after the app was left and the sound stopped (#28). Not on iOS, where Keep playing already passed. |
+| Leaving the app | `visibilitychange` to hidden pauses playback (the audio would otherwise go on in the background); coming back shows a message. The pause is silent (#29): `engine.fadeOut()` first ramps a `GainNode` between the worklet and the speaker to 0 in 30 ms, before anything else, since the pause itself drops the queued audio mid-wave (a pop, sometimes louder than the music) and lets the notes' release tails ring for about a second; the gain goes back to 1 once that pause is done and the page is shown again, and on every Play. `leave-silence-test.mjs` (the speaker through an analyser, on the audio clock): nothing from 60 ms after leaving on every test score, Play heard after coming back, the music heard while away with Keep playing on; `NOFIX=1` shows the failure without the fade. With Settings' *Keep playing* on, it doesn't pause (iOS may stop the sound anyway, which the *Interruptions* handler then reports). On Android, while playing with *Keep playing* on, a silent looping `<audio>` element (a 10 s 8-bit WAV made in the page, `media-src blob:`) plays alongside, with Media Session title and play/pause (`updateKeepAlive`): without it Android froze Chrome ~2 min after the app was left and the sound stopped (#28). Not on iOS, where Keep playing already passed. |
 | Saved sounds on reopening | The `playbackReady` handler waits for the opened score's saved settings to be restored (`mixLoading`). Before, when the audio was already running, the sounds could become ready while saved settings were being put back part by part, and the sound choices queued after that were never applied (parts back on the score's sound, e.g. 6 of 9 voices of GODS on MS Basic). `reopen-test.mjs` (SLOW=1 makes the restore slow, as on a phone) lost them in 4 of 6 reopenings before, 0 after. |
 | Screen fit | The app is pinned to the screen's edges (`body { position: fixed; inset: 0 }`) instead of `100dvh`, which was stale after an installed app restarted for an update (Android: bottom bar buried) and short of the screen (iPad: gap at the bottom). The bottom bar keeps the larger of its padding and the home-indicator space, not both. In the iPhone/iPad home-screen app the status bar is `black` (not `black-translucent`): with translucent, iOS 26 started the page under the status bar but kept it one status bar short (window 812 of 874 px on an iPhone) and left a light strip under the bottom bar that no CSS reaches. |
 | Cursor at barlines | A bar's end point (on the barline, at the same moment as the next bar's first note) is left out of the timeline when the next bar is on the same line, so the cursor glides from the last note of a bar to the first of the next instead of stopping at the barline and jumping. |
@@ -239,6 +242,7 @@ exported audio file.
 | Save stays dark when nothing changed (`no-change-test.mjs`): waits for sounds, mixer, sound list, touching every slider, notes mode, play/pause, tapping a note, zoom, views, reopening | Chromium, 5 scores | pass (27 failures on 0.3.3) |
 | Several parts' sound at once and back (`sounds-multi-test.mjs`) | Chromium | pass |
 | Self-check (`selfcheck-test.mjs`): a gap caused on purpose is detected, logged, told once, the queue grows, no further gaps | Chromium | pass |
+| Leaving while playing is silent (`leave-silence-test.mjs`): the speaker from 60 ms after leaving, 3 times per score; Play heard and the output at full volume after coming back; Keep playing on heard while away | Chromium, 5 scores | pass (without the fade: sound after leaving on all 4 scores with sound, up to 0.54 against 0.16 playing) |
 | Notes-mode taps (`notes-tap-test.mjs`): finger draws a dot with Draw with finger on; plays the note with it off (pen, highlighter, eraser), not with Text | Chromium | pass |
 | Security policy (`csp-test.mjs`, built copy): all 7 scores open and every page draws, it plays (Chromium), mixer, sound list, Settings and notes work with nothing refused; a script put into the page and a picture from another address are refused; text boxes are `plaintext-only` | Chromium, WebKit 26.6 | pass |
 | Go to a bar or section (`goto-test.mjs`): every score, phone and desktop: typed bar lands on its start and in view, past the end goes to the last bar, section menu only with rehearsal marks and jumps to them, the field follows the music, Page by page turns to the bar's page, still right at 50% speed | Chromium, 7 scores | pass |
@@ -254,7 +258,7 @@ exported audio file.
   - MuseScore 4.7's own FreeType engine (which desktop never uses) produced broken layouts, so it isn't used.
 - **Not applied:** automation lanes (none of your scores have any), and the "migrate MuseScore 3 score" step desktop offers.
 - **SVG pictures** in scores are not drawn.
-- **No loop, count-in, metronome button, speed control or parts view** yet. **The score library isn't remembered** between visits.
+- **No count-in, metronome button (it is in the mixer) or parts view** yet. **The score library isn't remembered** between visits.
 - **The iPhone/iPad native app** needs a Mac to build. iOS is covered by the installable web app.
 
 ## How to test
@@ -426,6 +430,7 @@ node scripts/focus-paper-test.mjs <score>    # focus: blank paper and around it 
 node scripts/no-change-test.mjs <folder>     # Save stays dark when nothing changed
 node scripts/sounds-multi-test.mjs <score>   # several parts' sound at once
 node scripts/selfcheck-test.mjs <score>      # playback self-check after a gap
+node scripts/leave-silence-test.mjs <folder>  # leaving while playing is silent (issue #29); NOFIX=1 without the fade
 node scripts/notes-tap-test.mjs <score>      # finger taps in notes mode
 node scripts/settings-test.mjs [folder]      # Settings: the panel at three sizes and what each setting does
 node scripts/compare-engines.mjs <old> <new>  # two engine builds: page drawings, timelines, staves, audio on every score

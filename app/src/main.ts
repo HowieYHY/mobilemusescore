@@ -1239,6 +1239,7 @@ engine.on("seeked", (e: { secs?: number }) => {
 // the music, so it doesn't play on unseen; coming back says so. Unless the reader
 // chose Keep playing (Settings), for listening with the screen off.
 let pausedOnLeaving = false;
+let leavePause: Promise<void> = Promise.resolve();
 document.addEventListener("visibilitychange", () => {
     lastFrame = 0; // no frames while away: not a slow frame
     void updateWakeLock();
@@ -1248,10 +1249,12 @@ document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
         if (state.playing && !settings.keepPlaying) {
             pausedOnLeaving = true;
-            void engine.pause();
+            engine.fadeOut(); // silent at once, whatever the pause still lets through (issue #29)
+            leavePause = engine.pause().catch(() => {});
         }
     } else if (pausedOnLeaving) {
         pausedOnLeaving = false;
+        void leavePause.then(() => engine.restoreVolume());
         setStatus("The music paused when you left PocketScore. Tap Play to go on.", "info", 6000);
     }
 });

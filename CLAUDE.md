@@ -227,6 +227,12 @@ build, tests, status) before working here.
   app on Android; change them knowing installed copies follow late, and check what the installed
   copy holds (`adb pull` its APK) before guessing.
 
+- **Chrome may never rebuild an installed app for a colour change.** The grey strip outlived the
+  navy manifest by three days: Chrome checked on 17 Oct with navy live and kept the 7 Oct copy
+  (`chrome://webapks`: version code 1); "Update Status: Succeeded" only meant the request was
+  accepted. A reinstall fixed it (18 Oct 2026). Rule: read `chrome://webapks` (over DevTools) before
+  telling the user to wait, and offer the reinstall, after checking their data shows in a normal tab.
+
 - **Playwright tells a page it is always visible.** Connected to the Pixel's Chrome, the page said
   "visible" on the home screen and with the screen off (Playwright's focus emulation), so leaving
   the app looked like it never paused. Also `adb shell input keyevent KEYCODE_SLEEP` is ignored

@@ -25,7 +25,10 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
 was measured over USB (see *Tests*). Open issues: #3 (design, open to contributors)
-and #18 (possibly shipping to the App Store and Google Play). #26 (go to a bar or section, 1.0.20) and #27
+and #18 (possibly shipping to the App Store and Google Play). The light strip under Android's gesture bar was the
+installed WebAPK's stored background colour (#e9ecef, from the 7 Oct install): Chrome never rebuilt
+it for 1.0.17's navy manifest (`chrome://webapks` on 18 Oct: version code 1, last check 17 Oct with
+navy live, no update, no reason given). Reinstalling from Chrome fixed it (the user, 18 Oct 2026). #26 (go to a bar or section, 1.0.20) and #27
 (security review and hardening, 1.0.19) were checked on an iPhone and an iPad by the user and closed
 on 16 Oct 2026. The RESO website's preview (#2, #14) is live on
 nusresonance.com since 10 Oct 2026; focus mode (#17) is live since 1.0.5, passes on the Pixel 9a
@@ -42,19 +45,7 @@ the user and closed on 18 Oct 2026.
 **Still open:**
 1. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
-2. **The light strip under Android's gesture bar.** The manifest has said navy (#1e2a3a) since 1.0.17,
-   but on 18 Oct 2026 the installed WebAPK (pulled over USB) still stored `backgroundColor`
-   -1446673 = #e9ecef, the grey strip (theme #1e2a3a): Chrome hadn't refreshed it, though the user
-   had waited and followed the steps. `chrome://webapks` (read over DevTools, 18 Oct): Version code 1 (the 7 Oct
-   install), Background color rgba(233,236,239), last update check 17 Oct 03:14 (when the live
-   manifest already said navy), last completion 15 Oct; "Update Status: Succeeded" only means the
-   request was accepted. Chrome checked and chose not to rebuild; it doesn't say why. The page can't paint there (`viewport-fit=cover` is already
-   set; the page ends above the gesture bar). Next: read `chrome://webapks` for PocketScore (last
-   update check, update status), and after *Request update*, close the app fully and reopen it
-   (Chrome updates on a launch). Reinstalling would take the new colours, but say first what it may
-   cost (notes and settings live in Chrome's storage for the site; not checked whether removing the
-   app clears them).
-3. #28's loose end: the notification's play after its pause once didn't restart the music in a tab
+2. #28's loose end: the notification's play after its pause once didn't restart the music in a tab
    (Chrome had stopped the page's audio); `updateKeepAlive` is still Android-only, against the
    user's one-code-path rule (17 Oct).
 

@@ -8,7 +8,9 @@ build, tests, status) before working here.
 - The user works from several machines. Commit and push when they say the session is ending, after
   updating the README and DEVELOPMENT.md so each is one current picture, not a log.
 - Their test scores are in `real test musescores/` (gitignored, copied by hand between machines),
-  with desktop MP3 exports in `real test musescores/audio equivalents/`. Run the tests on every score.
+  with desktop MP3 exports in `real test musescores/audio equivalents/`. Run the tests on every score,
+  but only through the parts of each score the change touches, not each score from start to end
+  (e.g. a volume change: only the passages with distinct dynamics). The user's rule, 17 Oct 2026.
 - Android gets the **installable web app from Chrome** (the Capacitor project was removed in 0.2.0).
   iPad/iPhone use Safari's Add to Home Screen. One web app, one update path. Don't mention APKs in the
   README: the user was the only one who used one.

@@ -19,12 +19,12 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (17 Oct 2026, version 1.0.26)
+## Current status (18 Oct 2026, version 1.0.26)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
-was measured over USB (see *Tests*). Open issues: #28, #29 and #30 (below), #3 (design, open to contributors)
+was measured over USB (see *Tests*). Open issues: #3 (design, open to contributors)
 and #18 (possibly shipping to the App Store and Google Play). #26 (go to a bar or section, 1.0.20) and #27
 (security review and hardening, 1.0.19) were checked on an iPhone and an iPad by the user and closed
 on 16 Oct 2026. The RESO website's preview (#2, #14) is live on
@@ -34,50 +34,26 @@ iPhone (focus by the button and by itself, taps in focus, leaving it, panel moti
 score open) passed (the user, 16 Oct 2026). Settings (the gear) arrived in 1.0.15 and passed on
 Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark page was removed in
 1.0.18 at the user's request.
+#28 (Keep playing on Android: a silent `<audio>` beside the music keeps Chrome from being frozen,
+1.0.23; passed in the installed app too, `android-installed-test.mjs`), #29 (leaving while playing is
+silent, 1.0.25) and #30 (typing leaves nothing for iPadOS's Shake to Undo, 1.0.26) were confirmed by
+the user and closed on 18 Oct 2026.
 
 **Still open:**
-1. **#28: with *Keep playing* on, the sound stops after leaving the app while playback carries on
-   (Android). Still happens in the installed app** (the user, 17 Oct 2026, on 1.0.24).
-   - Found on the Pixel 9a (17 Oct), in a **Chrome tab**: about 2 minutes after leaving to the home
-     screen, Android froze all of Chrome's processes (`dumpsys activity processes`, `isFrozen=true`);
-     Web Audio alone is not media playback to Android. 1.0.23 plays a silent looping `<audio>`
-     alongside (`updateKeepAlive`, see *Leaving the app*), so Chrome shows its media notification;
-     in the tab, `android-background-test.mjs` then passed (no freeze, sound throughout, 2 min home and
-     screen off, 3.5 min home, the notification's pause and play).
-   - **The installed app was never tested**: every phone test runs in a Chrome tab at a local address,
-     so the reader's own data is safe. The installed app runs as its own Android task (a WebAPK) and
-     may be treated differently: its own media notification, process priority, or the silent audio
-     not starting there. Next: test leaving the installed app over USB (it shows in Chrome's DevTools
-     list too; read `app.engine.health`, `dumpsys activity processes` and `dumpsys notification`
-     while it is away, without changing its data), find what differs from the tab, then fix.
-   - **Installed app tested over USB (18 Oct, 1.0.26, `android-installed-test.mjs`, read only): passed.**
-     Home screen for 3 min, Keep playing on (the reader's own setting): sound throughout, audio clock
-     183.3 s in 183 s, 0 gaps, no Chrome or WebAPK process frozen (all at process state 4), Chrome's
-     media session PLAYING throughout. Not reproduced. Still untested: **unplugged** (a phone on USB
-     charges, and Android doesn't Doze a charging phone; every test so far ran plugged in), the
-     screen locked, and another app taking the sound. Next: the user plays unplugged until it stops,
-     then plugs in without closing the app, and `app.engine.health` plus `dumpsys` are read.
-   - The user's rule for the fix (17 Oct): one block of code for every platform and feature, with
-     small changes where one needs them, not code for one platform. `updateKeepAlive` is Android-only
-     today (`ANDROID`); make the fix work the same way everywhere, then check iPhone and iPad again.
-   - Also seen once in four tab runs: the notification's play after its pause didn't restart the
-     music (Chrome had stopped the page's audio), and Play showed "Starting audio…" for good. 1.0.24
-     clears that message (or says the sound couldn't start); the notification's play itself was not
-     fixed. `app.engine.health` logs each audio state change (`audio`).
-2. **#29: a sudden sound when leaving the app while playing with *Keep playing* off** (the user,
-   17 Oct 2026, Android, 1.0.24). Fixed in 1.0.25 (see *Leaving the app*), **still to check on the
-   Android phone, then iPhone and iPad**. Measured in Chromium before the fix: after leaving, the
-   speaker got the cut of the dropped queue and the notes' release tails, up to 3.5 times as loud as
-   the music had been (Cheap Thrills 0.54 vs 0.16).
-3. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
+1. Android sound stutters in Page view: not reproduced in a 45 s run (see below). Next time it
    happens, the phone on USB before closing the app.
-4. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
-   update the installed app (see the Settings checklist below).
-5. **#30: the iPad keeps showing "Undo Typing" without the screen being touched** (the user, 17 Oct
-   2026). Fixed in 1.0.26 (see *Typing*), **still to check on the iPad**: type a bar, a tempo and a
-   text box, then shake or bump the iPad; no "Undo Typing" should come. The box is iPadOS's **Shake to
-   Undo**, offering to undo typing the page still holds (nothing visible would change). Workaround
-   meanwhile: Settings, Accessibility, Touch, Shake to Undo off.
+2. **The light strip under Android's gesture bar.** The manifest has said navy (#1e2a3a) since 1.0.17,
+   but on 18 Oct 2026 the installed WebAPK (pulled over USB) still stored `backgroundColor`
+   -1446673 = #e9ecef, the grey strip (theme #1e2a3a): Chrome hadn't refreshed it, though the user
+   had waited and followed the steps. The page can't paint there (`viewport-fit=cover` is already
+   set; the page ends above the gesture bar). Next: read `chrome://webapks` for PocketScore (last
+   update check, update status), and after *Request update*, close the app fully and reopen it
+   (Chrome updates on a launch). Reinstalling would take the new colours, but say first what it may
+   cost (notes and settings live in Chrome's storage for the site; not checked whether removing the
+   app clears them).
+3. #28's loose end: the notification's play after its pause once didn't restart the music in a tab
+   (Chrome had stopped the page's audio); `updateKeepAlive` is still Android-only, against the
+   user's one-code-path rule (17 Oct).
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
 

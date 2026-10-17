@@ -291,6 +291,7 @@ No. PocketScore is for reading, playing and practising. Make changes in MuseScor
 | Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once |
 | A score won't open | It must be a `.mscz` file saved by MuseScore |
 | The music stops a few minutes after leaving the app, with **Keep playing** on (Android) | A known problem, being fixed ([#28](https://github.com/HowieYHY/mobilemusescore/issues/28)). Until then, keep PocketScore on screen while you listen |
+| A light grey strip under the bottom bar (Android, installed before version 1.0.17) | It's only cosmetic. Android paints it with the colours the app had when it was installed, and Chrome updates them by itself, but that can take a while. To hurry it: in Chrome, go to `chrome://webapks`, find PocketScore, tap **Request update**, then close PocketScore fully (swipe it away) and open it again |
 | A light strip under the bottom bar (iPhone or iPad, added to the home screen before version 1.0.3) | It's only cosmetic. To remove it, open PocketScore in Safari or Chrome until the start screen says 1.0.3 or later, then add it to your home screen again. **The new icon starts without your notes and settings** (each icon keeps its own), so keep the old one until you no longer need them |
 
 **Report a problem:** [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or message

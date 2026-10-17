@@ -1,11 +1,11 @@
 {
   "settings-test": {
-    "streak": 12,
+    "streak": 13,
     "last": "pass",
-    "commit": "9e7fb9c",
-    "passCommit": "9e7fb9c",
-    "date": "2026-10-16",
-    "note": "ran on the code of this commit (Settings page on phones)"
+    "commit": "9f58cc3+changes",
+    "passCommit": "9f58cc3",
+    "date": "2026-10-17",
+    "note": "1.0.25, #29 fade"
   },
   "tour-test": {
     "streak": 4,
@@ -148,20 +148,20 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
-    "streak": 7,
+    "streak": 8,
     "last": "pass",
-    "commit": "7bc943b+changes",
-    "passCommit": "7bc943b",
-    "date": "2026-10-16",
-    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+    "commit": "9f58cc3+changes",
+    "passCommit": "9f58cc3",
+    "date": "2026-10-17",
+    "note": "1.0.25, #29 fade"
   },
   "selfcheck-test": {
-    "streak": 7,
+    "streak": 8,
     "last": "pass",
-    "commit": "7bc943b+changes",
-    "passCommit": "7bc943b",
-    "date": "2026-10-16",
-    "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
+    "commit": "9f58cc3+changes",
+    "passCommit": "9f58cc3",
+    "date": "2026-10-17",
+    "note": "1.0.25, #29 fade"
   },
   "install-hint-test": {
     "streak": 3,
@@ -169,5 +169,13 @@
     "commit": "d58d7fb+changes",
     "passCommit": "d58d7fb",
     "date": "2026-10-15"
+  },
+  "leave-silence-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "9f58cc3+changes",
+    "passCommit": "9f58cc3",
+    "date": "2026-10-17",
+    "note": "1.0.25, #29 fade"
   }
 }

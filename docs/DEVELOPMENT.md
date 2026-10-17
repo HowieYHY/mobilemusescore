@@ -50,6 +50,13 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
      not starting there. Next: test leaving the installed app over USB (it shows in Chrome's DevTools
      list too; read `app.engine.health`, `dumpsys activity processes` and `dumpsys notification`
      while it is away, without changing its data), find what differs from the tab, then fix.
+   - **Installed app tested over USB (18 Oct, 1.0.26, `android-installed-test.mjs`, read only): passed.**
+     Home screen for 3 min, Keep playing on (the reader's own setting): sound throughout, audio clock
+     183.3 s in 183 s, 0 gaps, no Chrome or WebAPK process frozen (all at process state 4), Chrome's
+     media session PLAYING throughout. Not reproduced. Still untested: **unplugged** (a phone on USB
+     charges, and Android doesn't Doze a charging phone; every test so far ran plugged in), the
+     screen locked, and another app taking the sound. Next: the user plays unplugged until it stops,
+     then plugs in without closing the app, and `app.engine.health` plus `dumpsys` are read.
    - The user's rule for the fix (17 Oct): one block of code for every platform and feature, with
      small changes where one needs them, not code for one platform. `updateKeepAlive` is Android-only
      today (`ANDROID`); make the fix work the same way everywhere, then check iPhone and iPad again.

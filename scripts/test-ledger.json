@@ -184,5 +184,12 @@
     "commit": "d8cb20e+changes",
     "passCommit": "d8cb20e",
     "date": "2026-10-17"
+  },
+  "android-installed-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "ca17599+changes",
+    "passCommit": "ca17599",
+    "date": "2026-10-17"
   }
 }

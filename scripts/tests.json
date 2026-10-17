@@ -47,6 +47,17 @@
       "goToTypedBar"
     ]
   },
+  "android-installed-test": {
+    "files": [
+      "scripts/lib/adb.mjs"
+    ],
+    "words": [
+      "updateKeepAlive",
+      "keepPlaying",
+      "mediaSession",
+      "visibilitychange"
+    ]
+  },
   "goto-test": {
     "files": [
       "engine/core/session.cpp",

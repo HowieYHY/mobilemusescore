@@ -7,6 +7,7 @@
 // stylus is seen), and two fingers then scroll.
 
 import { MusicMap, type Anchor, type SystemStaves, type TimelinePoint } from "./musicmap";
+import { textField } from "./typing";
 
 // Text boxes take plain text only, so pasted formatting or pictures never enter one (issue #27);
 // browsers without "plaintext-only" fall back to "true" (the text is still saved as plain text)
@@ -670,25 +671,7 @@ export class Annotations {
         box.style.color = t.color;
         box.style.fontSize = (t.size * ppu) + "px";
 
-        const body = document.createElement("div");
-        body.className = "tbody";
-        body.textContent = t.text;
-        body.contentEditable = this.active ? editable : "false";
-        body.spellcheck = false;
-        // highlighted (frame, move and delete buttons) only while being edited
-        body.addEventListener("focus", () => box.classList.add("sel"));
-        body.addEventListener("input", () => {
-            t.text = body.innerText;
-            this.save();
-        });
-        body.addEventListener("blur", () => {
-            box.classList.remove("sel");
-            t.text = body.innerText.trim();
-            if (!t.text) {
-                this.removeText(page, t, false);
-            }
-            this.save();
-        });
+        const body = this.textBody(page, t, box);
 
         const del = document.createElement("button");
         del.className = "tdel";
@@ -715,6 +698,29 @@ export class Annotations {
 
         box.append(grip, body, del, corner);
         return box;
+    }
+
+    private textBody(page: number, t: TextNote, box: HTMLElement): HTMLElement {
+        const body = document.createElement("div");
+        body.className = "tbody";
+        body.contentEditable = this.active ? editable : "false";
+        body.spellcheck = false;
+        // typed in code, so iPadOS has no typing to offer to undo on a shake (#30)
+        const text = textField(body, t.text, (v) => {
+            t.text = v;
+            this.save();
+        });
+        // highlighted (frame, move and delete buttons) only while being edited
+        body.addEventListener("focus", () => box.classList.add("sel"));
+        body.addEventListener("blur", () => {
+            box.classList.remove("sel");
+            t.text = text().trim();
+            if (!t.text) {
+                this.removeText(page, t, false);
+            }
+            this.save();
+        });
+        return body;
     }
 
     // Drag the corner: the box grows or shrinks and the text with it

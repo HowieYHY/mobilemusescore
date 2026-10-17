@@ -7,6 +7,7 @@ import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 import { Tour, type TourStep } from "./tour";
 import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings";
+import { numberField } from "./typing";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -2219,16 +2220,12 @@ function goToTypedBar() {
     ui.bar.value = String(best[0]);
     void goTo(best[1]);
 }
+numberField(ui.bar, goToTypedBar);
 ui.bar.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        goToTypedBar();
-    } else if (e.key === "Escape") {
+    if (e.key === "Escape") {
         ui.bar.blur();
     }
 });
-ui.bar.addEventListener("change", goToTypedBar);
-ui.bar.addEventListener("focus", () => ui.bar.select());
 ui.bar.addEventListener("blur", () => setTimeout(() => showBar(lastPosition), 0));
 ui.section.addEventListener("change", () => {
     const s = sections[Number(ui.section.value)];
@@ -2266,7 +2263,7 @@ function showTempo() {
         ui.tempoInput.value = v;
     }
 }
-ui.tempoInput.onchange = async () => {
+async function applyTypedTempo() {
     const want = Number(ui.tempoInput.value);
     const base = baseTempoAt(state.position);
     if (!(want > 0) || !base) {
@@ -2276,12 +2273,11 @@ ui.tempoInput.onchange = async () => {
     const m = Math.min(3, Math.max(0.1, want / base));
     showPractice(await engine.setSpeed(m, state.position));
     showTempo(); // shows the clamped tempo if the typed one was out of range
-};
-ui.tempoInput.onkeydown = (e) => {
-    if (e.key === "Enter") {
-        ui.tempoInput.blur(); // commits (change), and closes the phone's keyboard
-    }
-};
+}
+numberField(ui.tempoInput, () => void applyTypedTempo(), (by) => {
+    ui.tempoInput.value = String(Math.max(1, (Number(ui.tempoInput.value) || 0) + by));
+    void applyTypedTempo();
+});
 ui.tempoInput.onblur = () => setTimeout(showTempo, 0);
 
 // Buttons and the slider move in 5% steps, as desktop's Speed control

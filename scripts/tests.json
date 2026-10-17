@@ -34,6 +34,19 @@
       "createGain"
     ]
   },
+  "undo-typing-test": {
+    "files": [
+      "app/src/typing.ts"
+    ],
+    "words": [
+      "numberField",
+      "textField",
+      "beforeinput",
+      "contentEditable",
+      "tempo-input",
+      "goToTypedBar"
+    ]
+  },
   "goto-test": {
     "files": [
       "engine/core/session.cpp",

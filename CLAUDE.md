@@ -278,6 +278,12 @@ build, tests, status) before working here.
   after every run and thought something else was turning it off. Rule: name it each time, and use
   `SCREEN_OFF=0` once that case has passed.
 
+- **Re-measure a written-down finding before building on it.** The #30 notes said removing or copying
+  a finished text box cleared its typing from the undo list; measured again in WebKit, nothing did
+  (17 Oct 2026), and a fix built on the note passed nothing. Rule: before building on a recorded
+  measurement, rerun the smallest version of it (a few lines in a blank page), and keep a control
+  in the test that shows the check can fail (`undo-typing-test`'s plain input).
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

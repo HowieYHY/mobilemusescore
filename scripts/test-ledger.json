@@ -30,11 +30,11 @@
     "date": "2026-10-15"
   },
   "mobile-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "d8cb20e+changes",
+    "passCommit": "d8cb20e",
+    "date": "2026-10-17",
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
@@ -46,19 +46,19 @@
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15",
-    "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar"
+    "commit": "d8cb20e+changes",
+    "passCommit": "d8cb20e",
+    "date": "2026-10-17",
+    "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
   },
   "goto-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15"
+    "commit": "d8cb20e+changes",
+    "passCommit": "d8cb20e",
+    "date": "2026-10-17"
   },
   "csp-test": {
     "streak": 4,
@@ -177,5 +177,12 @@
     "passCommit": "9f58cc3",
     "date": "2026-10-17",
     "note": "1.0.25, #29 fade"
+  },
+  "undo-typing-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "d8cb20e+changes",
+    "passCommit": "d8cb20e",
+    "date": "2026-10-17"
   }
 }

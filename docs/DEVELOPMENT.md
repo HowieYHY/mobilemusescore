@@ -24,7 +24,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
 and an Android phone (Pixel 9a, Android 17, installed from Chrome); the Pixel
-was measured over USB (see *Tests*). Open issues: #28 and #29 (below), #3 (design, open to contributors)
+was measured over USB (see *Tests*). Open issues: #28, #29 and #30 (below), #3 (design, open to contributors)
 and #18 (possibly shipping to the App Store and Google Play). #26 (go to a bar or section, 1.0.20) and #27
 (security review and hardening, 1.0.19) were checked on an iPhone and an iPad by the user and closed
 on 16 Oct 2026. The RESO website's preview (#2, #14) is live on
@@ -66,6 +66,27 @@ Android (measured over USB) and on iPhone and iPad (the user, 16 Oct 2026); Dark
    happens, the phone on USB before closing the app.
 4. The light strip under Android's gesture bar: fixed in the manifest (1.0.17); waiting for Chrome to
    update the installed app (see the Settings checklist below).
+5. **#30: the iPad keeps showing "Undo Typing" without the screen being touched** (the user, 17 Oct
+   2026). Cause found, not fixed yet; the fix below was agreed in principle but not built.
+   - The box is iPadOS's **Shake to Undo**: a shake or bump (a music stand, the piano) offers to undo
+     whatever typing the page still holds. Measured in WebKit (`document.queryCommandEnabled("undo")`,
+     a stand-in for the iPad's undo list): typing stays undoable after Enter in the *Bar* field and in
+     Speed's tempo field (also after the app rewrites their value), and after a note text box is
+     finished. Undoing does nothing visible, so the box is pure noise.
+   - Not confirmed on the iPad: ask whether it started after typing a bar, a tempo or a text box, and
+     whether it comes when the iPad moves. Workaround meanwhile: Settings, Accessibility, Touch,
+     Shake to Undo off.
+   - What clears it, in WebKit: removing a finished `contenteditable` text box, or replacing it with
+     `cloneNode(true)`, leaves nothing to undo. For `<input>`s nothing does (re-inserting the same
+     element, `type` or `disabled` or `readOnly` toggles, replacing it with a copy); there, typing
+     only through `beforeinput` (`preventDefault`, then set `value` and the selection in code)
+     records nothing. A prototype on *Bar* left nothing to undo, but needs care: focus selects all,
+     the caret was off by one (typed "12", Backspace, "3" showed "131"), and `change` no longer fires,
+     so Enter and blur must call `goToTypedBar` / the tempo's handler themselves.
+   - Plan: a small helper for both number fields (`beforeinput` typing), and finished text boxes
+     swapped for a copy in `annotations.ts`; a WebKit test that types in each and checks
+     `queryCommandEnabled("undo")` is false afterwards (and that the values still work); `Refs #30`
+     for the user to check on the iPad.
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
 

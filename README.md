@@ -42,6 +42,9 @@ No app store needed.
 - **Removing PocketScore deletes them.** So does clearing Safari's or Chrome's website data.
   There is no backup or export yet.
 - **Nothing is uploaded.** Your scores are opened on your device and never sent anywhere.
+  PocketScore keeps a short log of how playback went (times, score names, how the device kept up;
+  never your notes or files), on this device too: it leaves only if you send it yourself (see
+  *Playback report* in [Settings](#settings)).
   (The app itself is downloaded from GitHub's website hosting, which sees visits like any website.
   PocketScore has no accounts, ads or tracking.)
 - **The music pauses when you leave the app** (another app, home screen, screen locked), and
@@ -217,7 +220,7 @@ every score. Until you change them, PocketScore works as described above.
 
 | Setting | What it does |
 | --- | --- |
-| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On Android, PocketScore then shows in your notifications while it plays, with play and pause there. **Known problem:** in the installed app on Android the music can still stop a few minutes after you leave it; this is being fixed ([#28](https://github.com/HowieYHY/mobilemusescore/issues/28)). On iPhone and iPad the system may still stop it |
+| **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On Android, PocketScore then shows in your notifications while it plays, with play and pause there. On iPhone and iPad the system may still stop it |
 | **Metronome on when a score opens** | Every score opens with the click on. Off: it starts muted |
 | **Tap a note to hear it** | While stopped, a tap on a note plays it. Off: the tap only moves to that note |
 | **Start focus by itself** | Hides the bars when you leave the screen alone |
@@ -226,6 +229,7 @@ every score. Until you change them, PocketScore works as described above.
 | **Open scores in** | The view every score opens in: *Page view*, *Page by page* or *Continuous* |
 | **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
 | **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
+| **Playback report**, *Send* | If the music stutters or lags, tap **Send** soon after (or tap the "sound stuttered" message when it shows). Your phone's share menu opens, and the report is also copied, so you can paste it into a [GitHub issue](https://github.com/HowieYHY/mobilemusescore/issues) or a message. It tells how the device kept up during your recent plays: times, score names and the device's own figures, never your notes or files. It works offline and later too: the log stays on the device after the app is closed. Please add what you were doing and whether battery saver was on or the phone was warm, which apps can't see |
 
 ---
 
@@ -288,7 +292,7 @@ No. PocketScore is for reading, playing and practising. Make changes in MuseScor
 | No sound on iPhone / iPad | Check the volume buttons, and that Bluetooth isn't playing the sound elsewhere |
 | "Audio could not start" | Close PocketScore completely, reopen it, tap Play |
 | Drawing scrolls the page (or it won't scroll) | Check **Draw with finger** in the notes bar |
-| Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once |
+| Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once. If it keeps happening, send a playback report (**Settings** > **Playback report** > **Send**) soon after, even days later is fine |
 | A score won't open | It must be a `.mscz` file saved by MuseScore |
 | The music stops a few minutes after leaving the app, with **Keep playing** on (Android) | A known problem, being fixed ([#28](https://github.com/HowieYHY/mobilemusescore/issues/28)). Until then, keep PocketScore on screen while you listen |
 | A light grey strip under the bottom bar (Android, installed before version 1.0.17) | It's only cosmetic. Android paints it with the colours the app had when it was installed, and Chrome updates them by itself, but that can take a while. To hurry it: in Chrome, go to `chrome://webapks`, find PocketScore, tap **Request update**, then close PocketScore fully (swipe it away) and open it again. If it's still there, reinstalling fixes it: first open the PocketScore address in a normal Chrome tab and check your notes and settings are there (then they are kept), remove the app from the home screen without deleting its data, and add it again from Chrome |

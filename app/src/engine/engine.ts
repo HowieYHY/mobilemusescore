@@ -47,6 +47,7 @@ export class Engine {
         if (this.health.length > 100) {
             this.health.shift();
         }
+        this.emit("health", { kind, detail }); // the playback log keeps it on the device
     }
     /** For the playback check: how the audio engine is keeping up. */
     // load: share of the time the audio engine spends rendering while music
@@ -362,6 +363,18 @@ export class Engine {
 
     get sampleRate(): number {
         return this.ctx ? this.ctx.sampleRate : 0;
+    }
+
+    /** The audio device's own figures, for the playback log (null before the audio has started). */
+    get audioInfo() {
+        const ctx = this.ctx;
+        return ctx ? {
+            time: ctx.currentTime, // the audio clock, as rendered (falls behind when the device's output does)
+            state: ctx.state,
+            sampleRate: ctx.sampleRate,
+            baseLatency: ctx.baseLatency || 0,
+            outputLatency: (ctx as any).outputLatency || 0,
+        } : null;
     }
 
     get audioRunning() {

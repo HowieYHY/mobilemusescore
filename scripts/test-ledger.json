@@ -1,18 +1,18 @@
 {
   "settings-test": {
-    "streak": 13,
+    "streak": 14,
     "last": "pass",
-    "commit": "9f58cc3+changes",
-    "passCommit": "9f58cc3",
-    "date": "2026-10-17",
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18",
     "note": "1.0.25, #29 fade"
   },
   "tour-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "a27affe+changes",
-    "passCommit": "a27affe",
-    "date": "2026-10-15"
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18"
   },
   "layout-shots": {
     "streak": 5,
@@ -38,11 +38,11 @@
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18",
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
@@ -61,11 +61,11 @@
     "date": "2026-10-17"
   },
   "csp-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "9e7fb9c",
-    "passCommit": "9e7fb9c",
-    "date": "2026-10-16",
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18",
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
   "pageturn-test": {
@@ -148,19 +148,19 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
-    "streak": 8,
+    "streak": 9,
     "last": "pass",
-    "commit": "9f58cc3+changes",
-    "passCommit": "9f58cc3",
-    "date": "2026-10-17",
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18",
     "note": "1.0.25, #29 fade"
   },
   "selfcheck-test": {
-    "streak": 8,
+    "streak": 9,
     "last": "pass",
-    "commit": "9f58cc3+changes",
-    "passCommit": "9f58cc3",
-    "date": "2026-10-17",
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18",
     "note": "1.0.25, #29 fade"
   },
   "install-hint-test": {
@@ -191,5 +191,12 @@
     "commit": "ca17599+changes",
     "passCommit": "ca17599",
     "date": "2026-10-17"
+  },
+  "playlog-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "8d03257+changes",
+    "passCommit": "8d03257",
+    "date": "2026-10-18"
   }
 }

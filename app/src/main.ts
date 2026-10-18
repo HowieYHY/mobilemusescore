@@ -8,6 +8,7 @@ import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 import { Tour, type TourStep } from "./tour";
 import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings";
 import { numberField } from "./typing";
+import { PlayLog, stamp } from "./playlog";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -567,6 +568,9 @@ async function drawJobs() {
                 continue;
             }
             performance.measure("page-draw", { start: t1 });
+            if (state.playing) {
+                logWatch.drawMs += performance.now() - t1;
+            }
             if (done) {
                 jobs.delete(key);
                 freeCanvas(job.tile.el.querySelector("canvas"));
@@ -1268,9 +1272,150 @@ let stutterTold = false;
 engine.on("stutter", () => {
     if (!stutterTold && state.playing) {
         stutterTold = true;
-        setStatus("The sound stuttered, so PocketScore now prepares more of it ahead to keep it smooth.", "info", 6000);
+        setStatus("The sound stuttered, so PocketScore now prepares more of it ahead to keep it smooth." + (embedded ? "" : " Tap here to send a playback report."), "info", 10000);
+        if (!embedded) {
+            ui.status.classList.add("action");
+            ui.status.onclick = () => void sendReport("the stutter notice");
+        }
     }
 });
+
+// ---------------------------------------------------------------- playback log
+
+// What happened while music played, kept on this device (issue #31: stutters seen while travelling,
+// away from USB): the self-check's notes, what went on around them (jumps, focus, page drawing,
+// updates, leaving the app) and every 10 s how the device kept up. The reader sends it from Settings
+// or the stutter notice. See playlog.ts.
+const playLog = new PlayLog(!embedded);
+engine.on("health", (h) => playLog.add(h.kind, h.detail));
+const logWatch = {
+    playing: false, since: 0, gaps: 0, lastSample: 0,
+    frames: 0, slowFrames: 0, longestFrame: 0, drawMs: 0, // since the last sample (page in view only)
+    clockWall: 0, clockAudio: 0, outLatency: -1,
+};
+let battery: { level: number; charging: boolean } | null = null;
+(navigator as any).getBattery?.().then((b: any) => (battery = b)).catch(() => {});
+const installed = () => matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
+const ms = (secs: number) => `${Math.round(secs * 1000)} ms`;
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+function batteryText() {
+    return battery ? `battery ${Math.round(battery.level * 100)}%${battery.charging ? " charging" : ""}` : "battery unknown";
+}
+
+function playContext() {
+    return `"${state.score?.title || "?"}" at ${fmt(state.position)}, ${ui.viewMode.value} view, zoom ${Math.round(state.zoom * 100)}%, speed ${Math.round(practice.speed * 100)}%, focus ${state.focus ? "on" : "off"}`;
+}
+
+engine.on("status", (s) => {
+    const now = s.status === "playing";
+    if (now === logWatch.playing) {
+        return;
+    }
+    logWatch.playing = now;
+    if (now) {
+        Object.assign(logWatch, { since: performance.now(), gaps: engine.underruns, lastSample: performance.now(), frames: 0, slowFrames: 0, longestFrame: 0, drawMs: 0, clockWall: 0 });
+        const a = engine.audioInfo;
+        playLog.add("play", playContext() + (a ? `; audio ${a.sampleRate} Hz, latency ${ms(a.baseLatency)} + output ${ms(a.outputLatency)}, queue ${ms(engine.stats.targetSecs)}` : "") + `; ${batteryText()}, page ${document.visibilityState}`);
+    } else {
+        playLog.add("stop", `${playContext()}; played ${Math.round((performance.now() - logWatch.since) / 1000)} s, sound gaps ${engine.underruns - logWatch.gaps}`);
+        playLog.save();
+    }
+});
+engine.on("seeked", (e) => {
+    if (logWatch.playing) {
+        playLog.add("jump", `to ${fmt(e.secs)}`);
+    }
+});
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        playLog.save(); // the app may be closed from here
+    }
+});
+
+// Every second while playing: has the audio clock kept up with real time? It falls behind when the
+// device's own sound output does, a stutter PocketScore's queue doesn't see. Every 10 s: a sample.
+setInterval(() => {
+    if (!logWatch.playing) {
+        return;
+    }
+    const now = performance.now();
+    const a = engine.audioInfo;
+    if (a && a.state === "running") {
+        if (!logWatch.clockWall) {
+            logWatch.clockWall = now;
+            logWatch.clockAudio = a.time;
+        } else if (now - logWatch.clockWall >= 2000) {
+            // over 2 s or more, so Android's ~100 ms steps of the audio clock don't count
+            const wall = (now - logWatch.clockWall) / 1000;
+            const behind = wall - (a.time - logWatch.clockAudio);
+            if (behind > 0.25) {
+                playLog.add("audio clock slipped", `${ms(behind)} behind over ${wall.toFixed(1)} s (the device's sound output fell behind), page ${document.visibilityState}`);
+            }
+            logWatch.clockWall = now;
+            logWatch.clockAudio = a.time;
+        }
+        // headphones or a speaker connected or taken away (Bluetooth adds 100+ ms)
+        if (logWatch.outLatency >= 0 && Math.abs(a.outputLatency - logWatch.outLatency) > 0.02) {
+            playLog.add("sound output", `output latency now ${ms(a.outputLatency)} (was ${ms(logWatch.outLatency)})`);
+        }
+        logWatch.outLatency = a.outputLatency;
+    } else {
+        logWatch.clockWall = 0;
+    }
+    if (now - logWatch.lastSample >= 10000) {
+        const st = engine.stats;
+        const load = st.load !== null ? `${Math.round(st.load * 100)}%` : st.loadUnder !== null ? `under ${Math.round(st.loadUnder * 100)}%` : "?";
+        const frames = document.visibilityState === "visible"
+            ? `frames ${logWatch.frames}, longest ${Math.round(logWatch.longestFrame)} ms, ${logWatch.slowFrames} over 50 ms, page drawing ${Math.round(logWatch.drawMs)} ms`
+            : "page hidden";
+        playLog.add("sample", `at ${fmt(state.position)}: engine load ${load}, slowest block ${st.slowestMs.toFixed(0)} ms, queued ${ms(st.queuedSecs)} of ${ms(st.targetSecs)}, level ${engine.level.toFixed(2)}; ${frames}; ${batteryText()}`);
+        Object.assign(logWatch, { lastSample: now, frames: 0, slowFrames: 0, longestFrame: 0, drawMs: 0 });
+    }
+}, 1000);
+
+function reportHeader(): string[] {
+    const n = navigator as any;
+    const a = engine.audioInfo;
+    const tz = -new Date().getTimezoneOffset();
+    const conn = n.connection;
+    return [
+        "PocketScore playback report",
+        `Version ${__APP_VERSION__}, made ${stamp(Date.now())} (times are local, UTC${tz >= 0 ? "+" : "-"}${Math.floor(Math.abs(tz) / 60)}${tz % 60 ? ":" + pad2(Math.abs(tz) % 60) : ""})`,
+        `Device: ${navigator.userAgent}`,
+        `Running as ${installed() ? "the installed app" : "a browser tab"}; ${n.hardwareConcurrency || "?"} cores, ${n.deviceMemory || "?"} GB memory, screen ${screen.width}x${screen.height} at ${+devicePixelRatio.toFixed(2)}x`,
+        a ? `Audio: ${a.sampleRate} Hz, ${a.state}, latency ${ms(a.baseLatency)} + output ${ms(a.outputLatency)}, queue ${ms(engine.stats.targetSecs)}, sound gaps this session ${engine.underruns}` : "Audio: not started this session",
+        `Now: ${batteryText()}${conn ? `, network ${conn.effectiveType || "?"}${conn.saveData ? " (data saver on)" : ""}` : ""}`,
+        `Settings: keep playing ${settings.keepPlaying ? "on" : "off"}, focus by itself ${settings.autoFocus ? `after ${settings.focusPlayingSecs} s` : "off"}, follow ${settings.follow ? "on" : "off"}, keep the screen on ${settings.keepAwake ? "on" : "off"}`,
+        "Web apps can't see battery saver or the phone's heat: please say if either was on.",
+    ];
+}
+
+// Shared through the phone's own share sheet (GitHub, a message, email) and copied, to paste anywhere
+async function sendReport(from: string) {
+    playLog.add("report", `sent from ${from}`);
+    const text = playLog.report(reportHeader());
+    playLog.save();
+    let copied = false;
+    try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+    } catch {
+        // not allowed here: the share sheet may still work
+    }
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: "PocketScore playback report", text });
+            return;
+        } catch (err) {
+            if ((err as Error).name !== "AbortError" && !copied) {
+                setStatus("The report couldn't be shared or copied on this device.", "error", 6000);
+                return;
+            }
+        }
+    }
+    setStatus(copied ? "The playback report is copied. Paste it into a GitHub issue or a message." : "The report couldn't be copied on this device.", copied ? "info" : "error", 6000);
+}
 
 engine.on("audioState", (st: string) => {
     if (st !== "running" && state.playing) {
@@ -1296,6 +1441,13 @@ function animate() {
     const now = performance.now();
     if (state.playing && lastFrame && now - lastFrame > 120 && document.visibilityState === "visible") {
         engine.note("slow frame", `${Math.round(now - lastFrame)} ms`);
+    }
+    if (state.playing && lastFrame && document.visibilityState === "visible") {
+        logWatch.frames++;
+        logWatch.longestFrame = Math.max(logWatch.longestFrame, now - lastFrame);
+        if (now - lastFrame > 50) {
+            logWatch.slowFrames++;
+        }
     }
     lastFrame = now;
     if (state.playing) {
@@ -1876,6 +2028,9 @@ async function enterFocus(fullscreen = true) {
     }
     clearTimeout(autoFocusTimer);
     state.focus = true;
+    if (state.playing) {
+        playLog.add("focus", `on (${fullscreen ? "the button" : "by itself"})`);
+    }
     openLayer(leaveFocus);
     // full screen only from the Focus button: browsers allow it just after the reader's own tap
     const root = document.documentElement as any;
@@ -1919,6 +2074,9 @@ function leaveFocus() {
     const before = ui.viewer.getBoundingClientRect().top;
     const wasFocused = document.documentElement.classList.contains("focus");
     state.focus = false;
+    if (state.playing) {
+        playLog.add("focus", "off");
+    }
     document.documentElement.classList.remove("focus");
     placeSettings(); // an open panel comes back between the bars
     if (wasFocused) {
@@ -2425,6 +2583,7 @@ const unavailable: Partial<Record<keyof Settings, boolean>> = {
     focusFullscreen: !(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen), // iPhone
     keepAwake: !canWakeLock,
 };
+$("send-report").onclick = () => void sendReport("Settings");
 const settingInputs = [...ui.settings.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-set]")];
 
 function showSettings() {
@@ -3016,7 +3175,12 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
             }
         }, 30 * 60 * 1000);
     }).catch((err) => console.warn("service worker:", err));
+    let updateLogged = false;
     sw.addEventListener("message", (e) => {
+        if (e.data?.type === "sw-progress" && !updateLogged) {
+            updateLogged = true; // installing reads every stored file back: heavy work alongside the music
+            playLog.add("update", `downloading and installing a new version${state.playing ? " while playing" : ""}`);
+        }
         if (isUpdate && e.data?.type === "sw-progress" && !state.playing) {
             setStatus(`Downloading an update to PocketScore… ${Math.round(e.data.done / e.data.total * 100)}%`);
         }
@@ -3026,6 +3190,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
             return; // first visit, not an update
         }
         updateReady = true;
+        playLog.add("update", "installed");
         if (!state.score) {
             location.reload();
             return;
@@ -3439,7 +3604,7 @@ ui.notesClear.onclick = async () => {
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, settings, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
+(window as any).app = { engine, state, settings, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
     // update-restart-test.mjs: an update can't be produced on demand there
     markUpdateReady: () => (updateReady = true), restartForUpdate };
 
@@ -3482,7 +3647,7 @@ function tourSteps(): TourStep[] {
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first. On Android you can also share a score to PocketScore from the Files app." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
-            { target: el("settings-open"), also: () => [$("help")], title: "Settings and help", text: "The gear has Settings, such as keeping the music playing when you leave the app. Once a score is open, tap ? again to see how to play it, practise your part and write on it." },
+            { target: el("settings-open"), also: () => [$("help")], title: "Settings and help", text: "The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. Once a score is open, tap ? again to see how to play it, practise your part and write on it." },
             tipStep,
         ];
     }
@@ -3495,7 +3660,7 @@ function tourSteps(): TourStep[] {
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
-        { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app. ? shows this tour again." },
+        { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },
         tipStep,
     ];
 }

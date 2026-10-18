@@ -263,6 +263,20 @@
       "real test musescores/I am move it(howie version).mscz"
     ]
   },
+  "playlog-test": {
+    "files": [
+      "app/src/playlog.ts"
+    ],
+    "words": [
+      "playLog",
+      "logWatch",
+      "sendReport",
+      "health"
+    ],
+    "args": [
+      "real test musescores/I am move it(howie version).mscz"
+    ]
+  },
   "selfcheck-test": {
     "files": [
       "app/public/worklet/msaudio-worker.js",

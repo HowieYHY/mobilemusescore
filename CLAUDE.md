@@ -76,6 +76,9 @@ build, tests, status) before working here.
   `node scripts/tests.mjs record <test> pass|fail` (pass = only its known failures, kept in the
   ledger's note). Unsettled tests run every round. Keep `tests.json` up to date when a test or the
   code it covers moves.
+- **Never run a screen-off test myself; the user does those** (the user, 19 Oct 2026). Run phone tests
+  with `SCREEN_OFF=0`. After a test round, say plainly what couldn't be tested for certain (screen off,
+  iPhone/iPad, anything needing the user's own device or trip, e.g. #31 and #32) so they can test it.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 

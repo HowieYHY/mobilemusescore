@@ -1,18 +1,18 @@
 {
   "settings-test": {
-    "streak": 14,
+    "streak": 15,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "1.0.25, #29 fade"
   },
   "tour-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18"
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
   },
   "layout-shots": {
     "streak": 5,
@@ -23,42 +23,42 @@
     "note": "screenshots: look at them"
   },
   "no-change-test": {
-    "streak": 3,
-    "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15"
-  },
-  "mobile-test": {
     "streak": 4,
     "last": "pass",
-    "commit": "d8cb20e+changes",
-    "passCommit": "d8cb20e",
-    "date": "2026-10-17",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
+  },
+  "mobile-test": {
+    "streak": 5,
+    "last": "pass",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "d8cb20e+changes",
-    "passCommit": "d8cb20e",
-    "date": "2026-10-17",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
   },
   "goto-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "d8cb20e+changes",
-    "passCommit": "d8cb20e",
-    "date": "2026-10-17"
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
   },
   "csp-test": {
     "streak": 5,
@@ -100,27 +100,27 @@
     "note": "vs the published engine: all identical (drawings in another order after other scores)"
   },
   "android-background-test": {
-    "streak": 2,
-    "last": "pass",
-    "commit": "7bc943b+changes",
+    "streak": 0,
+    "last": "fail",
+    "commit": "ac86b61+changes",
     "passCommit": "7bc943b",
-    "date": "2026-10-16",
+    "date": "2026-10-19",
     "note": "Pixel 9a, 17 Oct: passes with the #28 fix (no Chrome freeze, sound heard, 2 min home + screen off, 3.5 min home, notification pause/play); the 15 Oct pass didn't count, the test then missed #28"
   },
   "android-settings-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "7bc943b+changes",
-    "passCommit": "7bc943b",
-    "date": "2026-10-16",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "Pixel 9a, 17 Oct: all passed, incl. all 10 settings kept after a reload and an update"
   },
   "notes-views-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "9e7fb9c+changes",
-    "passCommit": "9e7fb9c",
-    "date": "2026-10-16",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "needs 'I am move it edited.mscz' (its layout), not on this PC"
   },
   "continuous-test": {
@@ -132,71 +132,71 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "zoom-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "pinch-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "0fb2232",
-    "passCommit": "0fb2232",
-    "date": "2026-10-11",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
-    "streak": 9,
+    "streak": 10,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "1.0.25, #29 fade"
   },
   "selfcheck-test": {
-    "streak": 9,
+    "streak": 10,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "1.0.25, #29 fade"
   },
   "install-hint-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15"
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
   },
   "leave-silence-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "9f58cc3+changes",
-    "passCommit": "9f58cc3",
-    "date": "2026-10-17",
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19",
     "note": "1.0.25, #29 fade"
   },
   "undo-typing-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "d8cb20e+changes",
-    "passCommit": "d8cb20e",
-    "date": "2026-10-17"
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
   },
   "android-installed-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "ca17599+changes",
-    "passCommit": "ca17599",
-    "date": "2026-10-17"
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
   },
   "playlog-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18"
+    "commit": "ac86b61+changes",
+    "passCommit": "ac86b61",
+    "date": "2026-10-19"
   }
 }

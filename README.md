@@ -2,7 +2,7 @@
 
 **Your MuseScore scores on your phone or tablet. Read them, play them, practise your part.**
 
-### 👉 [Open PocketScore](https://howieyhy.github.io/mobilemusescore/)
+### [Open PocketScore](https://howieyhy.github.io/mobilemusescore/)
 
 - Opens the `.mscz` files you make in MuseScore.
 - Plays them with the same sounds as MuseScore on your computer.
@@ -50,16 +50,16 @@ No app store needed.
 - **The music pauses when you leave the app** (another app, home screen, screen locked), and
   goes quiet at once. Tap Play when you're back. To keep it playing instead, turn on **Keep playing when I leave
   PocketScore** in **Settings** (the gear at the top).
-- **It updates itself, even if you never close it.** With internet, it looks for a new version when
-  you open it, when you come back to it, and every 30 minutes. If a score is open, it restarts into
-  the new version at a quiet moment: when you switch away, or after 20 seconds of not touching it
-  while the music is stopped (never while it plays, or while the mixer, speed, loop or notes are
-  open). Your score comes back where you were: the same page, view, zoom, speed and loop, with
-  unsaved changes kept. The version number is on the start screen.
-- **On a version older than 1.0.8?** Those don't update by themselves while a score is open. Once,
-  with internet: close PocketScore completely (swipe it away in your recent apps, or close the browser
-  tab) and open it again. If the start screen still shows the old number, wait a moment and do it once
-  more. From 1.0.8 on, updates happen by themselves.
+- **It updates itself.** With internet, it checks for a new version when you open it, when you come
+  back to it, and every 30 minutes. If a score is open, it restarts into the new version when you
+  switch away, or after 20 seconds without a touch while the music is stopped. It never restarts
+  while music plays or while the mixer, speed, loop or notes are open. Your score comes back where
+  you were (page, view, zoom, speed and loop), with unsaved changes kept. The version number is on
+  the start screen.
+- **On a version older than 1.0.8?** Those don't update while a score is open. Once, with internet,
+  close PocketScore completely (swipe it away in your recent apps, or close the browser tab) and open
+  it again. If the start screen still shows the old number, wait a moment and do it once more. After
+  that it updates by itself.
 
 ---
 
@@ -295,7 +295,7 @@ No. PocketScore is for reading, playing and practising. Make changes in MuseScor
 | Choppy sound | Check you have the latest version (start screen). PocketScore also adjusts itself: if the sound stutters, it prepares more sound ahead and tells you once. If it keeps happening, send a playback report (**Settings** > **Playback report** > **Send**) soon after, even days later is fine |
 | A score won't open | It must be a `.mscz` file saved by MuseScore |
 | The music stops a few minutes after leaving the app, with **Keep playing** on (Android) | A known problem, being fixed ([#28](https://github.com/HowieYHY/mobilemusescore/issues/28)). Until then, keep PocketScore on screen while you listen |
-| A light grey strip under the bottom bar (Android, installed before version 1.0.17) | It's only cosmetic. Android paints it with the colours the app had when it was installed, and Chrome updates them by itself, but that can take a while. To hurry it: in Chrome, go to `chrome://webapks`, find PocketScore, tap **Request update**, then close PocketScore fully (swipe it away) and open it again. If it's still there, reinstalling fixes it: first open the PocketScore address in a normal Chrome tab and check your notes and settings are there (then they are kept), remove the app from the home screen without deleting its data, and add it again from Chrome |
+| A light grey strip under the bottom bar (Android, installed before version 1.0.17) | It's only cosmetic. Android paints it with the colours the app had when it was installed. Chrome is meant to update them by itself, but it can take days or never happen. To hurry it, go to `chrome://webapks` in Chrome, find PocketScore, tap **Request update**, then swipe PocketScore away and open it again. If the strip is still there, reinstall. First open the PocketScore address in a normal Chrome tab and check your notes and settings show up (then they are kept). Then remove the app from the home screen without deleting its data, and add it again from Chrome |
 | A light strip under the bottom bar (iPhone or iPad, added to the home screen before version 1.0.3) | It's only cosmetic. To remove it, open PocketScore in Safari or Chrome until the start screen says 1.0.3 or later, then add it to your home screen again. **The new icon starts without your notes and settings** (each icon keeps its own), so keep the old one until you no longer need them |
 
 **Report a problem:** [open an issue](https://github.com/HowieYHY/mobilemusescore/issues) or message

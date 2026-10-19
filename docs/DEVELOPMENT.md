@@ -19,7 +19,7 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
-## Current status (18 Oct 2026, version 1.0.27)
+## Current status (19 Oct 2026, version 1.0.28)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium
 and WebKit) and, as the installable web app, on an iPad (A16, iPadOS 26.6.2)
@@ -79,7 +79,10 @@ most likely first:
 `android-settings-test.mjs`):** 45 s of Page view from the start of "I am move it", **0 sound gaps**
 both with focus starting by itself (it did; one 285 ms frame as the bars went) and with it off;
 engine load 17%, slowest block 8 ms. So guess 1 did not reproduce in a short run on a cool phone.
-Next time it happens the user sends a playback report (1.0.27, #31), pasted into the issue.
+Next time it happens the user sends a playback report (1.0.27, #31), pasted into the issue. Since 1.0.28 the
+report also holds a `keep playing` line for each press of the Android notification's play or pause, with
+whether the app was playing and the audio running: a play press with no line after it means the press never
+reached the app (the loose end below; not reproduced on the Pixel, 19 Oct 2026, with 20 s and 120 s away).
 
 **Reading a playback report** (each line: local time, kind, detail; newest last):
 - `gap`: PocketScore's queue ran dry (the page or the engine was too slow). Look at the lines just

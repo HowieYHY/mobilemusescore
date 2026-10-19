@@ -1542,8 +1542,12 @@ function updateKeepAlive() {
         }
         if ("mediaSession" in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({ title: ui.title.textContent || "PocketScore", artist: "PocketScore" });
-            navigator.mediaSession.setActionHandler("play", () => ui.play.click());
-            navigator.mediaSession.setActionHandler("pause", () => ui.play.click());
+            for (const action of ["play", "pause"] as const) {
+                navigator.mediaSession.setActionHandler(action, () => {
+                    engine.note("keep playing", `the notification's ${action} (playing ${state.playing}, audio ${engine.audioRunning})`);
+                    ui.play.click();
+                });
+            }
         }
         // allowed without a tap here: the reader has already tapped in the page
         keepAlive.play().catch((err) => engine.note("keep playing", `the silent audio didn't start: ${err}`));

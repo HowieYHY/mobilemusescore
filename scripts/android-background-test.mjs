@@ -209,7 +209,7 @@ try {
             const resumed = await until(`app.state.playing`, 8000);
             console.log("  after the notification's play:", JSON.stringify(await run(`({ audio: app.engine.audioRunning,
                 status: document.getElementById("status").hidden ? "" : document.getElementById("status").textContent,
-                health: app.engine.health.filter((h) => h.kind === "audio") })`)));
+                health: app.engine.health.filter((h) => h.kind === "audio" || h.kind === "keep playing") })`)));
             check(paused && resumed, `the notification's pause and play work while away (paused ${paused}, playing again ${resumed})`);
             front();
             await until(`!document.hidden`, 15000); // fully back before the screen goes off

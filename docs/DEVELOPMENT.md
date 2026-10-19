@@ -46,9 +46,10 @@ the user and closed on 18 Oct 2026.
 1. Android sound stutters in Page view (#31: it keeps coming back, mostly while the user travels):
    not reproduced in a 45 s run (see below). Since 1.0.27 the phone keeps a playback log and the user
    sends it (Settings, *Playback report*, or the stutter notice); read it as described below.
-2. #28's loose end: the notification's play after its pause once didn't restart the music in a tab
-   (Chrome had stopped the page's audio); `updateKeepAlive` is still Android-only, against the
-   user's one-code-path rule (17 Oct).
+2. #28's loose end: the notification's play and pause work (the user pressed the real notification on
+   19 Oct 2026, 1.0.28; the one failure in the phone test was the test's `cmd media_session dispatch`
+   reaching another app's session, not reproduced in 2 more runs). What remains: `updateKeepAlive` is
+   still Android-only, against the user's one-code-path rule (17 Oct).
 
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
 

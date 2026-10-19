@@ -293,6 +293,12 @@ build, tests, status) before working here.
   measurement, rerun the smallest version of it (a few lines in a blank page), and keep a control
   in the test that shows the check can fail (`undo-typing-test`'s plain input).
 
+- **A stale `build/ghpages` rejects the publish.** The other PC published 1.0.27 and this PC's worktree
+  was a commit behind, so `deploy-pages.sh` was refused at the push (19 Oct 2026). Rule: before
+  publishing, `git -C build/ghpages fetch origin gh-pages && git -C build/ghpages reset --hard
+  origin/gh-pages`; the script replaces every file anyway. A Pages build can also sit queued for 20+
+  minutes: check `gh run list`, and the live script's hash, before saying it is live.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

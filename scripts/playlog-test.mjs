@@ -3,7 +3,7 @@
 // audio clock slip (the clock held back by a test hook), then checks the log has the play, the
 // samples, the gap, the slip and the stop; that it survives a reload (the app closed); that the
 // stutter notice and Settings' Send both produce the report (copied to the clipboard); and that the
-// report stays under a GitHub comment's 65536 characters with a full log.
+// report stays under 15 000 characters (a paste was cut at 20 000) with a full log.
 //
 // Needs the dev server: (cd app && npx vite --port 5180)
 // Usage: node scripts/playlog-test.mjs [score.mscz]
@@ -119,7 +119,7 @@ const size = await page.evaluate(() => {
     }
     return { n: app.playLog.entries.length, chars: app.playLog.report(["header"]).length };
 });
-check(size.n === 600 && size.chars < 65536, `a full log is capped (${size.n} entries, report ${size.chars} characters)`);
+check(size.n === 600 && size.chars < 15500, `a full log is capped (${size.n} entries, report ${size.chars} characters)`);
 await page.evaluate(() => app.playLog.clear());
 
 await browser.close();

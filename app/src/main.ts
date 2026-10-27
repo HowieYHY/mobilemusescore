@@ -1356,7 +1356,7 @@ setInterval(() => {
             logWatch.clockAudio = a.time;
         }
         // headphones or a speaker connected or taken away (Bluetooth adds 100+ ms)
-        if (logWatch.outLatency >= 0 && Math.abs(a.outputLatency - logWatch.outLatency) > 0.02) {
+        if (logWatch.outLatency >= 0 && Math.abs(a.outputLatency - logWatch.outLatency) > 0.1) {
             playLog.add("sound output", `output latency now ${ms(a.outputLatency)} (was ${ms(logWatch.outLatency)})`);
         }
         logWatch.outLatency = a.outputLatency;

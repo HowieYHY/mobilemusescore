@@ -12,8 +12,9 @@ export interface LogEntry {
 
 const KEY = "pocketscore.playlog";
 const MAX_ENTRIES = 600;
-// a GitHub comment holds up to 65536 characters; the report stays under it
-const MAX_REPORT_CHARS = 60000;
+// the user's paste was cut at exactly 20 000 characters in a chat and a GitHub comment (27 Oct 2026),
+// so the report stays well under that; the oldest entries go first
+const MAX_REPORT_CHARS = 15000;
 
 function pad(n: number, w = 2) {
     return String(n).padStart(w, "0");

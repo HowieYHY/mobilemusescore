@@ -65,6 +65,14 @@ EMSCRIPTEN_KEEPALIVE const char* mss_edit_add_note(int measure, int offNum, int 
     return ret(Session::instance()->editAddNote(measure, offNum, offDen, staff, midi, durNum, durDen));
 }
 
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_select(int page, double x, double y, double radius) { return ret(Session::instance()->editSelect(page, x, y, radius)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_selection() { return ret(Session::instance()->editSelectionJson()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_clear_selection() { return ret(Session::instance()->editClearSelection()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_move(const char* cmd) { return ret(Session::instance()->editMove(cmd)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_pitch(int mode) { return ret(Session::instance()->editPitch(mode)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_duration(int den) { return ret(Session::instance()->editDuration(den)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_dot() { return ret(Session::instance()->editDot()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_delete() { return ret(Session::instance()->editDelete()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_undo() { return ret(Session::instance()->editUndoRedo(true)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_redo() { return ret(Session::instance()->editUndoRedo(false)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_save(const char* path) { return ret(Session::instance()->saveTo(path)); }

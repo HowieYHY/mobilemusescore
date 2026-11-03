@@ -190,6 +190,33 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "practice":
             result = JSON.parse(callStr("mss_practice"));
             break;
+        case "editSelect":
+            result = JSON.parse(callStr("mss_edit_select", req.page, req.x, req.y, req.radius));
+            core._mss_process();
+            break;
+        case "editSelection": result = JSON.parse(callStr("mss_edit_selection")); break;
+        case "editClearSelection": result = JSON.parse(callStr("mss_edit_clear_selection")); break;
+        case "editMove": result = JSON.parse(callStr("mss_edit_move", req.to)); core._mss_process(); break;
+        case "editPitch": result = JSON.parse(callStr("mss_edit_pitch", req.mode)); core._mss_process(); break;
+        case "editDuration": result = JSON.parse(callStr("mss_edit_duration", req.den)); core._mss_process(); break;
+        case "editDot": result = JSON.parse(callStr("mss_edit_dot")); core._mss_process(); break;
+        case "editDelete": result = JSON.parse(callStr("mss_edit_delete")); core._mss_process(); break;
+        case "editUndo": result = JSON.parse(callStr("mss_edit_undo")); core._mss_process(); break;
+        case "editRedo": result = JSON.parse(callStr("mss_edit_redo")); core._mss_process(); break;
+        case "save": {
+            // the whole score as a .mscz, in a transferable buffer
+            const path = "/scores/_copy.mscz";
+            const r = JSON.parse(callStr("mss_save", path));
+            if (!r.ok) {
+                result = { ok: false, error: r.error };
+                break;
+            }
+            const bytes = core.FS.readFile(path) as Uint8Array;
+            core.FS.unlink(path);
+            const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+            post({ type: "reply", id: req.id, result: { ok: true, data } }, [data]);
+            return;
+        }
         }
         post({ type: "reply", id: req.id, result });
     } catch (err: any) {

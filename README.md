@@ -195,6 +195,23 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 
 </details>
 
+### Change the notes (Edit)
+
+**Edit** (the music-note button at the top) lets you change the music itself. This is new and still being tried out.
+
+1. Tap **Edit**. A bar appears under the top buttons.
+2. Tap a note or rest on the score. It gets a blue outline, and the bar says what it is, for example *C♯5 · quarter · bar 2*. A note sounds when you pick it.
+3. Change it:
+   - the arrows **‹ ›** go to the previous or next note;
+   - **⌄ ⌃** move the note down or up a step; turn on **Octave** to move by an octave instead;
+   - the note shapes (whole to 32nd) set how long it is, and the dot makes it half as long again;
+   - the bin turns a note into a rest.
+4. **Undo** and **Redo** are at the top right of the bar. **Done** closes the bar.
+
+**Save a copy** (the download arrow) makes a new `.mscz` file called *Your score (edited).mscz*. It opens in MuseScore or in PocketScore. **It never replaces the file you opened.** If you open another score first, PocketScore asks whether to save a copy.
+
+Good to know: the changes live only in this open score until you save a copy, so close nothing before saving. Notes you wrote with the pen (**Notes**) stay where they were drawn and may no longer line up with the music after you change it.
+
 ### Save
 **Save** (top bar) keeps your notes and mixer changes for this score, on this device.
 

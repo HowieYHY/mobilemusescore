@@ -1151,6 +1151,208 @@ std::string Session::editAddNote(int measureIndex, int offsetNum, int offsetDen,
     return editResult(true);
 }
 
+// ---- selection: one note or rest at a time
+
+static ChordRest* selectedChordRest(const MasterScore* ms, Note** noteOut = nullptr)
+{
+    EngravingItem* el = ms->selection().element();
+    if (noteOut) {
+        *noteOut = nullptr;
+    }
+    if (!el) {
+        return nullptr;
+    }
+    if (el->isNote()) {
+        if (noteOut) {
+            *noteOut = toNote(el);
+        }
+        return toNote(el)->chord();
+    }
+    return el->isChordRest() ? toChordRest(el) : nullptr;
+}
+
+static int durationDenominator(DurationType t)
+{
+    switch (t) {
+    case DurationType::V_WHOLE: return 1;
+    case DurationType::V_HALF: return 2;
+    case DurationType::V_QUARTER: return 4;
+    case DurationType::V_EIGHTH: return 8;
+    case DurationType::V_16TH: return 16;
+    case DurationType::V_32ND: return 32;
+    case DurationType::V_64TH: return 64;
+    case DurationType::V_128TH: return 128;
+    default: return 0; // breve, longer, measure rests
+    }
+}
+
+std::string Session::editSelectionJson() const
+{
+    const MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Note* note = nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms, &note) : nullptr;
+    if (!cr || !cr->measure() || !cr->measure()->system() || !cr->measure()->system()->page()) {
+        return "null";
+    }
+    const EngravingItem* el = note ? static_cast<const EngravingItem*>(note) : static_cast<const EngravingItem*>(cr);
+    const RectF r = el->pageBoundingRect();
+    std::string json = std::string("{\"kind\":\"") + (note ? "note" : "rest") + "\""
+                       + ",\"page\":" + std::to_string(cr->measure()->system()->page()->pageNumber())
+                       + ",\"x\":" + num(r.x()) + ",\"y\":" + num(r.y()) + ",\"w\":" + num(r.width()) + ",\"h\":" + num(r.height())
+                       + ",\"bar\":" + std::to_string(cr->measure()->no() + 1)
+                       + ",\"staff\":" + std::to_string(cr->staffIdx())
+                       + ",\"voice\":" + std::to_string(cr->voice() + 1)
+                       + ",\"den\":" + std::to_string(durationDenominator(cr->durationType().type()))
+                       + ",\"dots\":" + std::to_string(cr->dots());
+    if (note) {
+        json += ",\"pitch\":" + std::to_string(note->epitch())
+                + ",\"name\":" + jsonStr(note->tpcUserName(false, false).toStdString());
+    }
+    return json + "}";
+}
+
+std::string Session::editSelect(int pageIndex, double x, double y, double radius)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || pageIndex < 0 || pageIndex >= int(ms->pages().size())) {
+        return "null";
+    }
+    Page* page = ms->pages()[pageIndex];
+    // the note or rest nearest the tap, within `radius`; a note wins a tie with a rest
+    EngravingItem* best = nullptr;
+    double bestD = radius;
+    for (EngravingItem* item : page->items(RectF(x - radius, y - radius, 2 * radius, 2 * radius))) {
+        if (!(item->isNote() || item->isRest()) || !item->visible()) {
+            continue;
+        }
+        const RectF r = item->pageBoundingRect();
+        const double dx = std::max({ r.left() - x, 0.0, x - r.right() });
+        const double dy = std::max({ r.top() - y, 0.0, y - r.bottom() });
+        const double d = std::hypot(dx, dy) + (item->isRest() ? 0.001 : 0.0);
+        if (d < bestD) {
+            bestD = d;
+            best = item;
+        }
+    }
+    if (!best) {
+        ms->deselectAll();
+        return "null";
+    }
+    ms->select(best);
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+    if (best->isNote() && !playing && m_playbackModel) {
+        m_playbackModel->triggerEventsForItems({ best }, 500000, true);
+    }
+    return editSelectionJson();
+}
+
+std::string Session::editClearSelection()
+{
+    if (m_project) {
+        m_project->masterScore()->deselectAll();
+    }
+    return "null";
+}
+
+// Selection moves as the arrow keys do on desktop: "next-chord", "prev-chord", "next-measure", "prev-measure"
+std::string Session::editMove(const std::string& cmd)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || !ms->selection().element()) {
+        return "null";
+    }
+    ms->selectMove(String::fromStdString(cmd));
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+    if (EngravingItem* el = ms->selection().element(); el && el->isNote() && !playing && m_playbackModel) {
+        m_playbackModel->triggerEventsForItems({ el }, 500000, true);
+    }
+    return editSelectionJson();
+}
+
+// One undo step for the selected note: mode 0 up a semitone, 1 down, 2 octave up, 3 octave down
+std::string Session::editPitch(int mode)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Note* note = nullptr;
+    if (!ms || !selectedChordRest(ms, &note) || !note) {
+        return editResult(false, "Select a note first.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Change pitch"));
+    ms->upDown(mode == 0 || mode == 2, mode >= 2 ? UpDownMode::OCTAVE : UpDownMode::CHROMATIC);
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+    if (EngravingItem* el = ms->selection().element(); el && el->isNote() && !playing && m_playbackModel) {
+        m_playbackModel->triggerEventsForItems({ el }, 500000, true);
+    }
+    return editResult(true);
+}
+
+static Pad padForDenominator(int den)
+{
+    switch (den) {
+    case 1: return Pad::NOTE1;
+    case 2: return Pad::NOTE2;
+    case 4: return Pad::NOTE4;
+    case 8: return Pad::NOTE8;
+    case 16: return Pad::NOTE16;
+    case 32: return Pad::NOTE32;
+    case 64: return Pad::NOTE64;
+    default: return Pad::NOTE4;
+    }
+}
+
+// Sets the selected note or rest to a whole, half, quarter... (denominator 1, 2, 4...), as desktop's duration keys
+std::string Session::editDuration(int denominator)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || !selectedChordRest(ms)) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Change duration"));
+    ms->padToggle(padForDenominator(denominator));
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+std::string Session::editDot()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || !selectedChordRest(ms)) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Dot"));
+    ms->padToggle(Pad::DOT);
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+// Notes become rests, as Delete does on desktop
+std::string Session::editDelete()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || !selectedChordRest(ms)) {
+        return editResult(false, "Select a note first.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Delete"));
+    ms->cmdDeleteSelection();
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
 std::string Session::editUndoRedo(bool undo)
 {
     MasterScore* ms = m_project ? m_project->masterScore() : nullptr;

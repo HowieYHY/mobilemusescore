@@ -29,7 +29,24 @@ export type WorkerRequest =
     | Req<{ cmd: "loopMarker"; right: boolean; at: number }>
     | Req<{ cmd: "loop"; on: boolean }>
     | Req<{ cmd: "practice" | "clearLoop" | "tempos" | "bars" }>
-    | Req<{ cmd: "locate"; page: number; x: number; y: number; radius: number }>;
+    | Req<{ cmd: "locate"; page: number; x: number; y: number; radius: number }>
+    // editing (composer): see Session::edit* in the engine
+    | Req<{ cmd: "editSelect"; page: number; x: number; y: number; radius: number }>
+    | Req<{ cmd: "editSelection" | "editClearSelection" | "editUndo" | "editRedo" | "editDot" | "editDelete" }>
+    | Req<{ cmd: "editMove"; to: string }>
+    | Req<{ cmd: "editPitch"; mode: number }>
+    | Req<{ cmd: "editDuration"; den: number }>
+    | Req<{ cmd: "save" }>;
+
+/** The note or rest being edited (page units), or null. */
+export interface EditSelection {
+    kind: "note" | "rest";
+    page: number; x: number; y: number; w: number; h: number;
+    bar: number; staff: number; voice: number;
+    den: number; dots: number;
+    pitch?: number; name?: string;
+}
+export interface EditResult { ok: boolean; error?: string }
 
 export type WorkerReply =
     | { type: "reply"; id: number; result?: unknown; error?: string }

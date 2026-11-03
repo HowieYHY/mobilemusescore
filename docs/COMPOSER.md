@@ -66,6 +66,27 @@ with memory of just the audio buffer. The miss is two equal notes in a row, whic
 **Not yet tested on a real voice.** Several voices (Basic Pitch needs TensorFlow.js, tens of MB) is a separate,
 lazy-loaded, optional step, and is not started.
 
+## Built so far (3 Nov 2026, branch `composer`, unpublished)
+
+**Phase 1, Edit mode.** The *Edit* button (top bar) opens the edit bar (`#editbar`, main.ts "edit mode"): tap a
+note or rest to select it (the engine picks the nearest within a fingertip), previous/next, pitch up/down by a
+step or an octave, length whole to 32nd and dotted, delete (to a rest), undo/redo, *Save a copy*, Done. Engine:
+`mss_edit_select / selection / move / pitch / duration / dot / delete / undo / redo`, `mss_save` (session.cpp).
+After each change the page asks for the score info, timeline, bars and tempos again and redraws
+(`afterEdit`), about 60 to 140 ms on a desktop and the Android emulator. *Save a copy* shares a file where the
+device's share sheet takes files, and downloads otherwise; it never overwrites the opened file.
+
+Tests: `node scripts/edit-api-test.mjs` (engine in Node), `scripts/edit-test.mjs` (real touch in Chromium;
+`CDP=http://127.0.0.1:9333` drives the Android emulator's Chrome), `scripts/edit-layout-test.mjs` (top bar and
+edit bar at 320 to 1366 px).
+
+Not done yet: a silent draft of the edits (closing the tab loses them; the browser asks first), entering notes
+into rests (phase 2), notes written with the pen are not moved when the music changes, the first tap that
+starts the audio does not sound its note, and the edit bar is three rows high on a phone.
+
+Emulator: Android SDK on `D:ndroid-sdk` (cmdline-tools, emulator, platform-tools, Android 35 Play image),
+AVD `pixel35` (`ANDROID_AVD_HOME=D:ndroid-sdkvd`, `JAVA_HOME=D:ndroid-sdk\jdk\jdk-17.0.20.1+1`).
+
 ## Plan
 
 0. Spike: engine edit and save (done); pitch tracker on a real voice (the user's recordings, on localhost).

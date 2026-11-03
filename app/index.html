@@ -31,6 +31,7 @@
     </div>
     <button class="btn" id="save" disabled title="Everything is saved"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 3h11l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a1 1 0 0 1 1-2zM8 3v5h7V3M7 21v-7h10v7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg><span class="label">Save</span></button>
     <button class="btn" id="notes-toggle" aria-pressed="false" disabled title="Write on the score"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75zM20.7 7.04a1 1 0 0 0 0-1.41l-2.33-2.33a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z" fill="currentColor"/></svg><span class="label">Notes</span></button>
+    <button class="btn" id="edit-toggle" aria-pressed="false" disabled title="Change the notes"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm11-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="label">Edit</span></button>
     <select id="view-mode" aria-label="View mode" disabled>
       <option value="page">Page view</option>
       <option value="page_turn">Page by page</option>
@@ -57,6 +58,27 @@
       <button class="btn small primary" id="notes-done">Done</button>
     </div>
     <div class="hint" id="notes-hint"></div>
+  </div>
+
+  <div class="editbar" id="editbar" hidden>
+    <div class="edit-info" id="edit-info" aria-live="polite"></div>
+    <div class="edit-actions">
+      <button class="btn small" id="edit-undo" disabled aria-label="Undo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small" id="edit-redo" disabled aria-label="Redo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small" id="edit-copy" disabled aria-label="Save a copy" title="Save a copy of the score"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Save a copy</span></button>
+      <button class="btn small primary" id="edit-done">Done</button>
+    </div>
+    <div class="edit-tools" role="group" aria-label="Move and change the note">
+      <button class="btn small" id="edit-prev" disabled aria-label="Previous note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small" id="edit-next" disabled aria-label="Next note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="edit-gap"></span>
+      <button class="btn small" id="edit-down" disabled aria-label="Lower"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small" id="edit-up" disabled aria-label="Higher"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small oct" id="edit-octave" disabled aria-pressed="false" title="Move by an octave instead of a step">Octave</button>
+      <span class="edit-gap"></span>
+      <button class="btn small" id="edit-delete" disabled aria-label="Delete"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="edit-lengths" id="edit-lengths" role="group" aria-label="Length"></div>
   </div>
 
   <div class="palette" id="palette" role="dialog" aria-label="More colours" hidden>

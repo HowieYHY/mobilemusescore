@@ -376,5 +376,44 @@
       "for-safari",
       "tour"
     ]
+  },
+  "edit-api-test": {
+    "files": [
+      "engine/core/session.cpp",
+      "engine/core/mscore.cpp"
+    ],
+    "words": [
+      "mss_edit",
+      "editSelect",
+      "editPitch",
+      "editDuration"
+    ]
+  },
+  "edit-test": {
+    "files": [
+      "app/src/engine/protocol.ts",
+      "app/src/engine/engine.ts",
+      "app/src/engine/core.worker.ts"
+    ],
+    "words": [
+      "editbar",
+      "edit-sel",
+      "runEdit",
+      "afterEdit",
+      "saveCopy",
+      "edit\\.on",
+      "setEditActive"
+    ]
+  },
+  "edit-layout-test": {
+    "files": [
+      "app/index.html",
+      "app/src/style.css"
+    ],
+    "words": [
+      "editbar",
+      "edit-toggle",
+      "topbar"
+    ]
   }
 }

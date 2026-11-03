@@ -8,11 +8,11 @@
     "note": "1.0.25, #29 fade"
   },
   "tour-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19"
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03"
   },
   "layout-shots": {
     "streak": 5,
@@ -30,11 +30,11 @@
     "date": "2026-10-19"
   },
   "mobile-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03",
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
@@ -46,26 +46,26 @@
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03",
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
   },
   "goto-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19"
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03"
   },
   "csp-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "8d03257+changes",
-    "passCommit": "8d03257",
-    "date": "2026-10-18",
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03",
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
   "pageturn-test": {
@@ -197,6 +197,27 @@
     "last": "pass",
     "commit": "a50b74a+changes",
     "passCommit": "a50b74a",
+    "date": "2026-11-03"
+  },
+  "edit-api-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03"
+  },
+  "edit-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
+    "date": "2026-11-03"
+  },
+  "edit-layout-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "e1fd673+changes",
+    "passCommit": "e1fd673",
     "date": "2026-11-03"
   }
 }

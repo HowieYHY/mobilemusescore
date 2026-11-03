@@ -2,7 +2,7 @@
 // worklet, connects them with a MessageChannel (MuseScore's audio RPC), and
 // exposes a small promise-based API to the UI.
 
-import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
+import type { CursorInfo, EditResult, EditSelection, PracticeInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
 
 type Listener = (data: any) => void;
 
@@ -438,6 +438,22 @@ export class Engine {
     locate(page: number, x: number, y: number, radius: number): Promise<CursorInfo | null> { return this.request({ cmd: "locate", page, x, y, radius }); }
     /** Tempo changes, repeats unrolled: [secs, quarter-note BPM before the speed]. */
     tempos(): Promise<[number, number][]> { return this.request({ cmd: "tempos" }); }
+    // Editing. Every call that changes the score returns once the score is laid out again and the
+    // sound follows it; the page then asks for the score info and redraws.
+    editSelect(page: number, x: number, y: number, radius: number): Promise<EditSelection | null> { return this.request({ cmd: "editSelect", page, x, y, radius }); }
+    editSelection(): Promise<EditSelection | null> { return this.request({ cmd: "editSelection" }); }
+    editClearSelection(): Promise<null> { return this.request({ cmd: "editClearSelection" }); }
+    editMove(to: "next-chord" | "prev-chord" | "next-measure" | "prev-measure"): Promise<EditSelection | null> { return this.request({ cmd: "editMove", to }); }
+    /** mode: 0 semitone up, 1 semitone down, 2 octave up, 3 octave down */
+    editPitch(mode: 0 | 1 | 2 | 3): Promise<EditResult> { return this.request({ cmd: "editPitch", mode }); }
+    /** den: 1 whole, 2 half, 4 quarter, 8 eighth, 16, 32 */
+    editDuration(den: number): Promise<EditResult> { return this.request({ cmd: "editDuration", den }); }
+    editDot(): Promise<EditResult> { return this.request({ cmd: "editDot" }); }
+    editDelete(): Promise<EditResult> { return this.request({ cmd: "editDelete" }); }
+    editUndo(): Promise<EditResult> { return this.request({ cmd: "editUndo" }); }
+    editRedo(): Promise<EditResult> { return this.request({ cmd: "editRedo" }); }
+    /** The score, edits included, as the bytes of a .mscz. */
+    saveCopy(): Promise<{ ok: boolean; error?: string; data?: ArrayBuffer }> { return this.request({ cmd: "save" }); }
     /** Where each printed bar and each section (rehearsal mark) first plays, at the current speed. */
     bars(): Promise<{ bars: [number, number][]; sections: [number, string, number][] }> { return this.request({ cmd: "bars" }); }
 }

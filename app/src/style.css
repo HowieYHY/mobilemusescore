@@ -140,12 +140,12 @@ body {
 @media (max-width: 600px) {
   .topbar {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      "title title title title end"
-      "open save . notes view";
+      "title title title title end end"
+      "open save . edit notes view";
     row-gap: 4px;
-    column-gap: 8px;
+    column-gap: 6px;
     padding-top: calc(6px + var(--safe-t));
   }
   .topbar .title { grid-area: title; font-size: 16px; line-height: 1.3; padding: 0 2px; }
@@ -154,7 +154,9 @@ body {
   .topbar #open-label { grid-area: open; }
   .topbar #save { grid-area: save; }
   .topbar #notes-toggle { grid-area: notes; }
-  .topbar #view-mode { grid-area: view; max-width: 38vw; }
+  .topbar #edit-toggle { grid-area: edit; }
+  .topbar #view-mode { grid-area: view; max-width: 34vw; }
+  .topbar #save { padding-left: 10px; padding-right: 10px; }
   #open-label .long { display: none; }
   #open-label .short { display: inline; }
 }
@@ -165,10 +167,10 @@ body {
 @media (min-width: 601px) and (max-width: 1100px) {
   .topbar {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
     grid-template-areas:
-      "title title title title end"
-      "open . save notes view";
+      "title title title title end end"
+      "open . save edit notes view";
     row-gap: 6px;
     column-gap: 10px;
   }
@@ -177,6 +179,7 @@ body {
   .topbar #open-label { grid-area: open; }
   .topbar #save { grid-area: save; }
   .topbar #notes-toggle { grid-area: notes; }
+  .topbar #edit-toggle { grid-area: edit; }
   .topbar #view-mode { grid-area: view; }
 }
 /* With its own row, a name that still doesn't fit goes on to a second line instead of being cut */
@@ -371,7 +374,7 @@ body:has(#empty:not([hidden])) .zoom { display: none; }
 /* Focus (issue #17): only the music and a play button. The bars and any open panel are hidden, not
    closed, and come back as they were; tapping off the staves leaves (handled in main.ts). */
 body:has(#empty:not([hidden])) #focus-toggle { display: none; }
-.focus .topbar, .focus .status, .focus .notesbar, .focus .palette, .focus .settings,
+.focus .topbar, .focus .status, .focus .notesbar, .focus .editbar, .focus .palette, .focus .settings,
 .focus .zoom, .focus .mixer, .focus .practice { display: none !important; }
 .focus .pages { padding: calc(8px + var(--safe-t)) 8px calc(96px + var(--safe-b)); }
 .focus .transport {
@@ -1044,7 +1047,7 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 
 /* The website's own bar names the score and closes the preview, so PocketScore shows no title, and
    nothing for opening files, notes, saving or tips: only playing, views, speed, loop and mixer. */
-.embedded #open-label, .embedded #save, .embedded #notes-toggle, .embedded .tip-icon,
+.embedded #open-label, .embedded #save, .embedded #notes-toggle, .embedded #edit-toggle, .embedded .tip-icon,
 .embedded #score-title, .embedded #empty { display: none; }
 .embedded .topbar { display: flex; justify-content: flex-end; padding: 6px 10px; }
 .embedded .topbar select { max-width: none; }
@@ -1249,3 +1252,88 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   .set-row input[type=checkbox], .set-row input[type=checkbox]::after { transition: none; }
 }
 
+/* Edit: change the notes of the score. Same chrome as the notes bar. */
+#edit-toggle { gap: 6px; }
+#edit-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+@media (max-width: 480px) { #edit-toggle .label { display: none; } }
+.editbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "info actions"
+    "tools tools"
+    "lengths lengths";
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 12px 8px;
+  background: var(--chrome-2);
+  color: var(--text-on-chrome);
+  flex: none;
+}
+.edit-info { grid-area: info; font-size: 14px; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+.edit-info b { font-weight: 650; }
+.edit-info .dim { opacity: 0.8; }
+.edit-actions { grid-area: actions; display: flex; gap: 6px; align-items: center; }
+.edit-tools { grid-area: tools; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.edit-gap { flex: 1 1 8px; min-width: 6px; max-width: 28px; }
+.edit-lengths { grid-area: lengths; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.editbar .btn.small { min-width: 40px; min-height: 40px; padding: 4px 8px; }
+.editbar .btn.oct { font-size: 13px; padding: 4px 10px; }
+.editbar .btn[aria-pressed="true"], .editbar .len[aria-checked="true"] {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.editbar .len {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-on-chrome);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.editbar .len:disabled { opacity: 0.4; cursor: default; }
+.editbar .len.dot { font-size: 22px; font-weight: 700; line-height: 1; }
+.editbar .len svg { display: block; }
+@media (max-width: 699px) { .edit-actions .lbl { display: none; } }
+/* tablets: the name and the actions on top, then the note tools beside the lengths */
+@media (min-width: 700px) {
+  .editbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "info actions"
+      "tools lengths";
+    column-gap: 16px;
+  }
+  .edit-tools, .edit-lengths { flex-wrap: nowrap; }
+}
+/* wide screens: one row */
+@media (min-width: 1100px) {
+  .editbar {
+    grid-template-columns: minmax(8ch, 1fr) auto auto auto;
+    grid-template-areas: "info tools lengths actions";
+  }
+}
+/* the note or rest being edited */
+.edit-sel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 4px;
+  background: rgba(30, 106, 208, 0.22);
+  outline: 2px solid var(--accent-bright);
+  pointer-events: none;
+}
+/* five buttons and the view menu share the phone's second row: Save keeps only its icon when narrow */
+@media (max-width: 400px) { #save .label { display: none; } }
+/* the narrowest phones (320 px): the view menu and the buttons give a little so Open is not cut */
+@media (max-width: 340px) {
+  .topbar #view-mode { max-width: 29vw; padding-left: 8px; padding-right: 22px !important; background-position: right 6px center; }
+  .topbar .btn { padding-left: 9px; padding-right: 9px; }
+}

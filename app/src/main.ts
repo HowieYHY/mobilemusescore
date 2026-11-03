@@ -1,7 +1,7 @@
 // first: decides whether this is someone's first visit before anything else saves data
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
-import type { CursorInfo, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
+import type { CursorInfo, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
@@ -45,6 +45,20 @@ const ui = {
     soundsBody: $("sounds-body"),
     soundsBack: $<HTMLButtonElement>("sounds-back"),
     notesToggle: $<HTMLButtonElement>("notes-toggle"),
+    editToggle: $<HTMLButtonElement>("edit-toggle"),
+    editbar: $("editbar"),
+    editInfo: $("edit-info"),
+    editUndo: $<HTMLButtonElement>("edit-undo"),
+    editRedo: $<HTMLButtonElement>("edit-redo"),
+    editCopy: $<HTMLButtonElement>("edit-copy"),
+    editDone: $<HTMLButtonElement>("edit-done"),
+    editPrev: $<HTMLButtonElement>("edit-prev"),
+    editNext: $<HTMLButtonElement>("edit-next"),
+    editUp: $<HTMLButtonElement>("edit-up"),
+    editDown: $<HTMLButtonElement>("edit-down"),
+    editOctave: $<HTMLButtonElement>("edit-octave"),
+    editDelete: $<HTMLButtonElement>("edit-delete"),
+    editLengths: $("edit-lengths"),
     notesbar: $("notesbar"),
     swatches: $("swatches"),
     notesUndo: $<HTMLButtonElement>("notes-undo"),
@@ -820,6 +834,10 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
         }
         if (armedMarker) {
             void placeMarker(tap);
+            return;
+        }
+        if (edit.on) {
+            void editSelectAt(tap);
             return;
         }
         const audioReady = engine.audioRunning && state.playbackReady;
@@ -2912,6 +2930,14 @@ async function openChosen(name: string, data: ArrayBuffer) {
     if (state.playing) {
         await engine.stop();
     }
+    if (edit.dirty) {
+        const choice = await ask("Keep your edits?",
+            `You changed the notes of “${ui.title.textContent}”. Opening another score loses those changes unless you save a copy first.`,
+            [["cancel", "Cancel"], ["discard", "Don't keep"], ["copy", "Save a copy"]]);
+        if (choice === "cancel" || (choice === "copy" && !(await saveCopy()))) {
+            return;
+        }
+    }
     if (hasUnsaved()) {
         const choice = await ask("Save your changes?",
             `Your notes or mixer changes for “${ui.title.textContent}” are not saved. Save them before opening another score?`,
@@ -2978,8 +3004,10 @@ async function openScore(name: string, data: ArrayBuffer) {
     state.zoom = fitWidthZoom();
     renderGeneration++;
     setNotesActive(false);
+    resetEdit();
     notes.open(key, "page");
     ui.notesToggle.disabled = false;
+    ui.editToggle.disabled = false;
     // the view chosen in Settings: laid out straight in it, without drawing Page view first
     const startView = settings.startView;
     if (startView === "page") {
@@ -3582,6 +3610,9 @@ function setNotesActive(on: boolean) {
 
 const closeNotes = () => setNotesActive(false);
 ui.notesToggle.onclick = () => {
+    if (edit.on) {
+        closeLayer(closeEdit);
+    }
     if (notes.active) {
         closeLayer(closeNotes);
     } else {
@@ -3590,6 +3621,298 @@ ui.notesToggle.onclick = () => {
     }
 };
 ui.notesDone.onclick = () => closeLayer(closeNotes);
+
+// ---------------------------------------------------------------- edit mode (composer)
+
+// Edit changes the notes of the score itself, in the engine (one undo step per change), and the page
+// draws it again. The reader keeps the result with Save a copy: a .mscz of its own, never over the
+// file that was opened. Notes written on the score (Notes) are pinned to the old layout and may
+// no longer line up after an edit.
+const edit = {
+    on: false,
+    sel: null as EditSelection | null,
+    busy: false,
+    dirty: false,
+    octave: false,
+    undo: 0, // edits that can be undone
+    redo: 0,
+    selEl: null as HTMLDivElement | null,
+};
+
+const LENGTHS: [number, string][] = [[1, "Whole"], [2, "Half"], [4, "Quarter"], [8, "Eighth"], [16, "16th"], [32, "32nd"]];
+
+// A note drawn small: hollow head and no stem for a whole note, a stem, flags for eighths and shorter
+function lengthIcon(den: number): string {
+    const hollow = den <= 2;
+    const head = `<ellipse cx="${den === 1 ? 12 : 9}" cy="17" rx="${den === 1 ? 5 : 4.2}" ry="3.2" transform="rotate(-20 ${den === 1 ? 12 : 9} 17)" ${hollow ? 'fill="none" stroke="currentColor" stroke-width="1.8"' : 'fill="currentColor"'}/>`;
+    if (den === 1) {
+        return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">${head}</svg>`;
+    }
+    const flags = den >= 8 ? Math.round(Math.log2(den / 8)) + 1 : 0;
+    let flag = "";
+    for (let i = 0; i < flags; i++) {
+        flag += `<path d="M13 ${4 + i * 3.6}c0 3 5.5 4 5 8.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
+    }
+    return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">${head}<path d="M12.9 16.4V4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>${flag}</svg>`;
+}
+
+for (const [den, name] of LENGTHS) {
+    const b = document.createElement("button");
+    b.className = "len";
+    b.dataset.den = String(den);
+    b.disabled = true;
+    b.setAttribute("aria-label", name + " note");
+    b.title = name;
+    b.innerHTML = lengthIcon(den);
+    b.onclick = () => void runEdit(() => engine.editDuration(den));
+    ui.editLengths.appendChild(b);
+}
+const dotButton = document.createElement("button");
+dotButton.className = "len dot";
+dotButton.id = "edit-dot";
+dotButton.disabled = true;
+dotButton.setAttribute("aria-label", "Dotted");
+dotButton.title = "Dotted: half as long again";
+dotButton.textContent = "•";
+dotButton.onclick = () => void runEdit(() => engine.editDot());
+ui.editLengths.appendChild(dotButton);
+
+const lengthName = (den: number, dots: number) =>
+    (dots ? "dotted " : "") + (LENGTHS.find(([d]) => d === den)?.[1].toLowerCase() ?? "long");
+
+function updateEditBar() {
+    const s = edit.sel;
+    const note = s?.kind === "note";
+    ui.editInfo.innerHTML = "";
+    if (s) {
+        const b = document.createElement("b");
+        b.textContent = note ? (s.name ?? "Note") : "Rest";
+        const rest = document.createElement("span");
+        rest.className = "dim";
+        rest.textContent = ` · ${lengthName(s.den, s.dots)} · bar ${s.bar}`;
+        ui.editInfo.append(b, rest);
+    } else {
+        ui.editInfo.textContent = "Tap a note or rest to change it";
+    }
+    const idle = edit.busy;
+    ui.editPrev.disabled = ui.editNext.disabled = ui.editDelete.disabled = !s || idle;
+    ui.editUp.disabled = ui.editDown.disabled = ui.editOctave.disabled = !note || idle;
+    ui.editOctave.title = note ? "Move by an octave instead of a step" : "Select a note to move it";
+    ui.editUndo.disabled = edit.undo === 0 || idle;
+    ui.editRedo.disabled = edit.redo === 0 || idle;
+    ui.editCopy.disabled = !edit.dirty || idle;
+    ui.editLengths.querySelectorAll<HTMLButtonElement>(".len").forEach((b) => {
+        b.disabled = !s || idle;
+        if (b.dataset.den) {
+            b.setAttribute("aria-checked", String(!!s && Number(b.dataset.den) === s.den));
+            b.setAttribute("role", "radio");
+        }
+    });
+    dotButton.setAttribute("aria-pressed", String(!!s && s.dots > 0));
+}
+
+// The box round the selected note: placed on its page, kept in view
+function showEditSel(scroll: boolean) {
+    const s = edit.sel;
+    const pageEl = s ? state.pageEls[s.page] : undefined;
+    if (!s || !pageEl) {
+        edit.selEl?.remove();
+        return;
+    }
+    if (!edit.selEl) {
+        edit.selEl = document.createElement("div");
+        edit.selEl.className = "edit-sel";
+    }
+    if (edit.selEl.parentElement !== pageEl) {
+        pageEl.appendChild(edit.selEl);
+    }
+    const pad = 3;
+    edit.selEl.style.transform = `translate(${unitsToCss(s.x) - pad}px, ${unitsToCss(s.y) - pad}px)`;
+    edit.selEl.style.width = unitsToCss(s.w) + 2 * pad + "px";
+    edit.selEl.style.height = unitsToCss(s.h) + 2 * pad + "px";
+    if (scroll) {
+        const v = ui.viewer.getBoundingClientRect();
+        const r = edit.selEl.getBoundingClientRect();
+        const margin = 80;
+        if (r.top < v.top + margin || r.bottom > v.bottom - margin) {
+            ui.viewer.scrollTop += r.top + r.height / 2 - (v.top + v.height / 2);
+        }
+        if (r.left < v.left + margin || r.right > v.right - margin) {
+            ui.viewer.scrollLeft += r.left + r.width / 2 - (v.left + v.width / 2);
+        }
+    }
+}
+
+async function editSelectAt(tap: { page: number; x: number; y: number; radius: number }) {
+    if (edit.busy) {
+        return;
+    }
+    if (!(engine.audioRunning && state.playbackReady) && !state.playing) {
+        void startAudioFromTap(); // the first tap starts the sound; later notes sound as they are picked
+    }
+    edit.sel = await engine.editSelect(tap.page, tap.x, tap.y, tap.radius);
+    showEditSel(false);
+    updateEditBar();
+}
+
+// The score changed: its size, the time of each note and the pages are all new
+async function afterEdit() {
+    state.score = await engine.setViewMode(engineMode(shownView));
+    state.duration = state.score.duration;
+    ui.duration.textContent = fmt(state.duration);
+    await Promise.all([loadTimeline(), loadBars(), loadTempos()]);
+    rerenderAll(false);
+    edit.sel = await engine.editSelection();
+    showEditSel(true);
+}
+
+async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" | "redo" = "edit") {
+    if (edit.busy || !edit.on) {
+        return;
+    }
+    edit.busy = true;
+    updateEditBar();
+    try {
+        if (state.playing) {
+            await engine.pause();
+        }
+        const r = await change();
+        if (!r.ok) {
+            setStatus(r.error || "That could not be changed.", "error", 4000);
+            return;
+        }
+        edit.dirty = true;
+        if (kind === "edit") {
+            edit.undo++;
+            edit.redo = 0;
+        } else if (kind === "undo") {
+            edit.undo--;
+            edit.redo++;
+        } else {
+            edit.redo--;
+            edit.undo++;
+        }
+        await afterEdit();
+    } catch (err) {
+        console.warn("edit failed:", err);
+        setStatus("That could not be changed. Your score is as it was; try again.", "error", 5000);
+    } finally {
+        edit.busy = false;
+        updateEditBar();
+    }
+}
+
+async function moveSelection(to: "next-chord" | "prev-chord") {
+    if (edit.busy) {
+        return;
+    }
+    const s = await engine.editMove(to);
+    if (s) {
+        edit.sel = s;
+    }
+    showEditSel(true);
+    updateEditBar();
+}
+
+// A copy of the score with the edits, as a .mscz of its own. Shared where the device has a share
+// sheet that takes files, downloaded otherwise. Resolves true once it was handed over.
+async function saveCopy(): Promise<boolean> {
+    const r = await engine.saveCopy();
+    if (!r.ok || !r.data) {
+        setStatus(r.error || "The copy could not be made.", "error", 6000);
+        return false;
+    }
+    const base = (openedScore?.name ?? ui.title.textContent ?? "score").replace(/\.(mscz|mscx)$/i, "").replace(/[\\/:*?"<>|]+/g, " ").trim() || "score";
+    const name = `${base} (edited).mscz`;
+    const file = new File([r.data], name, { type: "application/octet-stream" });
+    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+    if (nav.canShare?.({ files: [file] })) {
+        try {
+            await navigator.share({ files: [file], title: name });
+            edit.dirty = false;
+            setStatus(`Saved a copy: ${name}`, "info", 5000);
+            updateEditBar();
+            return true;
+        } catch (err) {
+            if ((err as Error).name === "AbortError") {
+                return false; // the reader closed the share sheet
+            }
+            // no luck with the share sheet: download it instead
+        }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    edit.dirty = false;
+    setStatus(`Saved a copy: ${name}. Look in your downloads.`, "info", 7000);
+    updateEditBar();
+    return true;
+}
+
+function setEditActive(on: boolean) {
+    edit.on = on;
+    ui.editbar.hidden = !on;
+    ui.editToggle.setAttribute("aria-pressed", String(on));
+    document.documentElement.classList.toggle("editing", on);
+    if (on) {
+        if (notes.active) {
+            closeLayer(closeNotes);
+        }
+        if (state.playing) {
+            void engine.pause();
+        }
+    } else {
+        edit.sel = null;
+        edit.selEl?.remove();
+        void engine.editClearSelection();
+    }
+    updateEditBar();
+}
+
+// A new score starts with nothing edited
+function resetEdit() {
+    edit.on = false;
+    edit.sel = null;
+    edit.dirty = false;
+    edit.undo = edit.redo = 0;
+    edit.selEl?.remove();
+    ui.editbar.hidden = true;
+    ui.editToggle.setAttribute("aria-pressed", "false");
+    document.documentElement.classList.remove("editing");
+}
+
+const closeEdit = () => setEditActive(false);
+ui.editToggle.onclick = () => {
+    if (edit.on) {
+        closeLayer(closeEdit);
+    } else {
+        setEditActive(true);
+        openLayer(closeEdit);
+    }
+};
+ui.editDone.onclick = () => closeLayer(closeEdit);
+ui.editUp.onclick = () => void runEdit(() => engine.editPitch(edit.octave ? 2 : 0));
+ui.editDown.onclick = () => void runEdit(() => engine.editPitch(edit.octave ? 3 : 1));
+ui.editOctave.onclick = () => {
+    edit.octave = !edit.octave;
+    ui.editOctave.setAttribute("aria-pressed", String(edit.octave));
+};
+ui.editDelete.onclick = () => void runEdit(() => engine.editDelete());
+ui.editUndo.onclick = () => void runEdit(() => engine.editUndo(), "undo");
+ui.editRedo.onclick = () => void runEdit(() => engine.editRedo(), "redo");
+ui.editPrev.onclick = () => void moveSelection("prev-chord");
+ui.editNext.onclick = () => void moveSelection("next-chord");
+ui.editCopy.onclick = () => void saveCopy();
+window.addEventListener("beforeunload", (e) => {
+    if (edit.dirty) {
+        e.preventDefault(); // the browser's own "leave this page?" question
+    }
+});
 ui.notesUndo.onclick = () => notes.undo();
 // The app's own question, not confirm(): a system dialog stops the sound on iPad
 ui.notesClear.onclick = async () => {
@@ -3604,7 +3927,7 @@ ui.notesClear.onclick = async () => {
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, settings, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
+(window as any).app = { engine, state, settings, edit, updateEditBar, showEditSel, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
     // update-restart-test.mjs: an update can't be produced on demand there
     markUpdateReady: () => (updateReady = true), restartForUpdate };
 
@@ -3658,6 +3981,7 @@ function tourSteps(): TourStep[] {
         { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
         { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
+        { target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." },
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },

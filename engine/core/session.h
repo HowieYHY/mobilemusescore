@@ -50,6 +50,15 @@ public:
     // Editing (composer spike): each change is one undo step, then layout and the playback model are redone
     std::string editAddNote(int measureIndex, int offsetNum, int offsetDen, int staffIdx, int midiPitch, int durNum, int durDen);
     std::string editUndoRedo(bool undo);
+    // What is being edited: one note or rest, picked by a tap, and what can be done to it
+    std::string editSelect(int pageIndex, double x, double y, double radius);
+    std::string editSelectionJson() const;
+    std::string editMove(const std::string& cmd);
+    std::string editPitch(int mode);
+    std::string editDuration(int denominator);
+    std::string editDot();
+    std::string editDelete();
+    std::string editClearSelection();
     std::string saveTo(const std::string& path);
 
     // Transport

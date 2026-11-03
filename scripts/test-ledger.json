@@ -207,17 +207,66 @@
     "date": "2026-11-03"
   },
   "edit-test": {
-    "streak": 1,
+    "streak": 4,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
     "date": "2026-11-03"
   },
   "edit-layout-test": {
+    "streak": 4,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "edit-draft-test": {
     "streak": 1,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "voice-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "voice-edit-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "new-score-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "new-score-flow-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "edit-more-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
+    "date": "2026-11-03"
+  },
+  "edit-more-ui-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "77fc2b2+changes",
+    "passCommit": "77fc2b2",
     "date": "2026-11-03"
   }
 }

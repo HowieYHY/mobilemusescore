@@ -46,10 +46,20 @@
 #include "engraving/dom/part.h"
 #include "engraving/dom/rehearsalmark.h"
 #include "engraving/dom/repeatlist.h"
+#include "engraving/dom/rest.h"
+#include "engraving/dom/dynamic.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/keysig.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/stafftext.h"
+#include "engraving/dom/timesig.h"
+#include "engraving/dom/tuplet.h"
+#include "engraving/editing/editpart.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/stafftype.h"
 #include "engraving/dom/system.h"
+#include "engraving/dom/utils.h"
 #ifndef MSS_MUSESCORE_4_7
 #include "engraving/dom/tempotimeline.h"
 #endif
@@ -535,6 +545,64 @@ std::string Session::load(const std::string& path)
     }
 
     LOGI() << "load step 8";
+    buildTracks();
+
+    m_master = m_hasAudioSettings ? m_audioSettings.masterOutputParams() : OutputParams();
+    updateSoloMuteStates(); // nothing is sent yet: no track is added
+
+    m_playbackSetUp = false;
+    if (m_audioReady) {
+        setupPlayback();
+    }
+
+    return "{\"ok\":true,\"score\":" + scoreInfoJson() + "}";
+}
+
+// A track's name as PlaybackController::addTrack gives it; false when its part or instrument is missing
+bool Session::nameTrack(MasterScore* ms, Track& t)
+{
+    // as in PlaybackController::addTrack: a track is dropped only when its
+    // part or instrument is missing (an empty name is fine)
+    bool known = t.isMetronome;
+    if (t.isMetronome) {
+        t.title = "Metronome";
+    } else if (const Part* part = ms->partById(t.id.partId)) {
+        t.hidden = !part->show();
+        // Label strips with the name printed on the staff (desktop's mixer uses the
+        // part's track name, which is often the sound, e.g. "Piano" for every
+        // voice of a choir score), falling back to the part and track names.
+        String partName = part->instrument()->nameAsPlainText();
+        if (partName.empty()) {
+            partName = part->partName();
+        }
+        if (partName.empty()) {
+            partName = part->instrument()->trackName();
+        }
+        if (t.isChordSymbols) {
+            known = true;
+            t.title = "Chords." + partName.toStdString();
+        } else if (t.id.instrumentId == part->instrument()->id()) {
+            known = true;
+            t.title = partName.toStdString();
+        } else if (const Instrument* instr = part->instrumentById(t.id.instrumentId)) {
+            known = true;
+            t.title = "(" + instr->trackName().toStdString() + ")";
+        }
+    }
+
+    if (!known) {
+        return false;
+    }
+    if (t.title.empty()) {
+        t.title = "Part " + std::to_string(t.key);
+    }
+    return true;
+}
+
+// The tracks of the playback model, named, with the mixer values the score holds
+void Session::buildTracks()
+{
+    MasterScore* ms = m_project->masterScore();
     // Tracks, named as in PlaybackController::addTrack
     int key = 0;
     for (const InstrumentTrackId& id : m_playbackModel->existingTrackIdSet()) {
@@ -544,40 +612,8 @@ std::string Session::load(const std::string& path)
         t.isMetronome = id == m_playbackModel->metronomeTrackId();
         t.isChordSymbols = m_playbackModel->isChordSymbolsTrack(id);
 
-        // as in PlaybackController::addTrack: a track is dropped only when its
-        // part or instrument is missing (an empty name is fine)
-        bool known = t.isMetronome;
-        if (t.isMetronome) {
-            t.title = "Metronome";
-        } else if (const Part* part = ms->partById(id.partId)) {
-            t.hidden = !part->show();
-            // Label strips with the name printed on the staff (desktop's mixer uses the
-            // part's track name, which is often the sound, e.g. "Piano" for every
-            // voice of a choir score), falling back to the part and track names.
-            String partName = part->instrument()->nameAsPlainText();
-            if (partName.empty()) {
-                partName = part->partName();
-            }
-            if (partName.empty()) {
-                partName = part->instrument()->trackName();
-            }
-            if (t.isChordSymbols) {
-                known = true;
-                t.title = "Chords." + partName.toStdString();
-            } else if (id.instrumentId == part->instrument()->id()) {
-                known = true;
-                t.title = partName.toStdString();
-            } else if (const Instrument* instr = part->instrumentById(id.instrumentId)) {
-                known = true;
-                t.title = "(" + instr->trackName().toStdString() + ")";
-            }
-        }
-
-        if (!known) {
+        if (!nameTrack(ms, t)) {
             continue;
-        }
-        if (t.title.empty()) {
-            t.title = "Part " + std::to_string(t.key);
         }
 
         // Mixer values are known from the score itself, so the mixer works
@@ -630,16 +666,56 @@ std::string Session::load(const std::string& path)
         }
         return a.isChordSymbols < b.isChordSymbols;
     });
+    m_partCount = ms->parts().size();
+}
 
-    m_master = m_hasAudioSettings ? m_audioSettings.masterOutputParams() : OutputParams();
-    updateSoloMuteStates(); // nothing is sent yet: no track is added
-
-    m_playbackSetUp = false;
+// A line was added (or taken away again by undo): the playback is built again from the score, keeping the
+// volumes, mutes and solos the reader set for the lines that remain
+void Session::rebuildPlayback()
+{
+    MasterScore* ms = m_project->masterScore();
+    std::vector<Track> old = std::move(m_tracks);
+    m_tracks.clear();
+    removeAllTracks();
+    ++m_loadKey;
+    m_playbackModel = std::make_unique<PlaybackModel>(m_ctx);
+    m_playbackModel->setPlayRepeats(true);
+    m_playbackModel->setPlayChordSymbols(true);
+    m_playbackModel->setUseScoreDynamicsForOffstreamPlayback(true);
+    m_playbackModel->setIsMetronomeEnabled(m_metronome);
+    m_playbackModel->load(ms);
+    buildTracks();
+    for (Track& t : m_tracks) {
+        for (const Track& o : old) {
+            if (o.id == t.id) {
+                t.out = o.out;
+                t.soloMute = o.soloMute;
+                break;
+            }
+        }
+    }
+    updateSoloMuteStates();
     if (m_audioReady) {
         setupPlayback();
     }
+}
 
-    return "{\"ok\":true,\"score\":" + scoreInfoJson() + "}";
+// After an edit that may have added, removed or renamed a line
+void Session::syncTracks()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms) {
+        return;
+    }
+    if (ms->parts().size() != m_partCount) {
+        rebuildPlayback();
+        return;
+    }
+    for (Track& t : m_tracks) {
+        if (!t.isMetronome) {
+            nameTrack(ms, t);
+        }
+    }
 }
 
 std::string Session::scoreInfoJson() const
@@ -1201,13 +1277,18 @@ std::string Session::editSelectionJson() const
                        + ",\"x\":" + num(r.x()) + ",\"y\":" + num(r.y()) + ",\"w\":" + num(r.width()) + ",\"h\":" + num(r.height())
                        + ",\"bar\":" + std::to_string(cr->measure()->no() + 1)
                        + ",\"staff\":" + std::to_string(cr->staffIdx())
+                       + ",\"part\":" + jsonStr(cr->staff()->part()->partName().toStdString())
                        + ",\"voice\":" + std::to_string(cr->voice() + 1)
                        + ",\"den\":" + std::to_string(durationDenominator(cr->durationType().type()))
-                       + ",\"dots\":" + std::to_string(cr->dots());
+                       + ",\"dots\":" + std::to_string(cr->dots())
+                       // the pitch of the staff's middle line, for choosing an octave that fits
+                       + ",\"mid\":" + std::to_string(line2pitch(4, ms->staff(cr->staffIdx())->clef(cr->tick()), Key::C));
     if (note) {
         json += ",\"pitch\":" + std::to_string(note->epitch())
-                + ",\"name\":" + jsonStr(note->tpcUserName(false, false).toStdString());
+                + ",\"name\":" + jsonStr(note->tpcUserName(false, false).toStdString())
+                + ",\"tie\":" + (note->tieFor() ? "true" : "false");
     }
+    json += std::string(",\"tuplet\":") + (cr->tuplet() ? "true" : "false");
     return json + "}";
 }
 
@@ -1261,7 +1342,11 @@ std::string Session::editMove(const std::string& cmd)
     if (!ms || !ms->selection().element()) {
         return "null";
     }
-    ms->selectMove(String::fromStdString(cmd));
+    // selectMove wants desktop's command names ("select-next-chord") and leaves a range: pick the note itself
+    if (EngravingItem* moved = ms->selectMove(String(u"select-") + String::fromStdString(cmd))) {
+        EngravingItem* pick = moved->isChord() ? static_cast<EngravingItem*>(toChord(moved)->upNote()) : moved;
+        ms->select(pick, SelectType::SINGLE, 0);
+    }
     const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
     if (EngravingItem* el = ms->selection().element(); el && el->isNote() && !playing && m_playbackModel) {
         m_playbackModel->triggerEventsForItems({ el }, 500000, true);
@@ -1353,6 +1438,462 @@ std::string Session::editDelete()
     return editResult(true);
 }
 
+// Puts a note on the selected rest, as typing C D E F G A B does in desktop's note input: the letter
+// is in the key signature, in the octave nearest the note before it (Score::resolveNoteInputParams).
+// The rest's own length is kept (a whole-bar rest gets a quarter); the new note stays selected.
+std::string Session::editEnterNote(int letter)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    EngravingItem* el = ms ? ms->selection().element() : nullptr;
+    if (!ms || !el || !el->isRest() || letter < 0 || letter > 6) {
+        return editResult(false, "Select a rest first.");
+    }
+    Rest* rest = toRest(el);
+    const Fraction tick = rest->tick();
+    const track_idx_t track = rest->track();
+    InputState& is = ms->inputState();
+    is.setTrack(track);
+    is.setSegment(rest->segment());
+    is.setDuration(rest->durationType().type() == DurationType::V_MEASURE ? TDuration(DurationType::V_QUARTER) : rest->durationType());
+    is.setRest(false);
+    is.setNoteEntryMode(true);
+    NoteInputParams params;
+    if (!ms->resolveNoteInputParams(letter, false, params)) {
+        is.setNoteEntryMode(false);
+        return editResult(false, "A note can't go here.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Enter note"));
+    ms->cmdAddPitch(params, false, false);
+    ms->endCmd();
+    is.setNoteEntryMode(false);
+    // the new note, by where the rest was
+    Note* note = nullptr;
+    if (Segment* seg = ms->tick2segment(tick, false, SegmentType::ChordRest)) {
+        if (EngravingItem* e = seg->element(track); e && e->isChord()) {
+            note = toChord(e)->upNote();
+        }
+    }
+    if (!note) {
+        return editResult(false, "The note could not be added.");
+    }
+    ms->select(note);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+    if (!playing && m_playbackModel) {
+        m_playbackModel->triggerEventsForItems({ note }, 500000, true);
+    }
+    return editResult(true);
+}
+
+// A tune, from the selected note or rest on: "midi:sixteenths,midi:sixteenths,..." (midi -1 is a rest).
+// One undo step. Notes that cross a bar line are tied and split as in desktop's note input
+// (Score::setNoteRest, rhythmic); what was there is replaced. Stops where the score ends.
+std::string Session::editInsertNotes(const std::string& spec)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* start = ms ? selectedChordRest(ms) : nullptr;
+    if (!ms || !start) {
+        return editResult(false, "Select the note or rest where the tune should start.");
+    }
+    std::vector<std::pair<int, int> > events;
+    for (size_t pos = 0; pos < spec.size();) {
+        size_t colon = spec.find(':', pos);
+        size_t comma = spec.find(',', pos);
+        if (comma == std::string::npos) {
+            comma = spec.size();
+        }
+        if (colon == std::string::npos || colon > comma) {
+            break;
+        }
+        const int midi = std::atoi(spec.substr(pos, colon - pos).c_str());
+        const int units = std::atoi(spec.substr(colon + 1, comma - colon - 1).c_str());
+        if (units > 0 && midi >= -1 && midi < 128) {
+            events.emplace_back(midi, units);
+        }
+        pos = comma + 1;
+    }
+    if (events.empty()) {
+        return editResult(false, "There are no notes to put in.");
+    }
+    const Fraction firstTick = start->tick();
+    const track_idx_t track = start->track();
+    Fraction tick = firstTick;
+    size_t done = 0;
+    ms->startCmd(TranslatableString::untranslatable("Enter notes"));
+    for (const auto& [midi, units] : events) {
+        Segment* seg = ms->tick2segment(tick, false, SegmentType::ChordRest);
+        if (!seg) {
+            break; // the score ends
+        }
+        NoteVal nv(midi); // -1: a rest
+        if (midi >= 0) {
+            nv.tpc1 = nv.tpc2 = pitch2tpc(midi, ms->staff(track / VOICES)->key(tick), Prefer::NEAREST);
+        }
+        const Fraction len(units, 16);
+        if (!ms->setNoteRest(seg, track, nv, len, DirectionV::AUTO, false, {}, true)) {
+            break;
+        }
+        tick += len;
+        ++done;
+    }
+    ms->endCmd();
+    // the first note of the tune stays selected
+    Note* first = nullptr;
+    if (Segment* seg = ms->tick2segment(firstTick, false, SegmentType::ChordRest)) {
+        if (EngravingItem* e = seg->element(track); e && e->isChord()) {
+            first = toChord(e)->upNote();
+        }
+    }
+    if (first) {
+        ms->select(first);
+    }
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return std::string("{\"ok\":") + (done ? "true" : "false") + ",\"done\":" + std::to_string(done) + ",\"total\":" + std::to_string(events.size())
+           + (done ? "" : ",\"error\":\"The tune could not be put in there.\"") + "}";
+}
+
+// The first note or rest of the first staff, for a score that was just made
+std::string Session::editSelectStart()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Measure* m = ms ? ms->firstMeasure() : nullptr;
+    Segment* seg = m ? m->first(SegmentType::ChordRest) : nullptr;
+    EngravingItem* el = seg ? seg->element(0) : nullptr;
+    if (!el) {
+        return "null";
+    }
+    ms->select(el->isChord() ? static_cast<EngravingItem*>(toChord(el)->upNote()) : el);
+    return editSelectionJson();
+}
+
+// Editing that rebuilds bars or lines drops the selection: pick the same place again
+struct SelectedPlace {
+    Fraction tick;
+    track_idx_t track = muse::nidx;
+    bool valid = false;
+};
+static SelectedPlace placeOf(const MasterScore* ms)
+{
+    SelectedPlace p;
+    if (ChordRest* cr = selectedChordRest(ms)) {
+        p.tick = cr->tick();
+        p.track = cr->track();
+        p.valid = true;
+    }
+    return p;
+}
+static void reselect(MasterScore* ms, const SelectedPlace& p)
+{
+    if (!p.valid) {
+        return;
+    }
+    Segment* seg = ms->tick2segment(p.tick, false, SegmentType::ChordRest);
+    EngravingItem* e = seg ? seg->element(p.track) : nullptr;
+    if (e) {
+        ms->select(e->isChord() ? static_cast<EngravingItem*>(toChord(e)->upNote()) : e);
+    }
+}
+
+// ---- more of what a composer needs: bars, key, time, ties, accidentals, triplets, chords, words, lines
+
+// Bars on the end of the score
+std::string Session::editAddBars(int count)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || count < 1 || count > 200) {
+        return editResult(false, "Choose how many bars to add.");
+    }
+    const SelectedPlace place = ms ? placeOf(ms) : SelectedPlace();
+    ms->startCmd(TranslatableString::untranslatable("Add bars"));
+    ms->appendMeasures(count);
+    ms->endCmd();
+    reselect(ms, place);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+// Key signature (sharps positive, flats negative) from the selected bar on, on every line
+std::string Session::editSetKey(int key)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr || key < -7 || key > 7) {
+        return editResult(false, "Select a note or rest in the bar where the key starts.");
+    }
+    const Fraction tick = cr->measure()->tick();
+    const SelectedPlace place = ms ? placeOf(ms) : SelectedPlace();
+    ms->startCmd(TranslatableString::untranslatable("Change key signature"));
+    for (staff_idx_t i = 0; i < ms->nstaves(); ++i) {
+        KeySigEvent ke;
+        ke.setConcertKey(Key(key));
+        ms->undoChangeKeySig(ms->staff(i), tick, ke);
+    }
+    ms->endCmd();
+    reselect(ms, place);
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// Time signature from the selected bar on, on every line
+std::string Session::editSetTime(int num, int den)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr || num < 1 || num > 32 || (den != 2 && den != 4 && den != 8 && den != 16)) {
+        return editResult(false, "Select a note or rest in the bar where the time signature starts.");
+    }
+    const SelectedPlace place = ms ? placeOf(ms) : SelectedPlace();
+    ms->startCmd(TranslatableString::untranslatable("Change time signature"));
+    TimeSig* ts = Factory::createTimeSig(ms->dummy()->segment());
+    ts->setSig(Fraction(num, den), TimeSigType::NORMAL);
+    ms->cmdAddTimeSig(cr->measure(), 0, ts, false);
+    ms->endCmd();
+    reselect(ms, place);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+// Ties the selected note to the next one of the same pitch, or takes the tie away again
+std::string Session::editTie()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Note* note = nullptr;
+    if (!ms || !selectedChordRest(ms, &note) || !note) {
+        return editResult(false, "Select a note first.");
+    }
+    ms->cmdToggleTie(); // starts and ends its own command
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// kind 0 sharp, 1 flat, 2 natural: as desktop's accidental buttons
+std::string Session::editAccidental(int kind)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Note* note = nullptr;
+    if (!ms || !selectedChordRest(ms, &note) || !note) {
+        return editResult(false, "Select a note first.");
+    }
+    const AccidentalType types[] = { AccidentalType::SHARP, AccidentalType::FLAT, AccidentalType::NATURAL };
+    ms->startCmd(TranslatableString::untranslatable("Accidental"));
+    ms->toggleAccidental(types[std::max(0, std::min(2, kind))]);
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// The selected note or rest becomes three in the time of two (a triplet)
+std::string Session::editTriplet()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    if (cr->tuplet()) {
+        return editResult(false, "That is already in a tuplet.");
+    }
+    const track_idx_t track = cr->track();
+    const Fraction tick = cr->tick();
+    ms->startCmd(TranslatableString::untranslatable("Triplet"));
+    ms->addTuplet(cr, Fraction(3, 2), TupletNumberType::SHOW_NUMBER, TupletBracketType::AUTO_BRACKET);
+    ms->endCmd();
+    if (Segment* seg = ms->tick2segment(tick, false, SegmentType::ChordRest)) {
+        if (EngravingItem* e = seg->element(track)) {
+            ms->select(e->isChord() ? static_cast<EngravingItem*>(toChord(e)->upNote()) : e);
+        }
+    }
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// Another note on the selected note's chord, by letter (nearest above it, as desktop's Shift+letter)
+std::string Session::editAddToChord(int letter)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Note* note = nullptr;
+    if (!ms || !selectedChordRest(ms, &note) || !note || letter < 0 || letter > 6) {
+        return editResult(false, "Select a note first.");
+    }
+    Chord* chord = note->chord();
+    InputState& is = ms->inputState();
+    is.setTrack(chord->track());
+    is.setSegment(chord->segment());
+    is.setDuration(chord->durationType());
+    is.setRest(false);
+    is.setNoteEntryMode(true);
+    NoteInputParams params;
+    if (!ms->resolveNoteInputParams(letter, true, params)) {
+        is.setNoteEntryMode(false);
+        return editResult(false, "A note can't be added here.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Add note to chord"));
+    ms->cmdAddPitch(params, true, false);
+    ms->endCmd();
+    is.setNoteEntryMode(false);
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// Words above the selected note or rest (staff text)
+std::string Session::editStaffText(const std::string& text)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr || text.empty()) {
+        return editResult(false, "Select a note or rest, and type the words.");
+    }
+    ms->startCmd(TranslatableString::untranslatable("Add text"));
+    StaffText* t = Factory::createStaffText(cr->segment());
+    t->setParent(cr->segment());
+    t->setTrack(cr->track());
+    t->setPlainText(String::fromStdString(text));
+    ms->undoAddElement(t);
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// A dynamic mark under the selected note or rest: 0 ppp, 1 pp, 2 p, 3 mp, 4 mf, 5 f, 6 ff, 7 fff
+std::string Session::editDynamic(int which)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr || which < 0 || which > 7) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    const char* names[] = { "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff" };
+    ms->startCmd(TranslatableString::untranslatable("Add dynamic"));
+    Dynamic* d = Factory::createDynamic(cr->segment());
+    d->setDynamicType(String::fromAscii(names[which])); // sets the type and its text
+    d->setParent(cr->segment());
+    d->setTrack(cr->track());
+    ms->undoAddElement(d);
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// A lyric syllable under the selected note. A trailing "-" begins or continues a word, as typing a hyphen does.
+std::string Session::editLyric(const std::string& text)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    Note* note = nullptr;
+    if (!ms || !selectedChordRest(ms, &note) || !note || text.empty()) {
+        return editResult(false, "Select a note, and type its syllable.");
+    }
+    Chord* chord = note->chord();
+    std::string word = text;
+    bool hyphen = false;
+    if (word.size() > 1 && word.back() == '-') {
+        hyphen = true;
+        word.pop_back();
+    }
+    // is the syllable before this one in the same line the start of a word?
+    bool inWord = false;
+    for (Segment* s = chord->segment()->prev1(SegmentType::ChordRest); s; s = s->prev1(SegmentType::ChordRest)) {
+        EngravingItem* e = s->element(chord->track());
+        if (!e || !e->isChordRest()) {
+            continue;
+        }
+        const auto& ly = toChordRest(e)->lyrics();
+        if (!ly.empty()) {
+            inWord = ly.front()->syllabic() == LyricsSyllabic::BEGIN || ly.front()->syllabic() == LyricsSyllabic::MIDDLE;
+        }
+        break;
+    }
+    ms->startCmd(TranslatableString::untranslatable("Add lyric"));
+    for (Lyrics* old : std::vector<Lyrics*>(chord->lyrics())) {
+        if (old->verse() == 0) {
+            ms->undoRemoveElement(old);
+        }
+    }
+    Lyrics* l = Factory::createLyrics(chord);
+    l->setParent(chord);
+    l->setTrack(chord->track());
+    l->setPlainText(String::fromStdString(word));
+    l->setVerse(0);
+    l->setSyllabic(hyphen ? (inWord ? LyricsSyllabic::MIDDLE : LyricsSyllabic::BEGIN) : (inWord ? LyricsSyllabic::END : LyricsSyllabic::SINGLE));
+    ms->undoAddElement(l);
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+// A new line at the bottom, with the sound of the last one (clef 0 treble, 1 treble an octave lower, 2 bass)
+std::string Session::editAddLine(const std::string& name, int clef)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->parts().empty() || name.empty()) {
+        return editResult(false, "Name the new line.");
+    }
+    const ClefType clefs[] = { ClefType::G, ClefType::G8_VB, ClefType::F };
+    Part* src = ms->parts().back();
+    const SelectedPlace place = ms ? placeOf(ms) : SelectedPlace();
+    ms->startCmd(TranslatableString::untranslatable("Add line"));
+    Part* part = new Part(ms);
+    Instrument* instr = new Instrument(*src->instrument(Fraction(0, 1)));
+    instr->setTrackName(String::fromStdString(name));
+    instr->setLongName(String::fromStdString(name));
+    instr->setShortName(String::fromStdString(name.size() <= 4 ? name : name.substr(0, 3) + "."));
+    part->setInstrument(instr, Fraction(-1, 1)); // the first instrument, as appendPart does
+    part->setPartName(String::fromStdString(name));
+    Staff* staff = Factory::createStaff(part);
+    staff->setScore(ms);
+    staff->init(src->staff(0));
+    staff->setDefaultClefType(ClefTypeList(clefs[std::max(0, std::min(2, clef))]));
+    ms->undoInsertStaff(staff, 0);
+    ms->undoInsertPart(part, ms->parts().size());
+    ms->setUpTempoMapLater();
+    ms->masterScore()->rebuildMidiMapping();
+    ms->endCmd();
+    reselect(ms, place);
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    syncTracks();
+    return editResult(true);
+}
+
+// The name of the selected line
+std::string Session::editRenameLine(const std::string& name)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr || name.empty()) {
+        return editResult(false, "Select a note or rest on the line, and type its name.");
+    }
+    Part* part = cr->staff()->part();
+    const SelectedPlace place = ms ? placeOf(ms) : SelectedPlace();
+    ms->startCmd(TranslatableString::untranslatable("Rename line"));
+    part->setPartName(String::fromStdString(name));
+    EditPart::setInstrumentName(ms, part, Fraction(-1, 1), String::fromStdString(name));
+    EditPart::setInstrumentAbbreviature(ms, part, Fraction(-1, 1), String::fromStdString(name.size() <= 4 ? name : name.substr(0, 3) + "."));
+    ms->endCmd();
+    reselect(ms, place);
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    syncTracks();
+    return editResult(true);
+}
+
 std::string Session::editUndoRedo(bool undo)
 {
     MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
@@ -1366,6 +1907,7 @@ std::string Session::editUndoRedo(bool undo)
     afterEdit(ms, m_playbackModel.get(), [this, ms]() {
         m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
     });
+    syncTracks();
     return editResult(true);
 }
 

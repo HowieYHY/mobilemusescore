@@ -1,4 +1,7 @@
 // first: decides whether this is someone's first visit before anything else saves data
+import { editDraft } from "./editdraft";
+import { CLEFS, KEYS, TIMES, buildScore, type LineChoice } from "./newscore";
+import { SAMPLE_RATE, decodeTo16k, findNotes, toGrid, trackPitch, type GridNote, type SungNote } from "./voice/transcribe";
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
@@ -2937,6 +2940,10 @@ async function openChosen(name: string, data: ArrayBuffer) {
         if (choice === "cancel" || (choice === "copy" && !(await saveCopy()))) {
             return;
         }
+        if (choice === "discard") {
+            clearTimeout(edit.draftTimer);
+            await editDraft.remove(state.scoreKey);
+        }
     }
     if (hasUnsaved()) {
         const choice = await ask("Save your changes?",
@@ -2973,7 +2980,22 @@ async function openScore(name: string, data: ArrayBuffer) {
     const key = await scoreKey(name, data); // before the data goes to the engine
     state.scoreKey = key;
     openedScore = { name, data: data.slice(0) }; // a copy to reopen after restarting into an update
-    const res = await engine.load(name, data);
+    // edits from last time that were never saved as a copy: continue them or start again
+    let toLoad = data;
+    let restoredEdits = false;
+    const draft = embedded ? null : await editDraft.get(key);
+    if (draft) {
+        const choice = await ask("Continue your edits?",
+            `You changed the notes of “${name}” and did not save a copy. Continue from there, or start again from the file as it is?`,
+            [["start", "Start again"], ["continue", "Continue my edits"]]);
+        if (choice === "continue") {
+            toLoad = draft.data;
+            restoredEdits = true;
+        } else {
+            await editDraft.remove(key);
+        }
+    }
+    const res = await engine.load(name, toLoad);
     if (!res.ok || !res.score) {
         mixRestoreDone(false);
         setStatus(res.error || "Could not open this score.", "error");
@@ -3005,6 +3027,11 @@ async function openScore(name: string, data: ArrayBuffer) {
     renderGeneration++;
     setNotesActive(false);
     resetEdit();
+    if (restoredEdits) {
+        edit.dirty = true; // not saved as a copy yet
+        updateEditBar();
+        setStatus("Your edits are back. Save a copy to keep them.", "info", 6000);
+    }
     notes.open(key, "page");
     ui.notesToggle.disabled = false;
     ui.editToggle.disabled = false;
@@ -3637,6 +3664,8 @@ const edit = {
     undo: 0, // edits that can be undone
     redo: 0,
     selEl: null as HTMLDivElement | null,
+    draftTimer: 0,
+    fresh: false, // made with New score: no file behind it
 };
 
 const LENGTHS: [number, string][] = [[1, "Whole"], [2, "Half"], [4, "Quarter"], [8, "Eighth"], [16, "16th"], [32, "32nd"]];
@@ -3680,6 +3709,128 @@ ui.editLengths.appendChild(dotButton);
 const lengthName = (den: number, dots: number) =>
     (dots ? "dotted " : "") + (LENGTHS.find(([d]) => d === den)?.[1].toLowerCase() ?? "long");
 
+const LETTERS = ["C", "D", "E", "F", "G", "A", "B"];
+LETTERS.forEach((name, i) => {
+    const b = document.createElement("button");
+    b.className = "btn small letter";
+    b.textContent = name;
+    b.setAttribute("aria-label", `Put a ${name} here`);
+    b.title = `Put a ${name} on this rest`;
+    b.onclick = () => void runEdit(() => engine.editEnterNote(i));
+    $("edit-letters").appendChild(b);
+});
+
+// ---- More: the tools a composer needs less often, behind one button
+const em = {
+    btn: $<HTMLButtonElement>("edit-morebtn"),
+    panel: $("edit-more"),
+    words: $<HTMLInputElement>("edit-words"),
+    line: $<HTMLInputElement>("edit-line"),
+    key: $<HTMLSelectElement>("edit-key"),
+    time: $<HTMLSelectElement>("edit-time"),
+    clef: $<HTMLSelectElement>("edit-clef"),
+    bars: $<HTMLInputElement>("edit-bars"),
+};
+em.btn.onclick = () => {
+    em.panel.hidden = !em.panel.hidden;
+    em.btn.setAttribute("aria-pressed", String(!em.panel.hidden));
+    em.btn.setAttribute("aria-expanded", String(!em.panel.hidden));
+};
+LETTERS.forEach((name, i) => {
+    const b = document.createElement("button");
+    b.className = "btn small letter-more";
+    b.textContent = name;
+    b.setAttribute("aria-label", `Add a ${name} to this chord`);
+    b.title = `Add a ${name} above this note, in the same chord`;
+    b.onclick = () => void runEdit(() => engine.editAddToChord(i));
+    $("edit-chord").appendChild(b);
+});
+const DYNAMICS = ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"];
+DYNAMICS.forEach((name, i) => {
+    const b = document.createElement("button");
+    b.className = "btn small dyn";
+    b.textContent = name;
+    b.setAttribute("aria-label", `Mark ${name}`);
+    b.title = `Put ${name} under this note`;
+    b.onclick = () => void runEdit(() => engine.editDynamic(i));
+    $("edit-dynamics").appendChild(b);
+});
+em.key.add(new Option("Key…", ""));
+KEYS.forEach(([k, name]) => em.key.add(new Option(name, String(k))));
+em.time.add(new Option("Time…", ""));
+TIMES.forEach(([n, d]) => em.time.add(new Option(`${n}/${d}`, `${n}/${d}`)));
+CLEFS.forEach(([v, label]) => em.clef.add(new Option(label, v)));
+em.key.onchange = () => {
+    const v = em.key.value;
+    em.key.value = "";
+    if (v) void runEdit(() => engine.editSetKey(Number(v)));
+};
+em.time.onchange = () => {
+    const v = em.time.value;
+    em.time.value = "";
+    if (v) {
+        const [n, d] = v.split("/").map(Number);
+        void runEdit(() => engine.editSetTime(n, d));
+    }
+};
+$("edit-sharp").onclick = () => void runEdit(() => engine.editAccidental(0));
+$("edit-flat").onclick = () => void runEdit(() => engine.editAccidental(1));
+$("edit-natural").onclick = () => void runEdit(() => engine.editAccidental(2));
+$("edit-tie").onclick = () => void runEdit(() => engine.editTie());
+$("edit-triplet").onclick = () => void runEdit(() => engine.editTriplet());
+$("edit-text").onclick = () => {
+    const t = em.words.value.trim();
+    if (t) void runEdit(() => engine.editStaffText(t)).then(() => { em.words.value = ""; });
+};
+// A syllable goes under the note, and the next note is picked so the words can be typed straight on
+const putLyric = async () => {
+    const t = em.words.value.trim();
+    const before = edit.undo;
+    if (!t || edit.busy) {
+        return;
+    }
+    await runEdit(() => engine.editLyric(t));
+    if (edit.undo > before) {
+        em.words.value = "";
+        await moveSelection("next-chord");
+        em.words.focus();
+    }
+};
+$("edit-lyric").onclick = () => void putLyric();
+em.words.onkeydown = (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        void putLyric();
+    }
+};
+$("edit-addbars").onclick = () => {
+    const n = Math.max(1, Math.min(100, Math.round(Number(em.bars.value) || 1)));
+    void runEdit(() => engine.editAddBars(n));
+};
+$("edit-rename").onclick = () => {
+    const t = em.line.value.trim();
+    if (t) void runEdit(() => engine.editRenameLine(t));
+};
+$("edit-addline").onclick = async () => {
+    const lines = state.tracks.filter((t) => !t.metronome).length;
+    const name = em.line.value.trim() || `Line ${lines + 1}`;
+    const clef = Math.max(0, CLEFS.findIndex(([v]) => v === em.clef.value));
+    await runEdit(() => engine.editAddLine(name, clef));
+    em.line.value = "";
+};
+function updateMore(s: EditSelection | null, idle: boolean) {
+    const note = s?.kind === "note" && !idle;
+    const any = !!s && !idle;
+    const set = (ids: string[], on: boolean) => ids.forEach((id) => ($(id) as HTMLButtonElement).disabled = !on);
+    set(["edit-sharp", "edit-flat", "edit-natural", "edit-tie", "edit-lyric"], note);
+    set(["edit-triplet", "edit-text", "edit-rename"], any);
+    em.key.disabled = em.time.disabled = !any;
+    $("edit-chord").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !note));
+    $("edit-dynamics").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !any));
+    set(["edit-addbars", "edit-addline"], !idle);
+    $("edit-tie").setAttribute("aria-pressed", String(!!s?.tie));
+}
+
 function updateEditBar() {
     const s = edit.sel;
     const note = s?.kind === "note";
@@ -3689,12 +3840,18 @@ function updateEditBar() {
         b.textContent = note ? (s.name ?? "Note") : "Rest";
         const rest = document.createElement("span");
         rest.className = "dim";
-        rest.textContent = ` · ${lengthName(s.den, s.dots)} · bar ${s.bar}`;
+        const lines = state.tracks.filter((t) => !t.metronome).length;
+        rest.textContent = ` · ${lengthName(s.den, s.dots)}${s.tuplet ? " · triplet" : ""} · bar ${s.bar}${lines > 1 && s.part ? " · " + s.part : ""}`;
         ui.editInfo.append(b, rest);
     } else {
         ui.editInfo.textContent = "Tap a note or rest to change it";
     }
     const idle = edit.busy;
+    $("edit-letters").parentElement!.classList.toggle("on-rest", s?.kind === "rest");
+    $("edit-letters").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = idle));
+    updateMore(s, idle);
+    $("edit-voice").toggleAttribute("disabled", !s || idle);
+    $("edit-voice").title = s ? "Sing or hum a tune and put it in as notes" : "Pick the note or rest where the tune should start";
     ui.editPrev.disabled = ui.editNext.disabled = ui.editDelete.disabled = !s || idle;
     ui.editUp.disabled = ui.editDown.disabled = ui.editOctave.disabled = !note || idle;
     ui.editOctave.title = note ? "Move by an octave instead of a step" : "Select a note to move it";
@@ -3748,7 +3905,7 @@ async function editSelectAt(tap: { page: number; x: number; y: number; radius: n
         return;
     }
     if (!(engine.audioRunning && state.playbackReady) && !state.playing) {
-        void startAudioFromTap(); // the first tap starts the sound; later notes sound as they are picked
+        await startAudioFromTap(); // the first tap starts the sound, and waits for it, so this note sounds too
     }
     edit.sel = await engine.editSelect(tap.page, tap.x, tap.y, tap.radius);
     showEditSel(false);
@@ -3762,6 +3919,12 @@ async function afterEdit() {
     ui.duration.textContent = fmt(state.duration);
     await Promise.all([loadTimeline(), loadBars(), loadTempos()]);
     rerenderAll(false);
+    // a line was added or renamed: the mixer follows
+    const tracks = await engine.tracks();
+    if (tracks.map((k) => `${k.key}:${k.title}`).join("|") !== state.tracks.map((k) => `${k.key}:${k.title}`).join("|")) {
+        state.tracks = tracks;
+        buildMixer();
+    }
     edit.sel = await engine.editSelection();
     showEditSel(true);
 }
@@ -3793,6 +3956,7 @@ async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" 
             edit.undo++;
         }
         await afterEdit();
+        scheduleEditDraft();
     } catch (err) {
         console.warn("edit failed:", err);
         setStatus("That could not be changed. Your score is as it was; try again.", "error", 5000);
@@ -3801,6 +3965,30 @@ async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" 
         updateEditBar();
     }
 }
+
+// The silent draft: the edited score, kept shortly after each change (and when the page is hidden), so
+// closing the app or the tab loses nothing. Offered back the next time the same score is opened.
+async function saveEditDraft() {
+    clearTimeout(edit.draftTimer);
+    if (embedded || !edit.dirty || !state.scoreKey) {
+        return;
+    }
+    const key = state.scoreKey;
+    const r = await engine.saveCopy();
+    if (r.ok && r.data && edit.dirty && key === state.scoreKey) {
+        const name = (openedScore?.name ?? "score.mscz").replace(/\.mscx$/i, ".mscz"); // what is stored is always a .mscz
+        await editDraft.put(key, { name, data: r.data, at: Date.now(), key, fresh: edit.fresh });
+    }
+}
+function scheduleEditDraft() {
+    clearTimeout(edit.draftTimer);
+    edit.draftTimer = window.setTimeout(() => void saveEditDraft(), 800);
+}
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && edit.dirty) {
+        void saveEditDraft();
+    }
+});
 
 async function moveSelection(to: "next-chord" | "prev-chord") {
     if (edit.busy) {
@@ -3823,13 +4011,14 @@ async function saveCopy(): Promise<boolean> {
         return false;
     }
     const base = (openedScore?.name ?? ui.title.textContent ?? "score").replace(/\.(mscz|mscx)$/i, "").replace(/[\\/:*?"<>|]+/g, " ").trim() || "score";
-    const name = `${base} (edited).mscz`;
+    const name = edit.fresh ? `${base}.mscz` : `${base} (edited).mscz`;
     const file = new File([r.data], name, { type: "application/octet-stream" });
     const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
     if (nav.canShare?.({ files: [file] })) {
         try {
             await navigator.share({ files: [file], title: name });
             edit.dirty = false;
+            void editDraft.remove(state.scoreKey);
             setStatus(`Saved a copy: ${name}`, "info", 5000);
             updateEditBar();
             return true;
@@ -3849,6 +4038,7 @@ async function saveCopy(): Promise<boolean> {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
     edit.dirty = false;
+    void editDraft.remove(state.scoreKey);
     setStatus(`Saved a copy: ${name}. Look in your downloads.`, "info", 7000);
     updateEditBar();
     return true;
@@ -3876,6 +4066,8 @@ function setEditActive(on: boolean) {
 
 // A new score starts with nothing edited
 function resetEdit() {
+    clearTimeout(edit.draftTimer);
+    edit.fresh = false;
     edit.on = false;
     edit.sel = null;
     edit.dirty = false;
@@ -3908,6 +4100,292 @@ ui.editRedo.onclick = () => void runEdit(() => engine.editRedo(), "redo");
 ui.editPrev.onclick = () => void moveSelection("prev-chord");
 ui.editNext.onclick = () => void moveSelection("next-chord");
 ui.editCopy.onclick = () => void saveCopy();
+
+// ---------------------------------------------------------------- sing it in (voice to notes, one voice)
+
+// Record (or choose a recording), find the notes on this device, show them, and put them in from the picked
+// note or rest on, as one undo step. Nothing is uploaded; the recording is dropped once the notes are found.
+const voice = {
+    notes: [] as SungNote[],
+    grid: [] as GridNote[],
+    bpm: 100,
+    smallest: 16 as 8 | 16,
+    shift: 0,
+    stream: null as MediaStream | null,
+    recorder: null as MediaRecorder | null,
+    chunks: [] as Blob[],
+    timer: 0,
+    started: 0,
+    listen: null as { ctx: AudioContext; stop: () => void } | null,
+    token: 0, // a newer recording or a closed dialog makes older work stop
+};
+const vEl = {
+    dlg: $<HTMLDialogElement>("voice"),
+    source: $("voice-source"),
+    rec: $("voice-rec"),
+    time: $("voice-time"),
+    result: $("voice-result"),
+    roll: $<HTMLCanvasElement>("voice-roll"),
+    tempo: $<HTMLInputElement>("voice-tempo"),
+    grid: $<HTMLSelectElement>("voice-grid"),
+    status: $("voice-status"),
+    listen: $<HTMLButtonElement>("voice-listen"),
+    put: $<HTMLButtonElement>("voice-put"),
+};
+const MAX_VOICE_SECS = 60;
+
+function voiceSay(text: string, bad = false) {
+    vEl.status.textContent = text;
+    vEl.status.classList.toggle("bad", bad);
+}
+
+function voiceStopListening() {
+    voice.listen?.stop();
+    voice.listen = null;
+    vEl.listen.textContent = "Listen";
+}
+
+function voiceReleaseMic() {
+    clearInterval(voice.timer);
+    voice.stream?.getTracks().forEach((t) => t.stop());
+    voice.stream = null;
+    voice.recorder = null;
+}
+
+function voiceReset() {
+    voice.token++;
+    voiceStopListening();
+    voiceReleaseMic();
+    voice.chunks = [];
+    voice.notes = [];
+    voice.grid = [];
+    voice.shift = 0;
+    vEl.source.hidden = false;
+    vEl.rec.hidden = true;
+    vEl.result.hidden = true;
+    vEl.listen.disabled = vEl.put.disabled = true;
+    voiceSay("");
+}
+
+function drawRoll() {
+    const c = vEl.roll;
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth;
+    const h = c.clientHeight;
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    const g = c.getContext("2d")!;
+    g.scale(dpr, dpr);
+    g.clearRect(0, 0, w, h);
+    const notes = voice.grid.filter((n) => n.midi >= 0);
+    const total = voice.grid.reduce((a, n) => a + n.units, 0);
+    if (!notes.length || !total) {
+        return;
+    }
+    let lo = Math.min(...notes.map((n) => n.midi)) - 1;
+    let hi = Math.max(...notes.map((n) => n.midi)) + 1;
+    if (hi - lo < 12) {
+        lo = Math.floor((hi + lo) / 2 - 6);
+        hi = lo + 12;
+    }
+    const rowH = h / (hi - lo + 1);
+    g.strokeStyle = "rgba(16, 24, 36, 0.12)";
+    g.lineWidth = 1;
+    for (let u = 0; u <= total; u += 4) { // a line for each beat
+        const x = Math.round((u / total) * (w - 2)) + 0.5;
+        g.beginPath();
+        g.moveTo(x, 0);
+        g.lineTo(x, h);
+        g.stroke();
+    }
+    g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#1e6ad0";
+    let at = 0;
+    for (const n of voice.grid) {
+        if (n.midi >= 0) {
+            const x = (at / total) * (w - 2);
+            const wd = Math.max(2, (n.units / total) * (w - 2) - 1.5);
+            g.beginPath();
+            g.roundRect(x + 1, (hi - n.midi) * rowH + 1, wd, Math.max(3, rowH - 2), 2);
+            g.fill();
+        }
+        at += n.units;
+    }
+}
+
+function voiceRefresh() {
+    voice.grid = toGrid(voice.notes, voice.bpm, voice.smallest, voice.shift);
+    drawRoll();
+    const notes = voice.grid.filter((n) => n.midi >= 0).length;
+    const secs = voice.grid.reduce((a, n) => a + n.units, 0) * (60 / (voice.bpm * 4));
+    vEl.listen.disabled = vEl.put.disabled = !notes;
+    voiceSay(notes ? `${notes} note${notes === 1 ? "" : "s"}, about ${Math.round(secs)} s at this speed. Check them with Listen; change the speed if they look too crowded or too stretched.` : "No notes at this setting.");
+}
+
+async function voiceProcess(data: ArrayBuffer) {
+    const mine = ++voice.token;
+    vEl.source.hidden = true;
+    vEl.rec.hidden = true;
+    voiceSay("Listening to it…");
+    try {
+        const samples = await decodeTo16k(data);
+        if (voice.token !== mine) {
+            return;
+        }
+        if (samples.length / SAMPLE_RATE > MAX_VOICE_SECS + 5) {
+            throw new Error(`That is longer than ${MAX_VOICE_SECS} seconds. Choose or record a shorter tune.`);
+        }
+        const frames = await trackPitch(samples, (d) => voice.token === mine && voiceSay(`Listening to it… ${Math.round(d * 100)}%`));
+        if (voice.token !== mine) {
+            return;
+        }
+        voice.notes = findNotes(frames);
+    } catch (err) {
+        if (voice.token === mine) {
+            const msg = (err as Error).message || "";
+            voiceReset();
+            voiceSay(/longer than/.test(msg) ? msg : "That recording could not be read. Try another one.", true);
+        }
+        return;
+    }
+    if (!voice.notes.length) {
+        voiceReset();
+        voiceSay("No tune found. Sing a little louder and closer, one note at a time, and try again.", true);
+        return;
+    }
+    let bpm = baseTempoAt(0) || 100;
+    while (bpm < 50) bpm *= 2;
+    while (bpm > 200) bpm /= 2;
+    voice.bpm = Math.round(bpm);
+    // the octave that puts the tune in the middle of the staff it goes into (a bass line sung at C4 goes down)
+    const sorted = voice.notes.map((n) => n.midi).sort((a, b) => a - b);
+    const mid = edit.sel?.mid;
+    voice.shift = mid === undefined ? 0 : Math.max(-3, Math.min(3, Math.round((mid - sorted[sorted.length >> 1]) / 12)));
+    vEl.tempo.value = String(voice.bpm);
+    vEl.grid.value = String(voice.smallest);
+    vEl.result.hidden = false;
+    vEl.source.hidden = false;
+    voiceRefresh();
+}
+
+async function voiceRecord() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        voiceSay("This browser can't record here. Choose a recording instead.", true);
+        return;
+    }
+    try {
+        voice.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+    } catch (err) {
+        voiceSay("PocketScore can't use the microphone. Allow it in the browser's settings for this site, or choose a recording instead.", true);
+        return;
+    }
+    if (state.playing) {
+        await engine.pause();
+    }
+    voice.chunks = [];
+    const rec = new MediaRecorder(voice.stream);
+    voice.recorder = rec;
+    rec.ondataavailable = (e) => e.data.size && voice.chunks.push(e.data);
+    rec.onstop = async () => {
+        const blob = new Blob(voice.chunks, { type: rec.mimeType });
+        voiceReleaseMic();
+        voice.chunks = [];
+        if (vEl.dlg.open && blob.size) {
+            await voiceProcess(await blob.arrayBuffer());
+        }
+    };
+    rec.start();
+    voice.started = performance.now();
+    vEl.source.hidden = true;
+    vEl.result.hidden = true;
+    vEl.rec.hidden = false;
+    voiceSay("Sing now. Tap Stop when you are done.");
+    const tick = () => {
+        const secs = (performance.now() - voice.started) / 1000;
+        vEl.time.textContent = `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
+        if (secs >= MAX_VOICE_SECS && rec.state === "recording") {
+            rec.stop();
+        }
+    };
+    tick();
+    voice.timer = window.setInterval(tick, 250);
+}
+
+// The notes as the tune will sound, on a small synth of their own: a triangle wave per note
+function voiceListen() {
+    if (voice.listen) {
+        voiceStopListening();
+        return;
+    }
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx: AudioContext = new Ctx();
+    const unit = 60 / (voice.bpm * 4);
+    let at = ctx.currentTime + 0.1;
+    for (const n of voice.grid) {
+        const len = n.units * unit;
+        if (n.midi >= 0) {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = "triangle";
+            o.frequency.value = 440 * 2 ** ((n.midi - 69) / 12);
+            g.gain.setValueAtTime(0, at);
+            g.gain.linearRampToValueAtTime(0.25, at + 0.02);
+            g.gain.setValueAtTime(0.25, at + Math.max(0.02, len - 0.06));
+            g.gain.linearRampToValueAtTime(0, at + len - 0.01);
+            o.connect(g).connect(ctx.destination);
+            o.start(at);
+            o.stop(at + len);
+        }
+        at += len;
+    }
+    const timer = window.setTimeout(() => voice.listen?.ctx === ctx && voiceStopListening(), (at - ctx.currentTime) * 1000 + 100);
+    voice.listen = { ctx, stop: () => { clearTimeout(timer); void ctx.close(); } };
+    vEl.listen.textContent = "Stop listening";
+}
+
+function openVoice() {
+    if (!edit.sel || edit.busy) {
+        return;
+    }
+    voiceReset();
+    vEl.dlg.showModal();
+}
+
+$("edit-voice").onclick = openVoice;
+$("voice-record").onclick = () => void voiceRecord();
+$("voice-stop").onclick = () => voice.recorder?.state === "recording" && voice.recorder.stop();
+$<HTMLInputElement>("voice-file").onchange = async (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) {
+        await voiceProcess(await file.arrayBuffer());
+    }
+};
+vEl.tempo.onchange = () => {
+    voice.bpm = Math.max(30, Math.min(240, Math.round(Number(vEl.tempo.value)) || voice.bpm));
+    vEl.tempo.value = String(voice.bpm);
+    voiceRefresh();
+};
+vEl.grid.onchange = () => {
+    voice.smallest = vEl.grid.value === "8" ? 8 : 16;
+    voiceRefresh();
+};
+$("voice-oct-up").onclick = () => { voice.shift = Math.min(3, voice.shift + 1); voiceRefresh(); };
+$("voice-oct-down").onclick = () => { voice.shift = Math.max(-3, voice.shift - 1); voiceRefresh(); };
+vEl.listen.onclick = voiceListen;
+$("voice-cancel").onclick = () => vEl.dlg.close();
+vEl.dlg.addEventListener("close", voiceReset);
+vEl.put.onclick = async () => {
+    const events = voice.grid.map((n) => [n.midi, n.units] as [number, number]);
+    vEl.dlg.close();
+    let result: EditResult & { done?: number; total?: number } = { ok: false };
+    await runEdit(async () => (result = await engine.editInsertNotes(events)));
+    if (result.ok) {
+        const done = result.done ?? 0;
+        const total = result.total ?? 0;
+        setStatus(done < total ? `The score ended after ${done} of ${total} notes. Undo takes the tune out again.` : "The tune is in. Undo takes it out again.", "info", 7000);
+    }
+};
 window.addEventListener("beforeunload", (e) => {
     if (edit.dirty) {
         e.preventDefault(); // the browser's own "leave this page?" question
@@ -3923,6 +4401,125 @@ ui.notesClear.onclick = async () => {
         notes.clear();
     }
 };
+
+
+// ---------------------------------------------------------------- new score
+
+// A blank score made on the spot (newscore.ts): opened like a file, then straight into Edit with the first
+// rest picked. It has no file to open again, so its silent draft is offered on the start screen until a copy is saved.
+const ns = {
+    dlg: $<HTMLDialogElement>("newscore"),
+    title: $<HTMLInputElement>("ns-title"),
+    lines: $("ns-lines"),
+    key: $<HTMLSelectElement>("ns-key"),
+    time: $<HTMLSelectElement>("ns-time"),
+    bpm: $<HTMLInputElement>("ns-bpm"),
+    bars: $<HTMLInputElement>("ns-bars"),
+};
+// The lines of the new score: a name to change and a clef, as many as the reader adds
+function addLine(name?: string) {
+    const row = document.createElement("div");
+    row.className = "ns-line";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.maxLength = 30;
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", "Name of this line");
+    input.value = name ?? `Line ${ns.lines.children.length + 1}`;
+    const clef = document.createElement("select");
+    clef.setAttribute("aria-label", "Clef");
+    CLEFS.forEach(([v, label]) => clef.add(new Option(label, v)));
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.className = "btn small plain";
+    drop.setAttribute("aria-label", "Remove this line");
+    drop.textContent = "✕";
+    drop.onclick = () => { row.remove(); lineButtons(); };
+    row.append(input, clef, drop);
+    ns.lines.appendChild(row);
+    lineButtons();
+}
+function lineButtons() {
+    const rows = ns.lines.children.length;
+    ns.lines.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = rows < 2)); // one line stays
+    $<HTMLButtonElement>("ns-add").disabled = rows >= 12;
+}
+$("ns-add").onclick = () => {
+    addLine();
+    (ns.lines.lastElementChild!.querySelector("input") as HTMLInputElement).select();
+};
+addLine("Line 1");
+KEYS.forEach(([k, name]) => ns.key.add(new Option(name, String(k))));
+TIMES.forEach(([n, d]) => ns.time.add(new Option(`${n}/${d}`, `${n}/${d}`)));
+
+$("new-score").onclick = () => ns.dlg.showModal();
+$("ns-cancel").onclick = () => ns.dlg.close();
+$("ns-create").onclick = async () => {
+    const lines: LineChoice[] = [...ns.lines.children].map((row) => ({
+        name: (row.querySelector("input") as HTMLInputElement).value.trim() || "Line",
+        clef: (row.querySelector("select") as HTMLSelectElement).value as LineChoice["clef"],
+    }));
+    const title = ns.title.value.trim() || "Untitled";
+    const [num, den] = ns.time.value.split("/").map(Number);
+    const text = buildScore({
+        title, lines, key: Number(ns.key.value), time: [num, den],
+        bpm: Math.max(30, Math.min(240, Number(ns.bpm.value) || 100)),
+        bars: Math.max(1, Math.min(300, Number(ns.bars.value) || 16)),
+    });
+    ns.dlg.close();
+    const bytes = new TextEncoder().encode(text);
+    await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer);
+    if (openedScore?.name && state.score) {
+        await beginFresh();
+    }
+};
+
+// A score made here: Edit opens on its first rest, and nothing is saved until a copy is
+async function beginFresh() {
+    edit.fresh = true;
+    edit.dirty = true;
+    if (!edit.on) {
+        setEditActive(true);
+        openLayer(closeEdit);
+    }
+    edit.sel = await engine.editSelectStart();
+    showEditSel(true);
+    updateEditBar();
+    void saveEditDraft(); // so even an untouched new score can be resumed
+}
+
+// The start screen offers the newest unsaved new score
+const resume = { row: $("resume-row"), btn: $<HTMLButtonElement>("resume-score"), drop: $<HTMLButtonElement>("resume-drop"), key: "" };
+async function showResume() {
+    if (embedded) {
+        return;
+    }
+    const d = (await editDraft.fresh())[0];
+    resume.row.hidden = !d || !!state.score;
+    if (d) {
+        resume.key = d.key ?? "";
+        resume.btn.textContent = `Continue “${d.name.replace(/\.(mscz|mscx)$/i, "")}”`;
+    }
+}
+resume.btn.onclick = async () => {
+    const d = await editDraft.get(resume.key);
+    if (!d) {
+        return;
+    }
+    const old = resume.key;
+    resume.row.hidden = true;
+    await openChosen(d.name, d.data);
+    await editDraft.remove(old); // its draft is kept again, under the new key, by the next change
+    if (state.score) {
+        await beginFresh();
+    }
+};
+resume.drop.onclick = async () => {
+    await editDraft.remove(resume.key);
+    resume.row.hidden = true;
+    void showResume();
+};
+void showResume();
 
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
@@ -3981,7 +4578,7 @@ function tourSteps(): TourStep[] {
         { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
         { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        { target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." },
+        { target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. Tap a rest and a row of letters C to B puts a note on it. The three dots (More) hold sharps and flats, ties, triplets, chords, dynamics, words and lyrics, key and time, extra bars and lines, and the microphone that turns a tune you sing into notes. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." },
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },

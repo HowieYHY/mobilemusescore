@@ -32,10 +32,21 @@ export type WorkerRequest =
     | Req<{ cmd: "locate"; page: number; x: number; y: number; radius: number }>
     // editing (composer): see Session::edit* in the engine
     | Req<{ cmd: "editSelect"; page: number; x: number; y: number; radius: number }>
-    | Req<{ cmd: "editSelection" | "editClearSelection" | "editUndo" | "editRedo" | "editDot" | "editDelete" }>
+    | Req<{ cmd: "editSelection" | "editClearSelection" | "editUndo" | "editRedo" | "editDot" | "editDelete" | "editSelectStart" }>
     | Req<{ cmd: "editMove"; to: string }>
     | Req<{ cmd: "editPitch"; mode: number }>
     | Req<{ cmd: "editDuration"; den: number }>
+    | Req<{ cmd: "editEnterNote"; letter: number }>
+    | Req<{ cmd: "editInsertNotes"; spec: string }>
+    | Req<{ cmd: "editAddBars"; n: number }>
+    | Req<{ cmd: "editSetKey"; key: number }>
+    | Req<{ cmd: "editSetTime"; num: number; den: number }>
+    | Req<{ cmd: "editTie" | "editTriplet" }>
+    | Req<{ cmd: "editAccidental"; kind: number }>
+    | Req<{ cmd: "editAddToChord"; letter: number }>
+    | Req<{ cmd: "editDynamic"; which: number }>
+    | Req<{ cmd: "editStaffText" | "editLyric" | "editRenameLine"; text: string }>
+    | Req<{ cmd: "editAddLine"; name: string; clef: number }>
     | Req<{ cmd: "save" }>;
 
 /** The note or rest being edited (page units), or null. */
@@ -44,7 +55,11 @@ export interface EditSelection {
     page: number; x: number; y: number; w: number; h: number;
     bar: number; staff: number; voice: number;
     den: number; dots: number;
+    /** The pitch of the staff's middle line: where a tune should sit. */
+    mid?: number;
     pitch?: number; name?: string;
+    /** The name of the line, and whether the note is tied on or the note or rest is in a tuplet. */
+    part?: string; tie?: boolean; tuplet?: boolean;
 }
 export interface EditResult { ok: boolean; error?: string }
 

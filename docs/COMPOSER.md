@@ -80,9 +80,57 @@ Tests: `node scripts/edit-api-test.mjs` (engine in Node), `scripts/edit-test.mjs
 `CDP=http://127.0.0.1:9333` drives the Android emulator's Chrome), `scripts/edit-layout-test.mjs` (top bar and
 edit bar at 320 to 1366 px).
 
-Not done yet: a silent draft of the edits (closing the tab loses them; the browser asks first), entering notes
-into rests (phase 2), notes written with the pen are not moved when the music changes, the first tap that
-starts the audio does not sound its note, and the edit bar is three rows high on a phone.
+**Phase 2, notes onto rests.** With a rest selected, the pitch buttons give way to the letters C D E F G A B
+(same bar height). `mss_edit_enter_note(letter)` (`Session::editEnterNote`) does what desktop's letter keys do:
+`Score::resolveNoteInputParams` (key signature, octave nearest the previous note) then `cmdAddPitch`, one undo
+step, the rest's length kept (a whole-bar rest gets a quarter), the new note stays selected for Higher/Lower.
+Tests: edit-test (enter, bar height, adjust, undo) and edit-layout-test (letters at every width).
+
+**Silent draft.** `app/src/editdraft.ts`: after each edit (800 ms later, and when the page is hidden) the edited
+score is saved with `mss_save` into IndexedDB, one draft per score key. Opening the same score asks *Continue my
+edits / Start again*; *Save a copy* and *Don't keep* delete it. The undo history is not kept. Test:
+`scripts/edit-draft-test.mjs`.
+
+**Voice to notes, one voice.** `app/src/voice/transcribe.ts` (McLeod pitch, 16 kHz, plain JS, no model) finds the
+notes: pitch every 10 ms, bridges short dropouts, a new note where the pitch settles somewhere new, the same
+pitch sung again where the loudness dips and returns (measured over 20 ms, not the whole 64 ms window), and a
+short note straight into another a step or two away is dropped as the slide into it. `toGrid` puts them on
+sixteenths (or eighths) at the chosen speed, the first note starting the tune, gaps as rests. The dialog
+(`#voice`, main.ts "sing it in") records with MediaRecorder or takes an audio file (`decodeAudioData`, resampled to 16 kHz
+with an OfflineAudioContext), draws a piano roll, plays the result on a triangle synth, and offers an octave
+that fits the target staff (`mid`, the pitch of the staff's middle line, from the engine). `mss_edit_insert_notes`
+(`Session::editInsertNotes`) enters the events with `Score::setNoteRest` (rhythmic), one undo step, ties and
+rests across bar lines done by the engine. Tests: `voice-test.mjs` (tracker on a synthetic tune: 10/10 notes,
+36x real time) and `voice-edit-test.mjs` (the whole flow, tune in a Bass bar; `VIDEO=dir` films it to MP4).
+**Only tested on a synthetic voice and a synthetic recording; a real voice, a real microphone and a phone
+are not tested.** Several voices stay unbuilt.
+
+Found on the way: Previous/Next (`mss_edit_move`) never moved the selection in phase 1: the engine wants
+`select-next-chord`, not `next-chord`, and the test only waited for it to finish. Fixed, and tested for movement.
+
+**New score.** `app/src/newscore.ts` writes a MuseScore 3.x `.mscx` (parts, key, time, tempo, N whole-bar rests; the engine
+reads it like any file; desktop MuseScore 4.7 reads it too, `new-score-test.mjs`). The start screen's *New score*
+dialog opens it and `beginFresh` turns on Edit with the first rest picked (`mss_edit_select_start`). A fresh score has
+no file to reopen, so its silent draft is flagged `fresh` and the start screen offers *Continue* until a copy is
+saved (`new-score-flow-test.mjs`: New score, Soprano, Alto, a Tenor letter, close the page, Continue, Save a copy;
+`VIDEO=dir` films it). Chromatic notes are spelled as desktop spells them (a C in E major shows as B sharp).
+**Phase 3: More** (the three dots in the edit bar; the mic lives there too). Engine (`session.cpp`, `mss_edit_*`):
+`editAddBars`, `editSetKey`/`editSetTime` (every line, from the picked bar), `editTie` (`cmdToggleTie` runs its own
+command), `editAccidental`, `editTriplet`, `editAddToChord`, `editStaffText`, `editDynamic` (use the string
+overload of `setDynamicType`, or the text is empty), `editLyric` (BEGIN/MIDDLE/END/SINGLE by the syllable before),
+`editAddLine` (copies the last part's instrument, set at tick -1 like `appendPart`; tick 0 left a second, blank
+instrument and a ghost mixer strip) and `editRenameLine`. Edits that rebuild bars or lines drop the selection, so
+they pick the same place again (`placeOf`/`reselect`). A new or removed line (also by undo/redo) rebuilds the
+playback (`rebuildPlayback`, keeping volumes, mutes and solos per line; **sounds chosen in the mixer return to the
+score's**); a rename only renames the tracks (`syncTracks`). The selection also reports `tie`, `tuplet` and `part`.
+Tests: `edit-more-test.mjs` (engine, read back through desktop MuseScore) and `edit-more-ui-test.mjs` (real touch,
+every button's effect, layout of the open panel at 320/412/820/1280 px).
+The pen Notes stay a read-only-mode tool (Edit closes them); composers write text with More → Words.
+The first tap that starts the audio now waits for it, so its note sounds (written, not yet heard on a device).
+Not built: hearing the other lines while recording; New score from inside an open score; choosing the clef or
+sound of an existing line; several voices in one staff; the panel scrolls on a short phone (40% of the height).
+
+Not done yet: the edit bar is three rows high on a phone, and the open More panel leaves little of the score on a 640 px phone.
 
 Emulator: Android SDK on `D:ndroid-sdk` (cmdline-tools, emulator, platform-tools, Android 35 Play image),
 AVD `pixel35` (`ANDROID_AVD_HOME=D:ndroid-sdkvd`, `JAVA_HOME=D:ndroid-sdk\jdk\jdk-17.0.20.1+1`).

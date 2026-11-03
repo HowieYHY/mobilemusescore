@@ -19,6 +19,8 @@ Share → *Add to Home Screen*, then open it once online so it can work offline)
 > PocketScore plays files made with MuseScore. "MuseScore" is a trademark of
 > MuseScore Ltd; PocketScore is not affiliated with or endorsed by MuseScore Ltd.
 
+> Composer (Edit mode, voice to notes, New score, More panel) is on branch `composer`, unreleased: see [COMPOSER.md](COMPOSER.md) and HANDOFF.md.
+
 ## Current status (19 Oct 2026, version 1.0.28)
 
 **Version 1.0: the first release for everyone.** It runs in browsers (Chromium

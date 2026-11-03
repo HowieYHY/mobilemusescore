@@ -1262,7 +1262,8 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   grid-template-areas:
     "info actions"
     "tools tools"
-    "lengths lengths";
+    "lengths lengths"
+    "more more";
   align-items: center;
   gap: 6px 10px;
   padding: 6px 12px 8px;
@@ -1308,7 +1309,8 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "info actions"
-      "tools lengths";
+      "tools lengths"
+      "more more";
     column-gap: 16px;
   }
   .edit-tools, .edit-lengths { flex-wrap: nowrap; }
@@ -1317,9 +1319,30 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 @media (min-width: 1100px) {
   .editbar {
     grid-template-columns: minmax(8ch, 1fr) auto auto auto;
-    grid-template-areas: "info tools lengths actions";
+    grid-template-areas: "info tools lengths actions" "more more more more";
   }
 }
+/* More: the less used tools, behind one button */
+.edit-more { grid-area: more; display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.18); }
+.edit-more[hidden] { display: none; }
+.em-row { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.em-h { flex: 0 0 5.6em; font-size: 12px; opacity: 0.8; }
+.em-set { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; flex: 1 1 0; min-width: 0; }
+.em-words { flex-wrap: nowrap; }
+.em-words input[type="text"] { flex: 1 1 6em; min-width: 0; }
+.edit-more input, .edit-more select { min-height: 40px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); color: var(--text-on-chrome); padding: 4px 8px; font: inherit; font-size: 14px; }
+.edit-more input[type="number"] { width: 4.2em; }
+.edit-more select { max-width: 10em; }
+.edit-more input::placeholder { color: var(--text-on-chrome); opacity: 0.55; }
+.edit-more .btn { gap: 6px; }
+.editbar .btn.small.dyn { font-style: italic; font-weight: 700; padding: 4px 6px; }
+@media (max-width: 480px) { .em-h { flex-basis: 100%; } .em-words { flex-wrap: wrap; } }
+/* a rest is selected: the note letters take the place of the pitch buttons, so the bar keeps its height */
+.edit-letters { display: none; flex: 1 1 0; min-width: 0; gap: 4px; }
+.edit-tools.on-rest .edit-letters { display: flex; }
+.edit-tools.on-rest .note-only { display: none; }
+.editbar .btn.small.letter { flex: 1 1 0; min-width: 24px; max-width: 48px; padding: 4px 0; font-weight: 650; }
+@media (max-width: 340px) { .edit-letters { gap: 2px; } }
 /* the note or rest being edited */
 .edit-sel {
   position: absolute;
@@ -1337,3 +1360,39 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   .topbar #view-mode { max-width: 29vw; padding-left: 8px; padding-right: 22px !important; background-position: right 6px center; }
   .topbar .btn { padding-left: 9px; padding-right: 9px; }
 }
+
+/* Sing it in: record or choose a recording, check the notes found, put them in the score */
+.voice { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.voice-source, .voice-rec { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.voice-file { position: relative; overflow: hidden; background: #fff; color: var(--ink); border-color: #c4c9cf; }
+.voice-file input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
+.voice-dot { width: 10px; height: 10px; border-radius: 50%; background: #d64545; animation: voice-pulse 1s ease-in-out infinite; }
+@keyframes voice-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .voice-dot { animation: none; } }
+#voice-time { font-variant-numeric: tabular-nums; min-width: 3ch; }
+.voice-result { margin-bottom: 8px; }
+#voice-roll { display: block; width: 100%; height: 132px; border-radius: 8px; background: #eef1f4; margin-bottom: 10px; }
+.voice-opts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 14px; color: var(--ink-2); }
+.voice-opts input[type="number"] { width: 4.5em; font: inherit; padding: 6px; border: 1px solid #c4c9cf; border-radius: 8px; }
+.voice-opts select { font: inherit; padding: 6px; border: 1px solid #c4c9cf; border-radius: 8px; background: #fff; color: var(--ink); }
+.voice-oct { display: inline-flex; gap: 6px; }
+.voice-oct .btn { background: #fff; color: var(--ink); border-color: #c4c9cf; }
+.voice-status { min-height: 1.4em; margin: 6px 0 14px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+.voice-status.bad { color: #b3261e; }
+.voice .btn.plain { background: transparent; color: var(--ink); border-color: transparent; }
+
+/* New score */
+.newscore { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.newscore p { margin-bottom: 12px; }
+.ns-row, .ns-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.newscore input[type="text"], .newscore input[type="number"], .newscore select { font: inherit; font-size: 15px; padding: 8px; border: 1px solid #c4c9cf; border-radius: 8px; background: #fff; color: var(--ink); min-width: 0; }
+.ns-lines { border: 0; padding: 0; margin: 12px 0; }
+.ns-lines legend { font-size: 13px; color: var(--ink-2); padding: 0; margin-bottom: 6px; }
+.ns-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.ns-line select { max-width: 9.5em; }
+.ns-line .btn { min-width: 40px; min-height: 40px; padding: 4px 8px; }
+#ns-add { margin-top: 2px; }
+.ns-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.empty .new-row { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 20px 0; }
+.empty .new-row[hidden] { display: none; }
+.new-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }

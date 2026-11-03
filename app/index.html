@@ -63,6 +63,7 @@
   <div class="editbar" id="editbar" hidden>
     <div class="edit-info" id="edit-info" aria-live="polite"></div>
     <div class="edit-actions">
+      <button class="btn small" id="edit-morebtn" aria-expanded="false" aria-controls="edit-more" aria-label="More" title="More: sharps and flats, ties, words, key, time, bars, lines, singing a tune in"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
       <button class="btn small" id="edit-undo" disabled aria-label="Undo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="btn small" id="edit-redo" disabled aria-label="Redo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="btn small" id="edit-copy" disabled aria-label="Save a copy" title="Save a copy of the score"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Save a copy</span></button>
@@ -71,14 +72,48 @@
     <div class="edit-tools" role="group" aria-label="Move and change the note">
       <button class="btn small" id="edit-prev" disabled aria-label="Previous note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="btn small" id="edit-next" disabled aria-label="Next note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <span class="edit-gap"></span>
-      <button class="btn small" id="edit-down" disabled aria-label="Lower"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="btn small" id="edit-up" disabled aria-label="Higher"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="btn small oct" id="edit-octave" disabled aria-pressed="false" title="Move by an octave instead of a step">Octave</button>
-      <span class="edit-gap"></span>
-      <button class="btn small" id="edit-delete" disabled aria-label="Delete"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="edit-gap note-only"></span>
+      <button class="btn small note-only" id="edit-down" disabled aria-label="Lower"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small note-only" id="edit-up" disabled aria-label="Higher"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small oct note-only" id="edit-octave" disabled aria-pressed="false" title="Move by an octave instead of a step">Octave</button>
+      <span class="edit-gap note-only"></span>
+      <button class="btn small note-only" id="edit-delete" disabled aria-label="Delete"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="edit-letters rest-only" id="edit-letters" role="group" aria-label="Put a note here"></span>
     </div>
     <div class="edit-lengths" id="edit-lengths" role="group" aria-label="Length"></div>
+    <div class="edit-more" id="edit-more" hidden>
+      <div class="em-row"><button class="btn" id="edit-voice" disabled aria-label="Sing it in" title="Sing or hum a tune and put it in as notes"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sing it in</span></button></div>
+      <div class="em-row"><span class="em-h">Note</span>
+        <span class="em-set">
+          <button class="btn small" id="edit-sharp" disabled aria-label="Sharp" title="Sharp">♯</button>
+          <button class="btn small" id="edit-flat" disabled aria-label="Flat" title="Flat">♭</button>
+          <button class="btn small" id="edit-natural" disabled aria-label="Natural" title="Natural">♮</button>
+          <button class="btn small" id="edit-tie" disabled title="Tie to the next note of the same pitch">Tie</button>
+          <button class="btn small" id="edit-triplet" disabled title="Make this three in the time of two">Triplet</button>
+        </span></div>
+      <div class="em-row"><span class="em-h">Add to chord</span><span class="em-set" id="edit-chord" role="group" aria-label="Add a note to this one"></span></div>
+      <div class="em-row"><span class="em-h">Dynamics</span><span class="em-set" id="edit-dynamics" role="group" aria-label="Loudness mark"></span></div>
+      <div class="em-row"><span class="em-h">Words</span>
+        <span class="em-set em-words">
+          <input type="text" id="edit-words" maxlength="80" autocomplete="off" aria-label="Words" placeholder="Words or a syllable">
+          <button class="btn small" id="edit-text" disabled title="Put the words above the note">Above</button>
+          <button class="btn small" id="edit-lyric" disabled title="Put the syllable under the note (end it with - to go on to the next note)">Lyric</button>
+        </span></div>
+      <div class="em-row"><span class="em-h">From this bar</span>
+        <span class="em-set">
+          <select id="edit-key" disabled aria-label="Key signature"></select>
+          <select id="edit-time" disabled aria-label="Time signature"></select>
+        </span></div>
+      <div class="em-row"><span class="em-h">Bars</span>
+        <span class="em-set"><input type="number" id="edit-bars" min="1" max="100" value="4" aria-label="How many bars"><button class="btn small" id="edit-addbars" title="Add bars at the end">Add at the end</button></span></div>
+      <div class="em-row"><span class="em-h">Lines</span>
+        <span class="em-set em-words">
+          <input type="text" id="edit-line" maxlength="30" autocomplete="off" aria-label="Name of the line" placeholder="Name">
+          <button class="btn small" id="edit-rename" disabled title="Rename the line of the picked note">Rename</button>
+          <select id="edit-clef" aria-label="Clef of a new line"></select>
+          <button class="btn small" id="edit-addline" title="Add a line at the bottom">Add a line</button>
+        </span></div>
+    </div>
   </div>
 
   <div class="palette" id="palette" role="dialog" aria-label="More colours" hidden>
@@ -91,6 +126,8 @@
   <main class="viewer" id="viewer">
     <div class="empty" id="empty">
       <p><strong>Open a MuseScore file (.mscz)</strong> to view and play it.</p>
+      <p class="new-row" id="resume-row" hidden><span class="new-btns"><button class="btn primary" id="resume-score">Continue</button><button class="btn plain" id="resume-drop">Discard</button></span><span class="hint">Your unsaved new score, kept on this device.</span></p>
+      <p class="new-row"><button class="btn" id="new-score">New score</button><span class="hint">Or start from a blank page and build it up part by part.</span></p>
       <p class="install" id="install-row" hidden>
         <button class="btn primary" id="install">Install PocketScore</button>
         <span class="hint">Adds PocketScore to your home screen and app list, so it opens like an app and works offline.</span>
@@ -290,6 +327,53 @@
     <h2></h2>
     <p></p>
     <div class="ask-buttons"></div>
+  </dialog>
+
+  <dialog class="ask newscore" id="newscore" aria-labelledby="newscore-title">
+    <h2 id="newscore-title">New score</h2>
+    <p>A blank score to build up line by line: pick a bar, then type notes with the letters or sing them in.</p>
+    <label class="ns-row">Title <input type="text" id="ns-title" maxlength="80" placeholder="Untitled" autocomplete="off"></label>
+    <fieldset class="ns-lines"><legend>Lines</legend><div id="ns-lines"></div><button class="btn plain" id="ns-add" type="button">Add a line</button></fieldset>
+    <div class="ns-grid">
+      <label>Key <select id="ns-key"></select></label>
+      <label>Time <select id="ns-time"></select></label>
+      <label>Speed <input type="number" id="ns-bpm" min="30" max="240" value="100" inputmode="numeric"></label>
+      <label>Bars <input type="number" id="ns-bars" min="1" max="300" value="16" inputmode="numeric"></label>
+    </div>
+    <div class="ask-buttons">
+      <button class="btn plain" id="ns-cancel">Cancel</button>
+      <button class="btn primary" id="ns-create">Create</button>
+    </div>
+  </dialog>
+
+  <dialog class="ask voice" id="voice" aria-labelledby="voice-title">
+    <h2 id="voice-title">Sing it in</h2>
+    <p id="voice-hint">Sing or hum one tune, one note at a time. The notes go in from the note or rest you picked, and replace what is there.</p>
+    <div class="voice-source" id="voice-source">
+      <button class="btn primary" id="voice-record">Record</button>
+      <span class="btn voice-file">Choose a recording<input type="file" id="voice-file" accept="audio/*" aria-label="Choose a recording"></span>
+    </div>
+    <div class="voice-rec" id="voice-rec" hidden>
+      <span class="voice-dot" aria-hidden="true"></span><span id="voice-time">0:00</span>
+      <button class="btn" id="voice-stop">Stop</button>
+    </div>
+    <div class="voice-result" id="voice-result" hidden>
+      <canvas id="voice-roll" role="img" aria-label="The notes that were found"></canvas>
+      <div class="voice-opts">
+        <label>Speed <input type="number" id="voice-tempo" min="30" max="240" step="1" inputmode="numeric"> beats a minute</label>
+        <label>Shortest note <select id="voice-grid"><option value="16">Sixteenth</option><option value="8">Eighth</option></select></label>
+        <span class="voice-oct" role="group" aria-label="Octave">
+          <button class="btn small" id="voice-oct-down" aria-label="An octave lower">Octave ⌄</button>
+          <button class="btn small" id="voice-oct-up" aria-label="An octave higher">Octave ⌃</button>
+        </span>
+      </div>
+    </div>
+    <div class="voice-status" id="voice-status" aria-live="polite"></div>
+    <div class="ask-buttons">
+      <button class="btn plain" id="voice-cancel">Cancel</button>
+      <button class="btn plain" id="voice-listen" disabled>Listen</button>
+      <button class="btn primary" id="voice-put" disabled>Put in the score</button>
+    </div>
   </dialog>
 
   <div class="focus-hint" id="focus-hint" aria-live="polite" hidden>Tap off the music to show the controls</div>

@@ -124,7 +124,35 @@ await shot("3-edited");
 await tap("#edit-delete"); await idle();
 sel = await page.evaluate(() => app.edit.sel);
 check(sel === null || sel.kind === "rest", `Delete leaves a rest (${sel?.kind})`);
-await tap("#edit-next"); await idle();
+
+// phase 2: a note goes onto the rest through the letter buttons; the bar keeps its height
+check(await page.evaluate(() => document.querySelectorAll("#edit-letters button").length === 7 && !document.getElementById("edit-letters").offsetParent === false), "a rest shows the seven note letters");
+check(await page.evaluate(() => document.getElementById("edit-up").offsetParent === null), "the pitch buttons make room for them");
+const barH = await page.evaluate(() => document.getElementById("editbar").getBoundingClientRect().height);
+const restSel = sel;
+await tapAndWait('#edit-letters button[aria-label="Put a E here"]');
+sel = await page.evaluate(() => app.edit.sel);
+check(sel && sel.kind === "note" && /^E/.test(sel.name) && sel.den === restSel.den && sel.bar === restSel.bar, `E entered on the rest: ${sel?.name}, 1/${sel?.den}, bar ${sel?.bar}`);
+check(Math.abs(sel.pitch - spot.pitch) <= 12, `in the octave near the music (pitch ${sel?.pitch}, neighbours ${spot.pitch})`);
+const barH2 = await page.evaluate(() => document.getElementById("editbar").getBoundingClientRect().height);
+check(Math.abs(barH - barH2) < 1, `the edit bar keeps its height (${barH} -> ${barH2})`);
+await tap("#edit-up"); await idle(); // the new note is selected, so it can be adjusted at once
+sel = await page.evaluate(() => app.edit.sel);
+check(sel && sel.kind === "note", `the new note can be moved (${sel?.name})`);
+await tap("#edit-undo"); await idle(); await tap("#edit-undo"); await idle(); // pitch, then the entry: the rest is back
+pt = await screenPoint();
+await tapAt(pt.x, pt.y);
+await page.waitForFunction(() => app.edit.sel, null, { timeout: 5000 }).catch(() => {});
+sel = await page.evaluate(() => app.edit.sel);
+check(sel && sel.kind === "rest", `undoing the entry gives the rest back (${sel?.kind})`);
+await shot("3b-entered");
+const beforeNext = await page.evaluate(() => ({ x: app.edit.sel.x, y: app.edit.sel.y }));
+await tap("#edit-next");
+await page.waitForFunction(({ x, y }) => app.edit.sel && (app.edit.sel.x !== x || app.edit.sel.y !== y), beforeNext, { timeout: 4000 }).catch(() => {});
+check(await page.evaluate(({ x, y }) => app.edit.sel.x !== x || app.edit.sel.y !== y, beforeNext), "Next moves to another note");
+await tap("#edit-prev");
+await page.waitForFunction(({ x, y }) => app.edit.sel && app.edit.sel.x === x && app.edit.sel.y === y, beforeNext, { timeout: 4000 }).catch(() => {});
+check(await page.evaluate(({ x, y }) => app.edit.sel.x === x && app.edit.sel.y === y, beforeNext), "Previous comes back");
 
 // the copy
 check(await page.evaluate(() => !document.getElementById("edit-copy").disabled), "Save a copy is on after edits");

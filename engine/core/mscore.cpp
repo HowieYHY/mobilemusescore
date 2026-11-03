@@ -72,6 +72,21 @@ EMSCRIPTEN_KEEPALIVE const char* mss_edit_move(const char* cmd) { return ret(Ses
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_pitch(int mode) { return ret(Session::instance()->editPitch(mode)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_duration(int den) { return ret(Session::instance()->editDuration(den)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_dot() { return ret(Session::instance()->editDot()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_note(int letter) { return ret(Session::instance()->editEnterNote(letter)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_insert_notes(const char* spec) { return ret(Session::instance()->editInsertNotes(spec)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_select_start() { return ret(Session::instance()->editSelectStart()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_add_bars(int n) { return ret(Session::instance()->editAddBars(n)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_set_key(int k) { return ret(Session::instance()->editSetKey(k)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_set_time(int n, int d) { return ret(Session::instance()->editSetTime(n, d)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_tie() { return ret(Session::instance()->editTie()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_accidental(int k) { return ret(Session::instance()->editAccidental(k)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_triplet() { return ret(Session::instance()->editTriplet()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_add_to_chord(int l) { return ret(Session::instance()->editAddToChord(l)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_staff_text(const char* t) { return ret(Session::instance()->editStaffText(t)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_dynamic(int w) { return ret(Session::instance()->editDynamic(w)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_lyric(const char* t) { return ret(Session::instance()->editLyric(t)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_add_line(const char* n, int c) { return ret(Session::instance()->editAddLine(n, c)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_rename_line(const char* n) { return ret(Session::instance()->editRenameLine(n)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_delete() { return ret(Session::instance()->editDelete()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_undo() { return ret(Session::instance()->editUndoRedo(true)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_redo() { return ret(Session::instance()->editUndoRedo(false)); }

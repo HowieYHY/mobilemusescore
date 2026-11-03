@@ -415,5 +415,95 @@
       "edit-toggle",
       "topbar"
     ]
+  },
+  "edit-draft-test": {
+    "files": [
+      "app/src/editdraft.ts"
+    ],
+    "words": [
+      "editDraft",
+      "saveEditDraft",
+      "restoredEdits"
+    ]
+  },
+  "voice-test": {
+    "files": [
+      "app/src/voice/transcribe.ts"
+    ],
+    "words": [
+      "trackPitch",
+      "findNotes",
+      "toGrid"
+    ]
+  },
+  "voice-edit-test": {
+    "files": [
+      "app/src/voice/transcribe.ts"
+    ],
+    "words": [
+      "editInsertNotes",
+      "voice-",
+      "voiceProcess",
+      "openVoice",
+      "edit_insert_notes"
+    ]
+  },
+  "new-score-test": {
+    "files": [
+      "app/src/newscore.ts"
+    ],
+    "words": [
+      "buildScore",
+      "PARTS",
+      "newscore"
+    ]
+  },
+  "new-score-flow-test": {
+    "files": [
+      "app/src/newscore.ts",
+      "app/src/editdraft.ts"
+    ],
+    "words": [
+      "beginFresh",
+      "editSelectStart",
+      "showResume",
+      "resume-"
+    ]
+  },
+  "edit-more-test": {
+    "files": [
+      "engine/core/session.cpp",
+      "engine/core/mscore.cpp",
+      "app/src/engine/core.worker.ts"
+    ],
+    "words": [
+      "editAddBars",
+      "editSetKey",
+      "editSetTime",
+      "editTie",
+      "editAccidental",
+      "editTriplet",
+      "editAddToChord",
+      "editStaffText",
+      "editDynamic",
+      "editLyric",
+      "editAddLine",
+      "editRenameLine",
+      "rebuildPlayback",
+      "syncTracks"
+    ]
+  },
+  "edit-more-ui-test": {
+    "files": [
+      "scripts/edit-more-ui-test.mjs"
+    ],
+    "words": [
+      "edit-more",
+      "em-row",
+      "updateMore",
+      "edit-morebtn",
+      "putLyric",
+      "edit-dynamics"
+    ]
   }
 }

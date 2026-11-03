@@ -195,6 +195,10 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 
 </details>
 
+### Start a new score
+
+On the start screen, **New score** makes a blank score to build up part by part. Choose a title, then add the lines you want with **Add a line**: give each line a name (rename it as you like) and a clef (treble, an octave lower, or bass). Then the key, the time signature, the speed and the number of bars, and **Create**. It opens straight in **Edit** with the first rest picked. Build it layer by layer: pick a rest in one line, put notes in with the letters or **Sing it in**, then pick the next line's rest and do the same. Everything is kept quietly on this device as you go: if you close the app, the start screen offers **Continue “Your title”** next time. **Save a copy** makes `Your title.mscz`, which opens in MuseScore. The key, time signature, bars and lines can all be changed later with **More** in the Edit bar (below).
+
 ### Change the notes (Edit)
 
 **Edit** (the music-note button at the top) lets you change the music itself. This is new and still being tried out.
@@ -206,11 +210,22 @@ Tap the **pencil** at the top, then tap **Done** when finished.
    - **⌄ ⌃** move the note down or up a step; turn on **Octave** to move by an octave instead;
    - the note shapes (whole to 32nd) set how long it is, and the dot makes it half as long again;
    - the bin turns a note into a rest.
-4. **Undo** and **Redo** are at the top right of the bar. **Done** closes the bar.
+   - **On a rest**, the letters **C D E F G A B** take the place of those buttons: tap one to put that note on the rest, as long as the rest. It lands in the key of the piece, in the octave nearest the note before it; then use **⌄ ⌃** to fix the height.
+4. **Sing it in** (the microphone button in the bar) turns a tune you sing or hum into notes. First pick the note or rest where the tune should start. Then **Record** (or **Choose a recording**), sing one tune, one note at a time, and tap **Stop**. PocketScore finds the notes on your device (nothing is uploaded) and draws them. Check them with **Listen**, change the **speed** or the **shortest note** if they look wrong, use **Octave** to move them, then **Put in the score**. They go in from the picked note on and replace what is there; **Undo** takes the whole tune out in one step. This is new: it works best with a clear voice, one note at a time, and it can get notes wrong, so always listen back. Only one voice at a time for now.
+5. **More** (the three dots in the bar) opens the less-used tools:
+   - **Sing it in** (the microphone) is here too;
+   - **♯ ♭ ♮** change the picked note's accidental, **Tie** joins it to the next note of the same height, **Triplet** turns it into three in the time of two;
+   - **Add to chord** puts another note (C to B) on the picked note, above it;
+   - **Dynamics** (ppp to fff) goes under the picked note, **Words → Above** puts text above it, and **Lyric** puts a syllable under it (end it with **-** when the word goes on) and picks the next note so you can type on;
+   - **From this bar**, **Key** and **Time** change the key or the time signature from the picked bar on, on every line;
+   - **Bars → Add at the end** adds bars;
+   - **Lines**: type a name and **Rename** the picked note's line, or choose a clef and **Add a line** at the bottom (it plays with the same sound as the line above; its sound can be changed in the Mixer).
+   Adding or taking away a line reloads the sounds for a moment, and sounds you picked for lines in the Mixer go back to the score's own.
+6. **Undo** and **Redo** are at the top right of the bar. **Done** closes the bar.
 
 **Save a copy** (the download arrow) makes a new `.mscz` file called *Your score (edited).mscz*. It opens in MuseScore or in PocketScore. **It never replaces the file you opened.** If you open another score first, PocketScore asks whether to save a copy.
 
-Good to know: the changes live only in this open score until you save a copy, so close nothing before saving. Notes you wrote with the pen (**Notes**) stay where they were drawn and may no longer line up with the music after you change it.
+Good to know: until you save a copy, your changes are kept quietly on this device. If the app closes, opening the same score again asks whether to **Continue my edits** or **Start again** from the file as it is. The pen (**Notes**) is for marking up a score you are reading, so it is a separate mode: opening Edit closes it, and drawings stay where they were drawn and may not line up once the music is changed. To write something on the score as a composer would, use **More → Words** (real text in the score).
 
 ### Save
 **Save** (top bar) keeps your notes and mixer changes for this score, on this device.

@@ -50,6 +50,26 @@ for (const [name, width, height] of sizes) {
     failures += ok ? 0 : 1;
     console.log((ok ? "ok   " : "FAIL ") + `${name} ${width}x${height}: edit bar ${r.bar.b - r.bar.t}px high, smallest button ${Math.round(r.minTap)}px, Open ${r.open.l}..${r.open.r}, Edit ${r.edit.l}..${r.edit.r}, View ${r.view.l}..${r.view.r}${r.bad.length ? ", OUTSIDE: " + r.bad.join(" ") : ""}`);
     await page.screenshot({ path: path.join(shots, `layout-${name}.png`) });
+    // a rest selected: the letters replace the pitch buttons, same bar height, nothing outside, readable taps
+    await page.evaluate(async () => {
+        const sp = app.state.score.spatium, p0 = app.state.score.pages[0];
+        for (let y = p0.h * 0.1; y < p0.h * 0.6; y += sp / 2) {
+            for (let x = p0.w * 0.25; x < p0.w * 0.8; x += sp) {
+                const s = await app.engine.editSelect(0, x, y, sp * 0.4);
+                if (s && s.kind === "rest") { app.edit.sel = s; app.showEditSel(false); app.updateEditBar(); return; }
+            }
+        }
+    });
+    const rr = await page.evaluate(() => {
+        const W = document.documentElement.clientWidth;
+        const L = [...document.querySelectorAll("#edit-letters button")].map((b) => b.getBoundingClientRect());
+        const bar = document.getElementById("editbar").getBoundingClientRect();
+        return { n: L.length, minW: Math.min(...L.map((b) => b.width)), minH: Math.min(...L.map((b) => b.height)), out: L.some((b) => b.right > W + 0.5 || b.left < -0.5), h: Math.round(bar.height), oneRow: new Set(L.map((b) => Math.round(b.top))).size === 1 };
+    });
+    const rok = rr.n === 7 && rr.minW >= 24 && rr.minH >= 34 && !rr.out && rr.oneRow && (width < 340 || rr.h === r.bar.b - r.bar.t);
+    failures += rok ? 0 : 1;
+    console.log((rok ? "ok   " : "FAIL ") + `${name} rest: letters ${Math.round(rr.minW)}x${Math.round(rr.minH)} px, bar ${rr.h}px (note: ${r.bar.b - r.bar.t}px), one row ${rr.oneRow}`);
+    await page.screenshot({ path: path.join(shots, `layout-${name}-rest.png`) });
     await context.close();
 }
 await browser.close();

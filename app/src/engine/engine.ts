@@ -441,6 +441,8 @@ export class Engine {
     // Editing. Every call that changes the score returns once the score is laid out again and the
     // sound follows it; the page then asks for the score info and redraws.
     editSelect(page: number, x: number, y: number, radius: number): Promise<EditSelection | null> { return this.request({ cmd: "editSelect", page, x, y, radius }); }
+    /** The first note or rest of the first staff (a score that was just made). */
+    editSelectStart(): Promise<EditSelection | null> { return this.request({ cmd: "editSelectStart" }); }
     editSelection(): Promise<EditSelection | null> { return this.request({ cmd: "editSelection" }); }
     editClearSelection(): Promise<null> { return this.request({ cmd: "editClearSelection" }); }
     editMove(to: "next-chord" | "prev-chord" | "next-measure" | "prev-measure"): Promise<EditSelection | null> { return this.request({ cmd: "editMove", to }); }
@@ -448,6 +450,24 @@ export class Engine {
     editPitch(mode: 0 | 1 | 2 | 3): Promise<EditResult> { return this.request({ cmd: "editPitch", mode }); }
     /** den: 1 whole, 2 half, 4 quarter, 8 eighth, 16, 32 */
     editDuration(den: number): Promise<EditResult> { return this.request({ cmd: "editDuration", den }); }
+    /** A note on the selected rest: letter 0 C, 1 D ... 6 B, in the key and the octave nearest the note before. */
+    editAddBars(n: number): Promise<EditResult> { return this.request({ cmd: "editAddBars", n }); }
+    editSetKey(key: number): Promise<EditResult> { return this.request({ cmd: "editSetKey", key }); }
+    editSetTime(num: number, den: number): Promise<EditResult> { return this.request({ cmd: "editSetTime", num, den }); }
+    editTie(): Promise<EditResult> { return this.request({ cmd: "editTie" }); }
+    editTriplet(): Promise<EditResult> { return this.request({ cmd: "editTriplet" }); }
+    editAccidental(kind: number): Promise<EditResult> { return this.request({ cmd: "editAccidental", kind }); }
+    editAddToChord(letter: number): Promise<EditResult> { return this.request({ cmd: "editAddToChord", letter }); }
+    editDynamic(which: number): Promise<EditResult> { return this.request({ cmd: "editDynamic", which }); }
+    editStaffText(text: string): Promise<EditResult> { return this.request({ cmd: "editStaffText", text }); }
+    editLyric(text: string): Promise<EditResult> { return this.request({ cmd: "editLyric", text }); }
+    editRenameLine(text: string): Promise<EditResult> { return this.request({ cmd: "editRenameLine", text }); }
+    editAddLine(name: string, clef: number): Promise<EditResult> { return this.request({ cmd: "editAddLine", name, clef }); }
+    editEnterNote(letter: number): Promise<EditResult> { return this.request({ cmd: "editEnterNote", letter }); }
+    /** A tune from the selection on: [midi, sixteenths] pairs, midi -1 for a rest. One undo step. */
+    editInsertNotes(events: [number, number][]): Promise<EditResult & { done?: number; total?: number }> {
+        return this.request({ cmd: "editInsertNotes", spec: events.map(([m, u]) => `${m}:${u}`).join(",") });
+    }
     editDot(): Promise<EditResult> { return this.request({ cmd: "editDot" }); }
     editDelete(): Promise<EditResult> { return this.request({ cmd: "editDelete" }); }
     editUndo(): Promise<EditResult> { return this.request({ cmd: "editUndo" }); }

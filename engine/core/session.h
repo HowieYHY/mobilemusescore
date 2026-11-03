@@ -58,6 +58,21 @@ public:
     std::string editDuration(int denominator);
     std::string editDot();
     std::string editDelete();
+    std::string editEnterNote(int letter);
+    std::string editSelectStart();
+    std::string editAddBars(int count);
+    std::string editSetKey(int key);
+    std::string editSetTime(int num, int den);
+    std::string editTie();
+    std::string editAccidental(int kind);
+    std::string editTriplet();
+    std::string editAddToChord(int letter);
+    std::string editStaffText(const std::string& text);
+    std::string editDynamic(int which);
+    std::string editLyric(const std::string& text);
+    std::string editAddLine(const std::string& name, int clef);
+    std::string editRenameLine(const std::string& name);
+    std::string editInsertNotes(const std::string& spec);
     std::string editClearSelection();
     std::string saveTo(const std::string& path);
 
@@ -165,6 +180,10 @@ private:
     void onAudioReady();
     void setupPlayback();
     void addTrack(Track& t);
+    bool nameTrack(mu::engraving::MasterScore* ms, Track& t);
+    void buildTracks();
+    void rebuildPlayback();
+    void syncTracks();
     void addAuxTrack(muse::audio::aux_channel_idx_t index);
     void updateSoloMuteStates();
     void sendControl(const Track& t);
@@ -189,6 +208,7 @@ private:
     bool m_hasAudioSettings = false;
 
     std::vector<Track> m_tracks;
+    size_t m_partCount = 0; // the parts the tracks were made for
     std::map<muse::audio::aux_channel_idx_t, AudioBackend::TrackId> m_auxTracks;
     std::map<muse::audio::aux_channel_idx_t, OutputParams> m_auxOut;
     OutputParams m_master;

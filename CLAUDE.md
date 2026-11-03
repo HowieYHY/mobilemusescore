@@ -82,7 +82,16 @@ build, tests, status) before working here.
 - Publish with `npm run build` in `app/` then `bash scripts/deploy-pages.sh`; bump `app/package.json`'s
   version for each release (shown on the start screen and in the mixer's playback check).
 
+- **Demos are filmed as MP4**, not GIF (the user, 3 Nov 2026): record a Playwright run with `recordVideo`
+  (a ring where each tap lands) and convert with ffmpeg; `scripts/voice-edit-test.mjs` with `VIDEO=dir` does it.
+  The Claude-in-Chrome tool can only make GIFs.
+
 ## Lessons learnt
+
+- **A test that waits for "done" doesn't prove the control did anything.** Previous/Next in Edit mode never
+  moved the selection (the engine wanted `select-next-chord`, the app sent `next-chord`), and `edit-test`
+  passed for two phases because it only waited for the busy flag. Rule: every control gets a check of its
+  effect (the selection moved, the pitch changed), and a new test is shown to fail on the broken behaviour.
 
 - **Touch is not mouse.** A double-tap text box worked with the mouse but vanished on a phone: after a
   finger lifts, the browser sends emulated mouse events that move focus away, and the empty box removed

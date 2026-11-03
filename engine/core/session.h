@@ -47,6 +47,11 @@ public:
     // Page drawing commands as JSON (see painter.cpp).
     std::string renderPage(int pageIndex);
 
+    // Editing (composer spike): each change is one undo step, then layout and the playback model are redone
+    std::string editAddNote(int measureIndex, int offsetNum, int offsetDen, int staffIdx, int midiPitch, int durNum, int durDen);
+    std::string editUndoRedo(bool undo);
+    std::string saveTo(const std::string& path);
+
     // Transport
     void play();
     void pause();

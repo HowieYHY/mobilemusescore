@@ -60,6 +60,15 @@ EMSCRIPTEN_KEEPALIVE const char* mss_load(const char* path)
     return ret(Session::instance()->load(path));
 }
 
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_add_note(int measure, int offNum, int offDen, int staff, int midi, int durNum, int durDen)
+{
+    return ret(Session::instance()->editAddNote(measure, offNum, offDen, staff, midi, durNum, durDen));
+}
+
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_undo() { return ret(Session::instance()->editUndoRedo(true)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_redo() { return ret(Session::instance()->editUndoRedo(false)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_save(const char* path) { return ret(Session::instance()->saveTo(path)); }
+
 EMSCRIPTEN_KEEPALIVE const char* mss_score_info()
 {
     return ret(Session::instance()->scoreInfoJson());

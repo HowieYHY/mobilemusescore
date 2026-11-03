@@ -18,6 +18,7 @@
 #include "global/modularity/ioc.h"
 #include "global/async/processevents.h"
 #include "global/io/ifilesystem.h"
+#include "global/iapplication.h"
 #include "global/defer.h"
 
 #include "draw/painter.h"
@@ -35,6 +36,11 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/mscore.h"
 #include "engraving/dom/note.h"
+#include "engraving/dom/noteval.h"
+#include "global/io/buffer.h"
+#include "engraving/editing/undo.h"
+#include "engraving/dom/pitchspelling.h"
+#include "engraving/infrastructure/mscwriter.h"
 #include "playback/qml/MuseScore/Playback/msbasicpresetscategories.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/part.h"
@@ -300,6 +306,33 @@ void Session::emit(const std::string& type, const std::string& json) const
     mss_js_emit(type.c_str(), json.c_str());
 }
 
+// The score writer stamps the file with the application's version (Writer::writeScore), so something
+// has to answer for IApplication. Only the version is real: the rest is never called here.
+namespace {
+class AppInfo : public muse::IApplication
+{
+public:
+    String name() const override { return u"PocketScore"; }
+    String title() const override { return u"PocketScore"; }
+    bool unstable() const override { return false; }
+    Version version() const override { return Version(4, 7, 5); }
+    Version fullVersion() const override { return Version(4, 7, 5); }
+    String build() const override { return String(); }
+    String revision() const override { return u"0"; }
+    RunMode runMode() const override { return RunMode::GuiApp; }
+    bool noGui() const override { return true; }
+    void setup() override {}
+    void finish() override {}
+    void restart() override {}
+    muse::modularity::ContextPtr setupNewContext() override { return nullptr; }
+    int contextCount() const override { return 1; }
+    std::vector<muse::modularity::ContextPtr> contexts() const override { return {}; }
+    const muse::modularity::ContextPtr iocContext() const override { return nullptr; }
+    muse::modularity::ModulesIoC* ioc() const override { return nullptr; }
+    void processEvents() override {}
+};
+}
+
 void Session::init()
 {
     using namespace muse::modularity;
@@ -309,6 +342,7 @@ void Session::init()
     auto ioc = globalIoc();
     ioc->registerExport<io::IFileSystem>(MODULE, std::make_shared<PosixFileSystem>());
     ioc->registerExport<ICryptographicHash>(MODULE, std::make_shared<Md4Hash>());
+    ioc->registerExport<muse::IApplication>(MODULE, std::make_shared<AppInfo>());
     ioc->registerExport<IImageProvider>(MODULE, std::make_shared<ImageProvider>());
 
     // MuseScore 5.0's FreeType font engine in every build (see fonts.h)
@@ -1057,6 +1091,117 @@ std::string Session::seekAt(int pageIndex, double x, double y, double radius, bo
         json += ",\"note\":true}";
     }
     return json;
+}
+
+// ---------------------------------------------------------------------------
+// Editing: one undo step per call; then the playback model and play time follow the score
+
+static std::string editResult(bool ok, const std::string& error = "")
+{
+    return ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":" + jsonStr(error) + "}";
+}
+
+// Called after an edit: the score was laid out by endCmd; the sound follows
+static void afterEdit(MasterScore* ms, PlaybackModel* model, std::function<void()> updatePlayTime)
+{
+    ms->setPlaylistDirty();
+    if (model) {
+        model->reload();
+    }
+    updatePlayTime();
+}
+
+std::string Session::editAddNote(int measureIndex, int offsetNum, int offsetDen, int staffIdx, int midiPitch, int durNum, int durDen)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms) {
+        return editResult(false, "No score is open.");
+    }
+    Measure* m = ms->crMeasure(measureIndex);
+    if (!m || staffIdx < 0 || staffIdx >= static_cast<int>(ms->nstaves())) {
+        return editResult(false, "No such bar or staff.");
+    }
+    Segment* seg = m->tick2segment(m->tick() + Fraction(offsetNum, offsetDen), SegmentType::ChordRest);
+    if (!seg) {
+        return editResult(false, "No place for a note there.");
+    }
+    InputState& is = ms->inputState();
+    is.setTrack(static_cast<track_idx_t>(staffIdx) * VOICES);
+    is.setSegment(seg);
+    is.setDuration(TDuration(Fraction(durNum, durDen)));
+    is.setRest(false);
+    is.setNoteEntryMode(true);
+
+    NoteVal nv(midiPitch);
+    nv.tpc1 = nv.tpc2 = pitch2tpc(midiPitch, ms->staff(staffIdx)->key(seg->tick()), Prefer::NEAREST);
+
+    ms->startCmd(TranslatableString::untranslatable("Enter note"));
+    Note* note = ms->addPitch(nv, false);
+    ms->endCmd();
+    is.setNoteEntryMode(false);
+    if (!note) {
+        return editResult(false, "The note could not be added.");
+    }
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+std::string Session::editUndoRedo(bool undo)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms) {
+        return editResult(false, "No score is open.");
+    }
+    if (undo ? !ms->undoStack()->canUndo() : !ms->undoStack()->canRedo()) {
+        return editResult(false, "Nothing to " + std::string(undo ? "undo." : "redo."));
+    }
+    ms->undoRedo(undo, nullptr);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+    });
+    return editResult(true);
+}
+
+// As NotationProject::writeProject, into a file of the engine's own file system
+std::string Session::saveTo(const std::string& path)
+{
+    if (!m_project) {
+        return editResult(false, "No score is open.");
+    }
+    // into memory first (the engine's file classes need a real file system), then to the file
+    io::Buffer buf;
+    buf.open(io::IODevice::WriteOnly);
+    MscWriter::Params params;
+    params.device = &buf;
+    params.filePath = io::path_t(path);
+    params.mainFileName = String::fromStdString(io::filename(io::path_t(path), false).toStdString()) + u".mscx";
+    params.mode = MscIoMode::Zip;
+    bool ok = false;
+    {
+        MscWriter writer(params);
+        Ret ret = writer.open();
+        if (!ret) {
+            return editResult(false, "Could not write the file: " + ret.toString());
+        }
+        ok = m_project->writeMscz(writer, /*createThumbnail*/ false) && !writer.hasError();
+        writer.close();
+    }
+    if (!ok) {
+        return editResult(false, "MuseScore could not write the score.");
+    }
+    const ByteArray data = buf.data();
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) {
+        return editResult(false, "Could not create " + path);
+    }
+    const bool wrote = fwrite(data.constData(), 1, data.size(), f) == data.size();
+    fclose(f);
+    return editResult(wrote, "Could not write " + path);
 }
 
 // ---------------------------------------------------------------------------

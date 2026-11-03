@@ -1,5 +1,5 @@
 diff --git a/src/engraving/internal/engravingfontsprovider.cpp b/src/engraving/internal/engravingfontsprovider.cpp
-index 90a9561e..c8384258 100644
+index 90a9561efe..c8384258b1 100644
 --- a/src/engraving/internal/engravingfontsprovider.cpp
 +++ b/src/engraving/internal/engravingfontsprovider.cpp
 @@ -36,7 +36,7 @@ EngravingFontsProvider::EngravingFontsProvider(const muse::modularity::ContextPt
@@ -11,8 +11,26 @@ index 90a9561e..c8384258 100644
      muse::io::path_t metadataPath = basePath + "/metadata.json";
      std::shared_ptr<EngravingFont> f = std::make_shared<EngravingFont>(name, family, filePath, metadataPath, iocContext());
      m_symbolFonts.push_back(f);
+diff --git a/src/engraving/rendering/score/lyricslayout.cpp b/src/engraving/rendering/score/lyricslayout.cpp
+index 31d0f5ec10..7fbf18832c 100644
+--- a/src/engraving/rendering/score/lyricslayout.cpp
++++ b/src/engraving/rendering/score/lyricslayout.cpp
+@@ -298,6 +298,13 @@ void LyricsLayout::layoutDashes(LyricsLineSegment* item)
+         endX = startCR ? startCR->measure()->endingXForOpenEndedLines() : endX;
+     }
+ 
++    //! NOTE PocketScore: after an edit a line can be left without a laid-out start or end (here -DBL_MAX).
++    //! The length then converts to int as INT_MIN on x86 and harmlessly gives one dash, but as INT_MAX in
++    //! WebAssembly, whose conversions saturate, and the dash list runs out of memory. Draw nothing instead.
++    if (std::abs(startX) > 1.0e9 || std::abs(endX) > 1.0e9) {
++        return;
++    }
++
+     adjustLyricsLineYOffset(item, endLyrics);
+ 
+     item->mutldata()->setPosX(startX);
 diff --git a/src/framework/audio/common/audiotypes.h b/src/framework/audio/common/audiotypes.h
-index 1ba7d772..d286a27a 100644
+index 1ba7d7724b..d286a27a0c 100644
 --- a/src/framework/audio/common/audiotypes.h
 +++ b/src/framework/audio/common/audiotypes.h
 @@ -182,12 +182,12 @@ enum class AudioResourceType {
@@ -35,7 +53,7 @@ index 1ba7d772..d286a27a 100644
  
  struct AudioResourceMeta {
 diff --git a/src/framework/audio/common/workmode.cpp b/src/framework/audio/common/workmode.cpp
-index 12af9a80..1e069b77 100644
+index 12af9a8030..1e069b7703 100644
 --- a/src/framework/audio/common/workmode.cpp
 +++ b/src/framework/audio/common/workmode.cpp
 @@ -22,7 +22,10 @@
@@ -78,7 +96,7 @@ index 12af9a80..1e069b77 100644
  }
  
 diff --git a/src/framework/audio/engine/internal/audioengineconfiguration.cpp b/src/framework/audio/engine/internal/audioengineconfiguration.cpp
-index feecc321..540c3a4d 100644
+index feecc32135..540c3a4d47 100644
 --- a/src/framework/audio/engine/internal/audioengineconfiguration.cpp
 +++ b/src/framework/audio/engine/internal/audioengineconfiguration.cpp
 @@ -33,16 +33,20 @@ using namespace muse::audio::engine;
@@ -122,7 +140,7 @@ index feecc321..540c3a4d 100644
      return result;
  }
 diff --git a/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp b/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
-index 6a27131c..84ed5327 100644
+index 6a27131c40..84ed5327e7 100644
 --- a/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
 +++ b/src/framework/audio/engine/internal/synthesizers/soundfontrepository.cpp
 @@ -148,7 +148,7 @@ void SoundFontRepository::doAddSoundFont(const SoundFontUri& uri, const SoundFon
@@ -135,7 +153,7 @@ index 6a27131c..84ed5327 100644
                  const io::path_t fileName = fileNameFromUri(uri);
  
 diff --git a/src/framework/global/settings.h b/src/framework/global/settings.h
-index cee128fc..6b5ce848 100644
+index cee128fc49..6b5ce848a8 100644
 --- a/src/framework/global/settings.h
 +++ b/src/framework/global/settings.h
 @@ -122,7 +122,9 @@ private:
@@ -149,7 +167,7 @@ index cee128fc..6b5ce848 100644
      QSettings* m_settings = nullptr;
      mutable Items m_items;
 diff --git a/src/framework/mpe/internal/articulationstringutils.h b/src/framework/mpe/internal/articulationstringutils.h
-index 5be49f5e..e0838740 100644
+index 5be49f5ea4..e08387402a 100644
 --- a/src/framework/mpe/internal/articulationstringutils.h
 +++ b/src/framework/mpe/internal/articulationstringutils.h
 @@ -22,13 +22,23 @@

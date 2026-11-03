@@ -156,11 +156,11 @@
     "note": "1.0.25, #29 fade"
   },
   "selfcheck-test": {
-    "streak": 10,
+    "streak": 11,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "a50b74a+changes",
+    "passCommit": "a50b74a",
+    "date": "2026-11-03",
     "note": "1.0.25, #29 fade"
   },
   "install-hint-test": {
@@ -193,10 +193,10 @@
     "date": "2026-10-19"
   },
   "playlog-test": {
-    "streak": 3,
+    "streak": 5,
     "last": "pass",
-    "commit": "2221f21+changes",
-    "passCommit": "2221f21",
-    "date": "2026-10-19"
+    "commit": "a50b74a+changes",
+    "passCommit": "a50b74a",
+    "date": "2026-11-03"
   }
 }

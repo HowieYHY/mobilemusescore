@@ -229,7 +229,7 @@ every score. Until you change them, PocketScore works as described above.
 | **Open scores in** | The view every score opens in: *Page view*, *Page by page* or *Continuous* |
 | **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
 | **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
-| **Playback report**, *Send* | If the music stutters or lags, tap **Send** soon after (or tap the "sound stuttered" message when it shows). Your phone's share menu opens, and the report is also copied, so you can paste it into a [GitHub issue](https://github.com/HowieYHY/mobilemusescore/issues) or a message. It tells how the device kept up during your recent plays: times, score names and the device's own figures, never your notes or files. It works offline and later too: the log stays on the device after the app is closed. Please add what you were doing and whether battery saver was on or the phone was warm, which apps can't see |
+| **Playback report**, *Send* | If the music stutters or lags, tap **Send** soon after. Your phone's share menu opens, and the report is also copied, so you can paste it into a [GitHub issue](https://github.com/HowieYHY/mobilemusescore/issues) or a message. It tells how the device kept up during your recent plays: times, score names and the device's own figures, never your notes or files. It works offline and later too: the log stays on the device after the app is closed. Please add what you were doing and whether battery saver was on or the phone was warm, which apps can't see |
 
 ---
 

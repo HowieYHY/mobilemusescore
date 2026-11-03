@@ -1272,11 +1272,7 @@ let stutterTold = false;
 engine.on("stutter", () => {
     if (!stutterTold && state.playing) {
         stutterTold = true;
-        setStatus("The sound stuttered, so PocketScore now prepares more of it ahead to keep it smooth." + (embedded ? "" : " Tap here to send a playback report."), "info", 10000);
-        if (!embedded) {
-            ui.status.classList.add("action");
-            ui.status.onclick = () => void sendReport("the stutter notice");
-        }
+        setStatus("The sound stuttered, so PocketScore now prepares more of it ahead to keep it smooth.", "info", 10000);
     }
 });
 
@@ -1285,7 +1281,7 @@ engine.on("stutter", () => {
 // What happened while music played, kept on this device (issue #31: stutters seen while travelling,
 // away from USB): the self-check's notes, what went on around them (jumps, focus, page drawing,
 // updates, leaving the app) and every 10 s how the device kept up. The reader sends it from Settings
-// or the stutter notice. See playlog.ts.
+// See playlog.ts.
 const playLog = new PlayLog(!embedded);
 engine.on("health", (h) => playLog.add(h.kind, h.detail));
 const logWatch = {

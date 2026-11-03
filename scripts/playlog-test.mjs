@@ -2,7 +2,7 @@
 // later, away from USB. Plays a score, causes a sound gap (the engine frozen on purpose) and an
 // audio clock slip (the clock held back by a test hook), then checks the log has the play, the
 // samples, the gap, the slip and the stop; that it survives a reload (the app closed); that the
-// stutter notice and Settings' Send both produce the report (copied to the clipboard); and that the
+// Settings' Send produces the report (copied to the clipboard); and that the
 // report stays under 15 000 characters (a paste was cut at 20 000) with a full log.
 //
 // Needs the dev server: (cd app && npx vite --port 5180)
@@ -57,13 +57,13 @@ const sample = await page.evaluate(() => app.playLog.entries.find((e) => e.kind 
 check(/engine load .*queued .*frames \d+/.test(sample || ""), `the sample has the load, queue and frames: ${sample}`);
 check(!kinds.includes("audio clock slipped"), "steady playback: no clock slip");
 
-// a gap: logged, and the notice offers the report
+// a gap: logged, and the notice no longer offers the report
 const t0 = await page.evaluate(() => app.engine.stats.targetSecs);
 await page.evaluate((ms) => app.engine.testStall(ms), Math.round(t0 * 1000) + 400);
 await page.waitForFunction(() => app.playLog.entries.some((e) => e.kind === "gap"), null, { timeout: 8000 }).catch(() => {});
 check(await page.evaluate(() => app.playLog.entries.some((e) => e.kind === "gap")), "the gap is in the log");
 const notice = await page.evaluate(() => ({ text: document.getElementById("status").textContent, action: document.getElementById("status").classList.contains("action") }));
-check(notice.action && /send a playback report/.test(notice.text), `the stutter notice offers the report: "${notice.text}"`);
+check(!notice.action && !/playback report/.test(notice.text), `the stutter notice offers no report: "${notice.text}"`);
 
 // the device's output falls behind: the audio clock is held back 600 ms
 await page.evaluate(() => {
@@ -80,11 +80,11 @@ const slip = await page.evaluate(() => app.playLog.entries.find((e) => e.kind ==
 check(!!slip, `a slip of the audio clock is logged: ${slip}`);
 await page.evaluate(() => delete app.engine.audioInfo);
 
-// the notice, tapped: the report is copied
-await page.evaluate(() => { const s = document.getElementById("status"); s.hidden = false; s.click(); });
+// the report is copied (Settings' Send runs the same function)
+await page.evaluate(() => app.sendReport("test"));
 await page.waitForTimeout(500);
 let clip = await page.evaluate(() => navigator.clipboard.readText());
-check(clip.startsWith("PocketScore playback report") && /sound gap/.test(clip), `tapping the notice copies the report (${clip.length} characters)`);
+check(clip.startsWith("PocketScore playback report") && /sound gap/.test(clip), `the report is copied (${clip.length} characters)`);
 
 await page.tap("#play"); // pause
 await page.waitForFunction(() => !app.state.playing, null, { timeout: 10000 });

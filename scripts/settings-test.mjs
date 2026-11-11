@@ -134,7 +134,7 @@ for (const [name, width, height, touch] of sizes) {
     check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
     const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
         `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
-    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true keepAwake=false pairSwipeTwo=false",
+    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page pairSwipeTwo=false follow=true keepAwake=false",
         `${name}: defaults are today's behaviour (${defaults})`);
     // every control is reachable: scroll to the last one and check it's on screen
     const last = page.locator('[data-set="keepAwake"]');
@@ -366,7 +366,7 @@ for (const [name, width, height, touch] of sizes) {
     await setSetting(page, "metronomeOn", true);
     for (const file of scores) {
         const short = path.basename(file).slice(0, 24);
-        for (const view of ["page", "page_turn", "continuous_h", "continuous_v"]) {
+        for (const view of ["page", "page_turn", "page_pair", "continuous_h", "continuous_v"]) {
             await setSetting(page, "startView", view);
             await openScore(page, file);
             await page.waitForTimeout(300);
@@ -380,7 +380,7 @@ for (const [name, width, height, touch] of sizes) {
                 position: app.state.position,
             }));
             const engineOk = view.startsWith("continuous") ? got.pages === 1 : got.pages >= 1;
-            check(got.view === view && got.turn === (view === "page_turn") && engineOk && got.drawn > 0,
+            check(got.view === view && got.turn === (view === "page_turn" || view === "page_pair") && engineOk && got.drawn > 0,
                 `${short}: opens in ${view} (${got.pages} page(s), ${got.drawn} drawn)`);
             if (view === "page") {
                 check(got.metronome === false && got.save, `${short}: metronome on when it opens, Save stays dark`);

@@ -8,9 +8,16 @@ build, tests, status) before working here.
 - The user works from several machines. Commit and push when they say the session is ending, after
   updating the README and DEVELOPMENT.md so each is one current picture, not a log.
 - Their test scores are in `real test musescores/` (gitignored, copied by hand between machines),
-  with desktop MP3 exports in `real test musescores/audio equivalents/`. Run the tests on every score,
-  but only through the parts of each score the change touches, not each score from start to end
-  (e.g. a volume change: only the passages with distinct dynamics). The user's rule, 17 Oct 2026.
+  with desktop MP3 exports in `real test musescores/audio equivalents/`.
+- **Bare minimum testing, especially for small changes** (the user's rule, 11 Nov 2026; it replaces
+  "run the tests on every score" of 17 Oct). The user checks the result themselves. For a change:
+  typecheck, then the one test that covers it, on one score, at one screen size. Add a second
+  score or size only where the change's own logic differs there (e.g. a short score, landscape
+  pages, a screen where the width and not the height sets the size), and say which and why. No
+  rounds over every score or every size, and no reruns of neighbouring tests "to be safe". A wider
+  run only for a foundational change (engine, file format, storage, shared layout code many views
+  use), or when the user asks. Within a score, only the passages the change touches. Say in one
+  line what was run, and what was left for the user to check.
 - Android gets the **installable web app from Chrome** (the Capacitor project was removed in 0.2.0).
   iPad/iPhone use Safari's Add to Home Screen. One web app, one update path. Don't mention APKs in the
   README: the user was the only one who used one.
@@ -74,7 +81,7 @@ build, tests, status) before working here.
   problem there. `node scripts/tests.mjs which` lists what to run and why (areas in
   `scripts/tests.json`: files, and words matched against the changed lines); after each run,
   `node scripts/tests.mjs record <test> pass|fail` (pass = only its known failures, kept in the
-  ledger's note). Unsettled tests run every round. Keep `tests.json` up to date when a test or the
+  ledger's note). Unsettled tests run only when the change touches their area too (the bare-minimum rule above comes first). Keep `tests.json` up to date when a test or the
   code it covers moves.
 - **Never run a screen-off test myself; the user does those** (the user, 19 Oct 2026). Run phone tests
   with `SCREEN_OFF=0`. After a test round, say plainly what couldn't be tested for certain (screen off,

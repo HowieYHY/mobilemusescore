@@ -84,7 +84,7 @@ No app store needed.
 | Move quickly through a long score | Start scrolling, then drag the handle that appears at the right edge (along the bottom in *Continuous (horizontal)*). It shows the page, or in the continuous views the time in the music, and fades away when you stop |
 | Change the layout | Menu at the top right: *Page view*, *Page by page*, *Two pages* or *Continuous* |
 | Read one page at a time | Choose *Page by page*: each page fills the screen whole; swipe left or right (or use the arrow keys) to turn one page. The page turns by itself as the music reaches the next one. You can zoom in (pinch, or **+**), but never out past the whole page; zoomed in, drag to move around the page, and keep swiping past its edge to turn. In notes mode, use two fingers |
-| Read two pages side by side | Choose *Two pages*, with the phone or tablet on its side: pages 1 and 2 fill the screen. Swipe left and the right page moves to the left, with the next page beside it (2 and 3, then 3 and 4); swipe right to go back. The arrow keys do the same, and the pages move on by themselves as the music plays. To turn both pages at once instead (1-2, then 3-4), switch on **Two pages: a swipe turns both** in Settings. On Android the installed app turns the screen on its side for you, and so does **⛶** (Focus) in Chrome; on an iPhone or iPad, turn it yourself |
+| Read two pages side by side | Choose *Two pages*, with the phone or tablet on its side. The bars go away (Focus starts with this view; tap off the music to bring the controls back) and pages 1 and 2 sit together in the middle of the screen. It works like a camera over the pages laid in a row: swipe left and the view slides along one page, so the right page moves to the left with the next page beside it (2 and 3, then 3 and 4); swipe right to go back; pinch or use + and − to move the camera closer. On a wide screen, such as a phone on its side, part of the page before and the page after shows at the edges. The arrow keys turn too, and the pages move on by themselves as the music plays. To turn both pages at once instead (1-2, then 3-4), switch on **Two pages: a swipe turns both** in Settings. On Android the screen turns on its side for you where the phone allows it (the installed app, and Chrome once the view has gone full screen); on an iPhone or iPad, turn it yourself |
 | Read with nothing in the way | Tap **⛶** (Focus) at the top |
 | Change how PocketScore works | Tap the **gear** (Settings) at the top. See [Settings](#settings) |
 | Close a panel | Tap **Done**, or your phone's **Back** |
@@ -198,9 +198,14 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 
 ### Start a new score
 
+> **Not in the published app yet.** New score and Edit are still being tried out and are hidden at
+> pocketscore's public address for now; adding `?composer` to the address shows them.
+
 On the start screen, **New score** makes a blank score to build up part by part (with a score already open: **Edit → More → New score**). Choose a title, then add the lines you want with **Add a line**: give each line a name (rename it as you like) and a clef (treble, an octave lower, or bass). Then the key, the time signature, the speed and the number of bars, and **Create**. It opens straight in **Edit** with the first rest picked. Build it layer by layer: pick a rest in one line, put notes in with the letters or **Sing it in**, then pick the next line's rest and do the same. Everything is kept quietly on this device as you go: if you close the app, the start screen offers **Continue “Your title”** next time. Several unsaved new scores are all kept: the newest is offered first, and the others are under **N more** below it. **Save a copy** makes `Your title.mscz`, which opens in MuseScore. The key, time signature, bars and lines can all be changed later with **More** in the Edit bar (below).
 
 ### Change the notes (Edit)
+
+> **Not in the published app yet** (see the note under *Start a new score*).
 
 **Edit** (the music-note button at the top) lets you change the music itself. This is new and still being tried out.
 

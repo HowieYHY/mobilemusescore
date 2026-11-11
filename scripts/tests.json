@@ -213,10 +213,23 @@
       "settleTurn",
       "keepSideways",
       "followCursor",
-      "fitPageZoom"
+      "fitPageZoom",
+      "PAIR_GAP",
+      "pageShare",
+      "lastTurned",
+      "showFocusHint"
     ],
     "args": [
       "real test musescores/I am move it edited.mscz"
+    ]
+  },
+  "android-pagepair-test": {
+    "phone": true,
+    "files": [],
+    "words": [
+      "keepSideways",
+      "page_pair",
+      "PAIR_GAP"
     ]
   },
   "scroller-test": {

@@ -1,18 +1,18 @@
 {
   "settings-test": {
-    "streak": 16,
+    "streak": 17,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04",
+    "commit": "cfd870c+changes",
+    "passCommit": "cfd870c",
+    "date": "2026-11-11",
     "note": "1.0.25, #29 fade"
   },
   "tour-test": {
-    "streak": 9,
+    "streak": 10,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "cfd870c+changes",
+    "passCommit": "cfd870c",
+    "date": "2026-11-11"
   },
   "layout-shots": {
     "streak": 5,
@@ -54,11 +54,11 @@
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
   },
   "goto-test": {
-    "streak": 7,
+    "streak": 8,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
-    "date": "2026-11-03"
+    "commit": "cfd870c+changes",
+    "passCommit": "cfd870c",
+    "date": "2026-11-11"
   },
   "csp-test": {
     "streak": 6,
@@ -69,19 +69,19 @@
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
   "pageturn-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04",
+    "commit": "cfd870c+changes",
+    "passCommit": "cfd870c",
+    "date": "2026-11-11",
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "scroller-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15",
+    "commit": "cfd870c+changes",
+    "passCommit": "cfd870c",
+    "date": "2026-11-11",
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "update-restart-test": {
@@ -310,5 +310,12 @@
     "commit": "d3f41aa+changes",
     "passCommit": "d3f41aa",
     "date": "2026-11-04"
+  },
+  "pagepair-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "cfd870c+changes",
+    "passCommit": "cfd870c",
+    "date": "2026-11-11"
   }
 }

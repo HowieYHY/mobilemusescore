@@ -1051,6 +1051,8 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 
 /* The website's own bar names the score and closes the preview, so PocketScore shows no title, and
    nothing for opening files, notes, saving or tips: only playing, views, speed, loop and mixer. */
+/* The Composer's ways in, while it is not published (see `composer` in main.ts) */
+.no-composer #edit-toggle, .no-composer .new-row { display: none !important; }
 .embedded #open-label, .embedded #save, .embedded #notes-toggle, .embedded #edit-toggle, .embedded .tip-icon,
 .embedded #score-title, .embedded #empty { display: none; }
 .embedded .topbar { display: flex; justify-content: flex-end; padding: 6px 10px; }

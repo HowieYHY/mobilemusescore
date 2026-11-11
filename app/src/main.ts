@@ -113,6 +113,14 @@ const EMBED_ORIGINS = ((import.meta.env.VITE_EMBED_ORIGINS as string | undefined
 if (embedded) {
     document.documentElement.classList.add("embedded");
 }
+// The Composer (Edit, New score, Continue) is not published yet: the user chose to put Two pages
+// live without it (11 Nov 2026), as it had not been tried on devices. Its ways in are hidden in the
+// published app unless the address has ?composer; the dev server (and so the tests) shows them.
+// To publish it, make this `true` and take the "Not in the published app yet" notes out of the README.
+const composer = import.meta.env.DEV || new URLSearchParams(location.search).has("composer");
+if (!composer) {
+    document.documentElement.classList.add("no-composer");
+}
 // The reader's settings (the gear); a preview keeps nothing, so it plays with the defaults
 const settings: Settings = loadSettings(!embedded);
 $("version").textContent = "PocketScore " + __APP_VERSION__;
@@ -238,7 +246,13 @@ function tileRects(w: number, h: number, scale: number): Rect[] {
 //
 // "Two pages" (issue #34) is the same view with two slots per screen: pages 1 and 2, and a swipe
 // moves on by one page (2 and 3, then 3 and 4), the right page going to the left. It asks the
-// device to stay on its side while it shows (where the device allows that).
+// device to stay on its side while it shows (where the device allows that), and starts Focus.
+// It is a camera over the pages laid in one row: the pages touch but for PAIR_GAP at every zoom
+// (a slot is a page's width plus that), the row's ends are padded so the first and last two can
+// sit in the middle, a swipe slides the camera along and it settles on two pages, and zooming
+// zooms the camera. Where the screen is wider than two pages (a phone on its side, where the
+// height sets the size) the pages before and after show at the sides, cut by the screen's edge.
+const PAIR_GAP = 4; // css px between the two pages
 const turnView = (v: string) => v === "page_turn" || v === "page_pair";
 const pageTurn = () => turnView(ui.viewMode.value);
 const engineMode = (v: string): ViewMode => (turnView(v) ? "page" : v as ViewMode);
@@ -254,24 +268,42 @@ function fitPageZoom() {
     }
     const css = (u: number) => u / UNITS_PER_INCH * CSS_PX_PER_INCH;
     // below the usual zoom limit if need be: a phone on its side leaves little height
-    return Math.min(MAX_ZOOM, Math.max(0.05, Math.min((ui.viewer.clientWidth / perScreen() - 16) / css(p.w), (ui.viewer.clientHeight - 16) / css(p.h))));
+    const n = perScreen();
+    return Math.min(MAX_ZOOM, Math.max(0.05, Math.min(((ui.viewer.clientWidth - 16 - (n - 1) * PAIR_GAP) / n) / css(p.w), (ui.viewer.clientHeight - 16) / css(p.h))));
 }
 
 // measured on the slots, which keep their width until rebuilt (the viewer may have changed size)
 const slotWidth = () => (state.pageEls[0]?.parentElement as HTMLElement | null)?.offsetWidth || ui.viewer.clientWidth / span;
 // the last page a screen can start on (two pages: the last but one, so the screen stays full)
 const lastTurn = () => Math.max(0, state.pageEls.length - span);
-// the page the screen starts on: the one whose slot holds the middle of the screen's first page
-// width (a screen is never wider than its slots, except just after it widened, before the slots
-// are rebuilt: then the slot's middle)
+// a page's share of the screen's width: the screen split between its pages, or the slot where
+// that is narrower (two pages on a wide screen; any view just after the screen widened, before
+// the slots are rebuilt)
+const pageShare = () => Math.min(ui.viewer.clientWidth / span, slotWidth());
+// the page the screen starts on: the one whose slot holds the middle of the screen's first share
 const turnedTo = () => Math.max(0, Math.min(lastTurn(),
-    Math.floor((ui.viewer.scrollLeft + Math.min(ui.viewer.clientWidth / span, slotWidth()) / 2) / Math.max(1, slotWidth()))));
+    Math.floor((ui.viewer.scrollLeft + pageShare() / 2) / Math.max(1, slotWidth()))));
 // the scroll positions that show only the screen starting on page i (one, unless zoomed in)
 const slotRange = (i: number) => [i * slotWidth(), i * slotWidth() + Math.max(0, span * slotWidth() - ui.viewer.clientWidth)];
 let turning = { to: 0, at: -Infinity }; // the last turn asked for (it glides for a moment)
+// The page the screen started on while the pages still fitted the screen they were built for.
+// When the screen changes size the browser may move the view at once, before the pages are built
+// again (a short score's row is hardly wider than a screen turned on its side: the view was pushed
+// back to the start), so where it "is" then says nothing, and the page to keep is this one.
+let builtFor = "";
+let lastTurned = 0;
+const viewerSize = () => `${ui.viewer.clientWidth}x${ui.viewer.clientHeight}`;
+ui.viewer.addEventListener("scroll", () => {
+    if (pageTurn() && viewerSize() === builtFor) {
+        lastTurned = turnedTo();
+    }
+}, { passive: true });
 function turnTo(i: number, smooth = true) {
     i = Math.max(0, Math.min(lastTurn(), i));
     turning = { to: i, at: performance.now() };
+    if (!smooth) {
+        lastTurned = i; // (no scroll is reported when the view is already there)
+    }
     ui.viewer.scrollTo({ left: i * slotWidth(), top: 0, behavior: smooth ? "smooth" : "instant" });
 }
 // How far one swipe or key goes: a page; in Two pages with Settings' "a swipe turns both", two
@@ -293,7 +325,7 @@ const turnLabel = () => {
 function settleTurn(from: number, quick: boolean) {
     const [lo, hi] = slotRange(from);
     const sl = ui.viewer.scrollLeft;
-    const over = (sl < lo ? sl - lo : sl > hi ? sl - hi : 0) / (ui.viewer.clientWidth / span);
+    const over = (sl < lo ? sl - lo : sl > hi ? sl - hi : 0) / pageShare();
     const step = Math.abs(over) > 0.2 || (quick && Math.abs(over) > 0.05) ? Math.sign(over) : 0;
     if (step && from + step >= 0 && from + step <= lastTurn()) {
         turnTo(turnFrom(from, step));
@@ -323,6 +355,18 @@ function pageAtMiddle() {
         }
     });
     return best;
+}
+
+// The page the reader is on: the first one showing whole (several small or wide pages can fit on a
+// screen, and at the top of the score that is page 1, not the one at the middle); with none whole
+// (zoomed in), the one at the middle
+function pageInView() {
+    const v = ui.viewer.getBoundingClientRect();
+    const whole = state.pageEls.findIndex((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.left >= v.left - 0.5 && r.right <= v.right + 0.5 && r.top >= v.top - 0.5 && r.bottom <= v.bottom + 0.5;
+    });
+    return whole >= 0 ? whole : pageAtMiddle();
 }
 
 // places an element over a part of page `i` (engraving units), so it scales with the page
@@ -362,6 +406,7 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
     }
     const turn = pageTurn();
     span = perScreen();
+    builtFor = viewerSize();
     keepSideways(ui.viewMode.value === "page_pair");
     const horizontal = turn || ui.viewMode.value === "continuous_v";
     ui.pages.style.flexDirection = horizontal ? "row" : "column";
@@ -370,7 +415,14 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
     document.body.classList.toggle("page-turn", turn);
     // one screen per page, bigger when zoomed in past it (all slots alike: the largest page)
     const css = (u: number) => unitsToCss(u) + 16;
-    const slotW = Math.max(Math.ceil(ui.viewer.clientWidth / span), ...score.pages.map((p) => turn ? css(p.w) : 0));
+    // (two pages: a page's width and the gap, whole px so that the slots' positions add up; the row's
+    // ends are padded to bring the first and the last two to the middle of a wider screen)
+    const slotW = span > 1
+        ? Math.ceil(Math.max(...score.pages.map((p) => unitsToCss(p.w)))) + PAIR_GAP
+        : Math.max(Math.ceil(ui.viewer.clientWidth / span), ...score.pages.map((p) => turn ? css(p.w) : 0));
+    const spare = turn && span > 1 ? Math.max(0, ui.viewer.clientWidth - span * slotW) : 0;
+    ui.pages.style.paddingLeft = spare ? Math.floor(spare / 2) + "px" : "";
+    ui.pages.style.paddingRight = spare ? Math.ceil(spare / 2) + "px" : "";
     const slotH = Math.max(ui.viewer.clientHeight, ...score.pages.map((p) => turn ? css(p.h) : 0));
     observer = new IntersectionObserver(tilesSeen, { root: ui.viewer, rootMargin: horizontal ? `${ACROSS}px ${NEAR}px` : `${NEAR}px ${ACROSS}px` });
     const scale = pageScale();
@@ -2178,13 +2230,26 @@ async function enterFocus(fullscreen = true) {
     if (!reduceMotion.matches) {
         ui.play.animate([{ opacity: 0, transform: "scale(0.85)" }, { opacity: 1, transform: "none" }], { duration: 260, delay: 120, easing: EASE_OUT, fill: "backwards" });
     }
+    showFocusHint();
+}
+
+// The line at the top of the screen in Focus: how to get the controls back, or something more
+// particular (which the usual line doesn't replace while it shows)
+const FOCUS_HINT = "Tap off the music to show the controls";
+let focusHintUntil = 0;
+function showFocusHint(text = FOCUS_HINT, ms = 2600) {
+    if (text === FOCUS_HINT && performance.now() < focusHintUntil) {
+        return;
+    }
+    focusHintUntil = text === FOCUS_HINT ? 0 : performance.now() + ms;
     clearTimeout(focusHintTimer);
+    focusHint.textContent = text;
     focusHint.classList.remove("fading");
     focusHint.hidden = false;
     focusHintTimer = window.setTimeout(() => {
         focusHint.classList.add("fading");
         focusHintTimer = window.setTimeout(() => (focusHint.hidden = true), 450);
-    }, 2600);
+    }, ms);
 }
 
 function leaveFocus() {
@@ -2209,6 +2274,7 @@ function leaveFocus() {
     }
     clearTimeout(focusHintTimer);
     focusHint.hidden = true;
+    focusHintUntil = 0;
     const d = document as any;
     if (focusFullscreen && (d.fullscreenElement || d.webkitFullscreenElement)) {
         Promise.resolve((d.exitFullscreen || d.webkitExitFullscreen).call(d)).catch(() => {});
@@ -3084,7 +3150,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     // edits from last time that were never saved as a copy: continue them or start again
     let toLoad = data;
     let restoredEdits = false;
-    const draft = embedded ? null : await editDraft.get(key);
+    const draft = embedded || !composer ? null : await editDraft.get(key);
     if (draft) {
         const choice = await ask("Continue your edits?",
             `You changed the notes of “${name}” and did not save a copy. Continue from there, or start again from the file as it is?`,
@@ -3182,7 +3248,13 @@ async function changeView() {
     const view = ui.viewMode.value;
     shownView = view;
     // page by page and page view share a layout: stay on the same page
-    const keepPage = was === "page" || turnView(was) ? (turnView(was) ? turnedTo() : pageAtMiddle()) : 0;
+    const keepPage = was === "page" || turnView(was) ? (turnView(was) ? turnedTo() : pageInView()) : 0;
+    let focusing: Promise<void> | null = null;
+    if (view === "page_pair") {
+        // two pages want the whole screen: Focus starts with the view (now, while the reader's
+        // choice still allows full screen); a tap off the music brings the controls back
+        focusing = enterFocus();
+    }
     setStatus("Laying out…");
     state.score = await engine.setViewMode(engineMode(view));
     notes.setMode(engineMode(view)); // notes belong to the layout they were written on
@@ -3190,6 +3262,7 @@ async function changeView() {
     // before fitting: the message above the score takes height, and when it goes within the same
     // frame nothing reports the screen growing back (the page stayed fitted to the shorter screen)
     setStatus("");
+    await focusing; // the bars have gone: fitted once, to the screen as it will be
     if (turnView(view)) {
         if (!turnView(was)) {
             zoomBeforeTurn = state.zoom;
@@ -3209,7 +3282,12 @@ async function changeView() {
         // two pages want a screen on its side; where the device won't be turned for us, say so
         const turned = await sideways;
         if (!turned && ui.viewMode.value === "page_pair" && ui.viewer.clientWidth < ui.viewer.clientHeight) {
-            setStatus("Turn your device on its side to read two pages.", "info", 6000);
+            const turn = "Turn your device on its side to read two pages.";
+            if (state.focus) {
+                showFocusHint(`${turn} ${FOCUS_HINT}.`, 6000); // the status line is hidden in Focus
+            } else {
+                setStatus(turn, "info", 6000);
+            }
         }
     }
 }
@@ -3265,7 +3343,9 @@ let turnFitted = true; // page by page at the whole-page zoom (kept that way whe
         }
         clearTimeout(timer);
         timer = window.setTimeout(() => {
-            const page = turnedTo(); // now, not when the size changed: the reader may have turned since
+            // the page the reader was on before the screen changed (see lastTurned); if the pages
+            // were built for this size meanwhile, where the view is now
+            const page = viewerSize() === builtFor ? turnedTo() : lastTurned;
             state.zoom = turnFitted ? fitPageZoom() : clampZoom(state.zoom);
             rerenderAll(true);
             turnTo(page, false);
@@ -3302,7 +3382,7 @@ let turnFitted = true; // page by page at the whole-page zoom (kept that way whe
         if (swipe.moving) {
             // never further than the next page either way
             const [lo, hi] = slotRange(swipe.from);
-            const vw = ui.viewer.clientWidth / span * turnStep();
+            const vw = pageShare() * turnStep();
             ui.viewer.scrollLeft = Math.min(Math.max(swipe.left - dx, lo - vw), hi + vw);
             ui.viewer.scrollTop = swipe.top - dy;
         }
@@ -3340,7 +3420,8 @@ let turnFitted = true; // page by page at the whole-page zoom (kept that way whe
 // Keys turn pages in page by page (computers, iPads with a keyboard)
 document.addEventListener("keydown", (e) => {
     const t = e.target as HTMLElement;
-    if (!pageTurn() || !state.score || layers.length || t.closest("input, select, textarea, [contenteditable]")) {
+    // (not under a panel; Focus is a layer too, and there the keys turn as ever)
+    if (!pageTurn() || !state.score || layers.some((l) => l !== leaveFocus) || t.closest("input, select, textarea, [contenteditable]")) {
         return;
     }
     const step = { ArrowRight: 1, PageDown: 1, ArrowLeft: -1, PageUp: -1 }[e.key];
@@ -4885,7 +4966,7 @@ const resume = {
 };
 const draftName = (d: EditDraft) => d.name.replace(/\.(mscz|mscx)$/i, "");
 async function showResume() {
-    if (embedded) {
+    if (embedded || !composer) {
         return;
     }
     const [d, ...others] = await editDraft.fresh();
@@ -5003,9 +5084,9 @@ function tourSteps(): TourStep[] {
         { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
         { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        { target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes, and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." },
+        ...(!composer ? [] : [{ target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes, and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." }]),
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
-        { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Two pages shows two side by side with the device on its side; each swipe moves on one page, so the right page becomes the left (Settings can make a swipe turn both). Continuous lays the music out in one long line." },
+        { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Two pages shows two side by side with the device on its side, and hides the controls (tap off the music to bring them back); each swipe slides along one page, so the right page becomes the left (Settings can make a swipe turn both). Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },
         tipStep,
     ];

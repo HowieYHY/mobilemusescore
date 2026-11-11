@@ -1,4 +1,30 @@
-# Handoff (11 Nov 2026, branch `two-pages-view`, made from `composer`)
+# Handoff (11 Nov 2026, late: 1.0.30 published from branch `two-pages-view`)
+
+## Newest: 1.0.30 is live, Two pages without the Composer
+- **Published from `two-pages-view`, not from `main`** (the user: "push this branch to live"). `main` is still
+  1.0.29, so publishing from `main` on any PC would take Two pages off the site again. Open question for the
+  user: merge `two-pages-view` into `main`?
+- **The Composer is hidden in the published app** (the user's choice: it was never tried on devices): `composer`
+  in `app/src/main.ts` is true only on the dev server or with `?composer` in the address; CSS `.no-composer`
+  hides Edit, New score and Continue, edit drafts aren't offered, the tour skips its step. README sections
+  carry a "Not in the published app yet" note. To publish it: make `composer` true, drop the notes.
+- **Two pages as the user asked after trying it on the Pixel:** Focus starts with the view; the pages are a
+  row 4 px apart at every zoom with the two in the middle of the screen (`PAIR_GAP`, padded row ends), the
+  pages before and after showing at the sides on a wide screen; a swipe slides one page. Arrow keys now turn
+  in Focus. Turning the screen keeps the page on short scores too (`lastTurned`).
+- **Also fixed:** from Page view, Page by page and Two pages open on the first page showing whole
+  (`pageInView`), not the one at the middle (landscape pages on a phone opened on page 2).
+- **Testing rule changed** (CLAUDE.md): bare minimum, the user checks themselves.
+- **Run after the last changes:** `pagepair-test` at 915x412 on Paper Hearts, 2002 v3 and Dream a little dream;
+  a check that the built app hides the Composer and shows Two pages. **Not run:** iPad size, `pageturn-test`,
+  `settings-test` (opening straight into Two pages now starts Focus), `android-pagepair-test.mjs` (new,
+  rewritten for the Focus flow, never run in that form). The user tried the view on their Android and was
+  happy; iPhone and iPad are untried.
+- **This PC (HOWIE):** scores are in `real test musescores/`; adb is `D:/Android/sdk/platform-tools/adb.exe`
+  (pass `ADB=`); Playwright's browsers are in `D:\ms-playwright` (the C: folder is a junction to it).
+- Open: is #34 done (commit says `Refs #34`)? #33, #18, #3.
+
+## Earlier the same day (branch `two-pages-view`, made from `composer`)
 
 ## Latest session (11 Nov 2026): issue #34, the *Two pages* view. Built, tests paused part-way
 Branch `two-pages-view` = `composer` plus the composer work that was still uncommitted on this PC plus #34, in one

@@ -1,5 +1,8 @@
-// "Two pages" view (issue #34), with real touch input: two whole pages side by side and nothing of
-// any other; a swipe moves on by exactly one page (1-2, 2-3, 3-4: the right page becomes the left),
+// "Two pages" view (issue #34), with real touch input: Focus starts with the view (the bars go, and
+// the arrow keys still turn); two whole pages together in the middle of the screen with the same
+// few px between them at every zoom (a camera over the pages in a row: where the screen is wider
+// than the two, the pages before and after show at the sides, whole or cut by the screen, and the
+// view still settles with two pages in the middle); a swipe moves on by exactly one page (1-2, 2-3, 3-4),
 // a long fast one too, a short slow one none; the last screen is the last two pages; arrow keys;
 // zoom never goes below the two pages; the drag handle's label names both pages; the view moves
 // with the music (the page it reaches becomes the left one); the device is asked to stay on its
@@ -44,6 +47,19 @@ await context.addInitScript(() => {
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+// a run once lost its score mid-test (the page back on the start screen): say if the page was loaded again, and by whom
+let loads = 0;
+page.on("load", () => {
+    if (++loads > 1) {
+        errors.push("the page was loaded again");
+        console.log("NOTE the page was loaded again during the test");
+    }
+});
+page.on("console", (m) => {
+    if (/\[vite\]/.test(m.text()) && !/connect/.test(m.text())) {
+        console.log("NOTE dev server: " + m.text());
+    }
+});
 const cdp = await context.newCDPSession(page);
 await page.goto(url);
 await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 120000 });
@@ -77,10 +93,28 @@ const view = () => page.evaluate(() => {
             }
         }
     });
-    return { shown, whole, zoom: app.state.zoom, pages: document.querySelectorAll(".page").length };
+    // the space between the first page showing and the next, and how far the whole pages' middle
+    // is from the screen's
+    const rects = [...document.querySelectorAll(".page")].map((el) => el.getBoundingClientRect());
+    const gap = shown.length && rects[shown[0] + 1] ? rects[shown[0] + 1].left - rects[shown[0]].right : null;
+    // for each page, how far the middle of it and the next is from the middle of the screen
+    const offs = rects.map((r, i) => (rects[i + 1] ? (r.left + rects[i + 1].right) / 2 - (v.left + v.width / 2) : Infinity));
+    return { shown, whole, gap, offs, zoom: app.state.zoom, pages: rects.length, focus: app.state.focus };
 });
-// pages i and i + 1, whole, the first on the left, and nothing of any other
-const pair = (s, i) => s.shown.join() === `${i},${i + 1}` && s.whole.join() === s.shown.join();
+const GAP = [3.5, 5.5]; // PAIR_GAP is 4; a slot is whole px wide, so up to 1 more
+const tight = (s) => s.gap !== null && s.gap >= GAP[0] && s.gap <= GAP[1];
+// the page whose pair (it and the next) sits in the middle of the screen, both whole; -1 if none
+const centred = (s) => s.offs.findIndex((o, i) => Math.abs(o) <= 1.5 && s.whole.includes(i) && s.whole.includes(i + 1));
+// pages i and i + 1 whole, together (the gap) and in the middle of the screen
+const pair = (s, i) => centred(s) === i && tight(s);
+const say = (s) => `in the middle: ${centred(s) < 0 ? "no two pages" : `${centred(s) + 1} and ${centred(s) + 2}`}, gap ${s.gap?.toFixed(1)} px, whole ${s.whole.map((k) => k + 1)}`;
+const hintText = () => page.evaluate(() => ["status", "focus-hint"].map((id) => document.getElementById(id)).filter((el) => !el.hidden).map((el) => el.textContent).join(" "));
+// Focus hides the bars the rest of the test uses
+const leaveFocus = async () => {
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !app.state.focus, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1300);
+};
 const settle = () => page.waitForTimeout(900);
 const touch = (type, pts) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts });
 const middle = () => page.evaluate(() => {
@@ -98,23 +132,46 @@ async function swipe(dx, { ms = 160 } = {}) {
     await touch("touchEnd", []);
     await settle();
 }
-const choose = async (v) => {
+const choose = async (v, { stay = false } = {}) => {
+    if (await page.evaluate(() => app.state.focus)) {
+        await leaveFocus();
+    }
     await page.selectOption("#view-mode", v);
     await page.waitForTimeout(500);
     await page.waitForFunction(() => document.getElementById("status").hidden, null, { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(1500);
+    if (v === "page_pair" && !stay) {
+        await leaveFocus();
+    }
 };
+// what was asked of the screen, in order
+const asked = () => page.evaluate(() => window.__orient);
 
-await choose("page_pair");
+await page.selectOption("#view-mode", "page_pair");
+const focusLine = await page.waitForFunction(() => !document.getElementById("focus-hint").hidden && document.getElementById("focus-hint").textContent, null, { timeout: 5000 }).then((h) => h.jsonValue(), () => "");
+check(/show the controls/.test(focusLine), `a line says how to get the controls back ("${focusLine}")`);
+await page.waitForTimeout(2000);
 let s = await view();
 const n = s.pages;
 if (n < 5) {
     console.log(`this score has ${n} page(s); the test needs 5`);
     process.exit(2);
 }
-check(pair(s, 0), `opens on pages 1 and 2, whole, side by side, nothing else (shown ${s.shown}, whole ${s.whole})`);
-let orient = await page.evaluate(() => window.__orient.join(", "));
-check(orient === "lock landscape", `the device is asked to stay on its side (${orient || "nothing asked"})`);
+check(s.focus && await page.evaluate(() => getComputedStyle(document.querySelector(".topbar")).display === "none"), "choosing Two pages starts Focus: the bars are gone");
+check(pair(s, 0), `opens on pages 1 and 2, whole, together in the middle (${say(s)})`);
+await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(900);
+s = await view();
+check(pair(s, 1) && s.focus, `in Focus the right arrow still moves on one page (${say(s)})`);
+await swipe(W * 0.3);
+s = await view();
+check(pair(s, 0) && s.focus, `and a swipe right goes back, still in Focus (${say(s)})`);
+const focusZoom = s.zoom;
+await leaveFocus();
+s = await view();
+check(!s.focus && pair(s, 0) && s.zoom <= focusZoom + 0.001, `Escape brings the bars back: the same two pages, fitted to the room left (zoom ${s.zoom.toFixed(3)}, in Focus ${focusZoom.toFixed(3)}; ${say(s)})`);
+let orient = await asked();
+check(orient.length > 0 && orient.every((o) => o === "lock landscape"), `the device is asked to stay on its side (${orient.join(", ") || "nothing asked"})`);
 const sideBySide = await page.evaluate(() => {
     const [a, b] = [...document.querySelectorAll(".page")].map((el) => el.getBoundingClientRect());
     return a.right <= b.left && Math.abs(a.top - b.top) < 1;
@@ -125,10 +182,17 @@ await page.click("#zoom-out");
 await settle();
 s = await view();
 check(Math.abs(s.zoom - fit) < 0.001 && pair(s, 0), `− at two whole pages goes no smaller (zoom ${s.zoom.toFixed(3)}, fitted ${fit.toFixed(3)})`);
+const scrollBefore = await page.evaluate(() => document.getElementById("viewer").scrollLeft);
 
 await swipe(-W * 0.3);
 s = await view();
-check(pair(s, 1), `a swipe left moves on one page: 2 and 3 (shown ${s.shown})`);
+check(pair(s, 1), `a swipe left moves on one page: 2 and 3 (${say(s)})`);
+{
+    // the camera moved by one page and its gap, no more
+    const moved = await page.evaluate(() => document.getElementById("viewer").scrollLeft) - scrollBefore;
+    const step = await page.evaluate(() => document.querySelector(".page").getBoundingClientRect().width);
+    check(moved - step >= GAP[0] - 0.5 && moved - step <= GAP[1] + 0.5, `the view moved one page's width and the gap (${moved.toFixed(1)} px, page ${step.toFixed(1)} px)`);
+}
 await swipe(-W * 0.3);
 s = await view();
 check(pair(s, 2), `another: 3 and 4 (shown ${s.shown})`);
@@ -183,13 +247,14 @@ await page.click("#zoom-in");
 await settle();
 s = await view();
 check(s.zoom > fit * 1.2, `+ zooms in (zoom ${s.zoom.toFixed(3)})`);
+check(tight(s), `zoomed in, the pages are as close together (gap ${s.gap?.toFixed(1)} px)`);
 for (let k = 0; k < 4; k++) {
     await page.click("#zoom-out");
     await page.waitForTimeout(150);
 }
 await settle();
 s = await view();
-check(Math.abs(s.zoom - fit) < 0.001 && s.whole.length === 2, `− back to two whole pages (zoom ${s.zoom.toFixed(3)}, shown ${s.shown})`);
+check(Math.abs(s.zoom - fit) < 0.001 && centred(s) >= 0, `− back to two whole pages (zoom ${s.zoom.toFixed(3)}; ${say(s)})`);
 await page.evaluate(() => app.turnTo?.(0));
 for (let k = 0; k < n; k++) {
     await page.keyboard.press("ArrowLeft");
@@ -199,8 +264,17 @@ await settle();
 s = await view();
 check(pair(s, 0), `back at the start (shown ${s.shown})`);
 
-// the drag handle: its label names both pages
-{
+// the drag handle: its label names both pages (the app shows it when there is more than a screen
+// to move through; a short score with small pages is nearly all on the screen, and has none)
+const handleUseful = await page.evaluate(() => {
+    const v = document.getElementById("viewer");
+    return v.scrollWidth - v.clientWidth > v.clientWidth;
+});
+if (!handleUseful) {
+    await swipe(-W * 0.3);
+    await swipe(W * 0.3);
+    check(!(await page.evaluate(() => document.getElementById("scroller").classList.contains("shown"))), "nearly the whole score is on the screen: no drag handle");
+} else {
     await swipe(-W * 0.3);
     await swipe(W * 0.3); // shows the handle
     const box = await page.evaluate(() => {
@@ -219,8 +293,8 @@ check(pair(s, 0), `back at the start (shown ${s.shown})`);
     await touch("touchEnd", []);
     await page.waitForTimeout(1200);
     s = await view();
-    check(s.whole.length === 2 && s.shown.length === 2, `dragged to the middle: two whole pages (shown ${s.shown})`);
-    check(label === `Pages ${s.shown[0] + 1}-${s.shown[1] + 1} of ${n}`, `its label named the two it settled on ("${label}")`);
+    check(centred(s) >= 0 && tight(s), `dragged to the middle: two whole pages (${say(s)})`);
+    check(label === `Pages ${centred(s) + 1}-${centred(s) + 2} of ${n}`, `its label named the two it settled on ("${label}")`);
     for (let k = 0; k < n; k++) {
         await page.keyboard.press("ArrowLeft");
         await page.waitForTimeout(120);
@@ -280,8 +354,8 @@ check(pair(s, 0), `back at the start (shown ${s.shown})`);
     s = await view();
     check(pair(s, 4) || (n < 6 && pair(s, n - 2)), `a long fast swipe turns one pair: 5-6 (shown ${s.shown})`);
     await swipe(-20, { ms: 300 });
-    const stay = (await view()).shown.join();
-    check(stay === s.shown.join(), `a short slow swipe turns none (shown ${stay})`);
+    const stay = centred(await view());
+    check(stay === centred(s), `a short slow swipe turns none (pages ${stay + 1} and ${stay + 2})`);
     await swipe(W * 0.3);
     s = await view();
     check(pair(s, 2), `a swipe right goes back a pair: 3-4 (shown ${s.shown})`);
@@ -325,18 +399,18 @@ check(pair(s, 0), `back at the start (shown ${s.shown})`);
 }
 
 // Page by page opens on the left page; back to two pages; Page view on the same page
-const before = (await view()).shown[0];
+const before = centred(await view());
 await choose("page_turn");
 s = await view();
 check(s.shown.join() === String(before) && s.whole.join() === String(before), `Page by page opens on the left page, ${before + 1}, alone (shown ${s.shown})`);
-orient = await page.evaluate(() => window.__orient.join(", "));
-check(orient === "lock landscape, unlock", `leaving the view lets the screen turn again (${orient})`);
+orient = await asked();
+check(orient[orient.length - 1] === "unlock", `leaving the view lets the screen turn again (last asked: ${orient[orient.length - 1]})`);
 await choose("page_pair");
 s = await view();
 check(pair(s, before), `and Two pages again: ${before + 1} and ${before + 2} (shown ${s.shown})`);
-orient = await page.evaluate(() => window.__orient.join(", "));
-check(orient === "lock landscape, unlock, lock landscape", `asked to stay on its side again (${orient})`);
-const hint = await page.evaluate(() => document.getElementById("status").hidden ? "" : document.getElementById("status").textContent);
+orient = await asked();
+check(orient[orient.length - 1] === "lock landscape", `asked to stay on its side again (last asked: ${orient[orient.length - 1]})`);
+const hint = await hintText();
 check(!/on its side/.test(hint), `no "turn your device" line when it is on its side ("${hint}")`);
 
 // upright on a device that won't turn by itself (an iPhone): two pages still, and a line says so
@@ -345,20 +419,24 @@ await page.evaluate(() => (window.__lockFails = true));
 await page.setViewportSize({ width: H, height: W });
 await page.waitForTimeout(1200);
 await page.selectOption("#view-mode", "page_pair");
-await page.waitForFunction(() => /on its side/.test(document.getElementById("status").textContent) && !document.getElementById("status").hidden, null, { timeout: 15000 })
-    .then(() => check(true, "upright, and the device won't turn itself: a line says to turn it"), () => check(false, "upright: no line saying to turn the device"));
-await page.waitForFunction(() => document.getElementById("status").hidden, null, { timeout: 30000 }).catch(() => {});
-await page.waitForTimeout(1500);
+// (in Focus the status line is hidden: the line is Focus's own, with how to get the controls back)
+const turnLine = await page.waitForFunction(() => {
+    const el = ["status", "focus-hint"].map((id) => document.getElementById(id)).find((el) => !el.hidden && /on its side/.test(el.textContent));
+    return el && el.textContent;
+}, null, { timeout: 15000 }).then((h) => h.jsonValue(), () => "");
+check(/on its side/.test(turnLine) && /show the controls/.test(turnLine), `upright, and the device won't turn itself: a line says to turn it, and how to get the controls back ("${turnLine}")`);
+await page.waitForTimeout(2000);
 s = await view();
-check(s.shown.length === 2 && s.whole.length === 2, `upright it still shows two whole pages (shown ${s.shown}, whole ${s.whole})`);
-const upright = s.shown[0];
+check(centred(s) >= 0 && tight(s), `upright it still shows two whole pages (${say(s)})`);
+const upright = centred(s);
+await leaveFocus(); // (a full-screen window can't be given another size here)
 await page.setViewportSize({ width: W, height: H });
 await page.waitForTimeout(1500);
 s = await view();
 check(pair(s, upright) && s.zoom > fit * 0.98, `turned on its side: the same two pages, fitted again (shown ${s.shown}, zoom ${s.zoom.toFixed(3)})`);
 
 await swipe(-W * 0.3);
-const left = (await view()).shown[0];
+const left = centred(await view());
 await choose("page");
 const back = await page.evaluate(() => {
     const v = document.getElementById("viewer").getBoundingClientRect();

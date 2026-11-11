@@ -32,11 +32,22 @@ export type WorkerRequest =
     | Req<{ cmd: "locate"; page: number; x: number; y: number; radius: number }>
     // editing (composer): see Session::edit* in the engine
     | Req<{ cmd: "editSelect"; page: number; x: number; y: number; radius: number }>
+    | Req<{ cmd: "editExtend"; page: number; x: number; y: number; radius: number }>
+    | Req<{ cmd: "editCopy"; cut: boolean }>
+    | Req<{ cmd: "editPaste" }>
+    | Req<{ cmd: "editHasClip" }>
+    | Req<{ cmd: "editVoice"; voice: number; input: boolean }>
+    | Req<{ cmd: "editInsertBars"; count: number }>
+    | Req<{ cmd: "editDeleteBars" }>
+    | Req<{ cmd: "editMark"; kind: number }>
+    | Req<{ cmd: "editSlur" }>
+    | Req<{ cmd: "editHairpin"; kind: number }>
     | Req<{ cmd: "editSelection" | "editClearSelection" | "editUndo" | "editRedo" | "editDot" | "editDelete" | "editSelectStart" }>
     | Req<{ cmd: "editMove"; to: string }>
     | Req<{ cmd: "editPitch"; mode: number }>
     | Req<{ cmd: "editDuration"; den: number }>
-    | Req<{ cmd: "editEnterNote"; letter: number }>
+    | Req<{ cmd: "editEnterNote"; letter: number; den: number; dots: number }>
+    | Req<{ cmd: "editEnterRest"; den: number; dots: number }>
     | Req<{ cmd: "editInsertNotes"; spec: string }>
     | Req<{ cmd: "editAddBars"; n: number }>
     | Req<{ cmd: "editSetKey"; key: number }>
@@ -51,7 +62,8 @@ export type WorkerRequest =
 
 /** The note or rest being edited (page units), or null. */
 export interface EditSelection {
-    kind: "note" | "rest";
+    /** A range (desktop's Shift+click) has bar to barEnd over `staves` lines, outlined by `boxes`, one per system. */
+    kind: "note" | "rest" | "range";
     page: number; x: number; y: number; w: number; h: number;
     bar: number; staff: number; voice: number;
     den: number; dots: number;
@@ -60,6 +72,7 @@ export interface EditSelection {
     pitch?: number; name?: string;
     /** The name of the line, and whether the note is tied on or the note or rest is in a tuplet. */
     part?: string; tie?: boolean; tuplet?: boolean;
+    barEnd?: number; staves?: number; boxes?: { page: number; x: number; y: number; w: number; h: number }[];
 }
 export interface EditResult { ok: boolean; error?: string }
 

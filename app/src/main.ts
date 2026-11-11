@@ -1,5 +1,5 @@
 // first: decides whether this is someone's first visit before anything else saves data
-import { editDraft } from "./editdraft";
+import { editDraft, type EditDraft } from "./editdraft";
 import { CLEFS, KEYS, TIMES, buildScore, type LineChoice } from "./newscore";
 import { SAMPLE_RATE, decodeTo16k, findNotes, toGrid, trackPitch, type GridNote, type SungNote } from "./voice/transcribe";
 import * as firstTime from "./firsttime";
@@ -235,8 +235,16 @@ function tileRects(w: number, h: number, scale: number): Rect[] {
 // screen wide and high; a swipe turns exactly one page and the view locks onto it. Zoom goes from
 // the whole page fitted to the screen (never smaller, so no other page shows) up to the usual
 // limit; zoomed in, a finger moves around the page and a swipe past its edge turns it.
-const pageTurn = () => ui.viewMode.value === "page_turn";
-const engineMode = (v: string): ViewMode => (v === "page_turn" ? "page" : v as ViewMode);
+//
+// "Two pages" (issue #34) is the same view with two slots per screen: pages 1 and 2, and a swipe
+// moves on by one page (2 and 3, then 3 and 4), the right page going to the left. It asks the
+// device to stay on its side while it shows (where the device allows that).
+const turnView = (v: string) => v === "page_turn" || v === "page_pair";
+const pageTurn = () => turnView(ui.viewMode.value);
+const engineMode = (v: string): ViewMode => (turnView(v) ? "page" : v as ViewMode);
+// pages per screen in the view chosen (a one-page score has its page alone, in the middle)
+const perScreen = () => (ui.viewMode.value === "page_pair" ? Math.min(2, state.score?.pages.length || 1) : 1);
+let span = 1; // pages per screen in the pages as built (the menu changes before they are rebuilt)
 
 // Zoom at which a whole page fits the screen
 function fitPageZoom() {
@@ -246,37 +254,56 @@ function fitPageZoom() {
     }
     const css = (u: number) => u / UNITS_PER_INCH * CSS_PX_PER_INCH;
     // below the usual zoom limit if need be: a phone on its side leaves little height
-    return Math.min(MAX_ZOOM, Math.max(0.05, Math.min((ui.viewer.clientWidth - 16) / css(p.w), (ui.viewer.clientHeight - 16) / css(p.h))));
+    return Math.min(MAX_ZOOM, Math.max(0.05, Math.min((ui.viewer.clientWidth / perScreen() - 16) / css(p.w), (ui.viewer.clientHeight - 16) / css(p.h))));
 }
 
 // measured on the slots, which keep their width until rebuilt (the viewer may have changed size)
-const slotWidth = () => (state.pageEls[0]?.parentElement as HTMLElement | null)?.offsetWidth || ui.viewer.clientWidth;
-// the page whose slot holds the middle of the screen (a slot is never narrower than the screen,
-// except just after the screen widened, before the slots are rebuilt: then the slot's middle)
-const turnedTo = () => Math.max(0, Math.min(state.pageEls.length - 1,
-    Math.floor((ui.viewer.scrollLeft + Math.min(ui.viewer.clientWidth, slotWidth()) / 2) / Math.max(1, slotWidth()))));
-// the scroll positions that show only page i (one, unless zoomed in)
-const slotRange = (i: number) => [i * slotWidth(), i * slotWidth() + Math.max(0, slotWidth() - ui.viewer.clientWidth)];
+const slotWidth = () => (state.pageEls[0]?.parentElement as HTMLElement | null)?.offsetWidth || ui.viewer.clientWidth / span;
+// the last page a screen can start on (two pages: the last but one, so the screen stays full)
+const lastTurn = () => Math.max(0, state.pageEls.length - span);
+// the page the screen starts on: the one whose slot holds the middle of the screen's first page
+// width (a screen is never wider than its slots, except just after it widened, before the slots
+// are rebuilt: then the slot's middle)
+const turnedTo = () => Math.max(0, Math.min(lastTurn(),
+    Math.floor((ui.viewer.scrollLeft + Math.min(ui.viewer.clientWidth / span, slotWidth()) / 2) / Math.max(1, slotWidth()))));
+// the scroll positions that show only the screen starting on page i (one, unless zoomed in)
+const slotRange = (i: number) => [i * slotWidth(), i * slotWidth() + Math.max(0, span * slotWidth() - ui.viewer.clientWidth)];
+let turning = { to: 0, at: -Infinity }; // the last turn asked for (it glides for a moment)
 function turnTo(i: number, smooth = true) {
-    i = Math.max(0, Math.min(state.pageEls.length - 1, i));
+    i = Math.max(0, Math.min(lastTurn(), i));
+    turning = { to: i, at: performance.now() };
     ui.viewer.scrollTo({ left: i * slotWidth(), top: 0, behavior: smooth ? "smooth" : "instant" });
 }
+// How far one swipe or key goes: a page; in Two pages with Settings' "a swipe turns both", two
+const turnStep = () => (span > 1 && settings.pairSwipeTwo ? 2 : 1);
+// The page the screen starts on after a turn forward (1) or back (-1) from page `from`. Turning
+// both pages keeps to 1-2, 3-4, 5-6…: back from an odd end (4-5 of 5) or a place the music led goes
+// to the pair before, not two back.
+function turnFrom(from: number, dir: number) {
+    const by = turnStep();
+    return dir > 0 ? from + by : Math.ceil(from / by) * by - by;
+}
+// "Page 3 of 9", or "Pages 3-4 of 9" with two on the screen
+const turnLabel = () => {
+    const i = turnedTo();
+    return span > 1 ? `Pages ${i + 1}-${i + span} of ${state.pageEls.length}` : `Page ${i + 1} of ${state.pageEls.length}`;
+};
 // After a swipe or a two-finger scroll that started on page `from`: past the page's edge by a fifth
-// of the screen, or a quick flick, turns to the next page that way; otherwise back within the page.
+// of a page's share of the screen, or a quick flick, turns one step that way; otherwise back.
 function settleTurn(from: number, quick: boolean) {
     const [lo, hi] = slotRange(from);
     const sl = ui.viewer.scrollLeft;
-    const over = (sl < lo ? sl - lo : sl > hi ? sl - hi : 0) / ui.viewer.clientWidth;
+    const over = (sl < lo ? sl - lo : sl > hi ? sl - hi : 0) / (ui.viewer.clientWidth / span);
     const step = Math.abs(over) > 0.2 || (quick && Math.abs(over) > 0.05) ? Math.sign(over) : 0;
-    if (step && from + step >= 0 && from + step < state.pageEls.length) {
-        turnTo(from + step);
+    if (step && from + step >= 0 && from + step <= lastTurn()) {
+        turnTo(turnFrom(from, step));
     } else if (sl < lo || sl > hi) {
         ui.viewer.scrollTo({ left: Math.min(hi, Math.max(lo, sl)), behavior: "smooth" });
     }
 }
 // keeps the view on the page under it (after a zoom or a drag of the handle)
-function keepOnPage() {
-    const [lo, hi] = slotRange(turnedTo());
+function keepOnPage(i = turnedTo()) {
+    const [lo, hi] = slotRange(i);
     ui.viewer.scrollLeft = Math.min(hi, Math.max(lo, ui.viewer.scrollLeft));
 }
 
@@ -334,6 +361,8 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
         return;
     }
     const turn = pageTurn();
+    span = perScreen();
+    keepSideways(ui.viewMode.value === "page_pair");
     const horizontal = turn || ui.viewMode.value === "continuous_v";
     ui.pages.style.flexDirection = horizontal ? "row" : "column";
     ui.pages.classList.toggle("turn", turn);
@@ -341,7 +370,7 @@ function buildPages(standIns?: Map<number, HTMLCanvasElement[]>) {
     document.body.classList.toggle("page-turn", turn);
     // one screen per page, bigger when zoomed in past it (all slots alike: the largest page)
     const css = (u: number) => unitsToCss(u) + 16;
-    const slotW = Math.max(ui.viewer.clientWidth, ...score.pages.map((p) => turn ? css(p.w) : 0));
+    const slotW = Math.max(Math.ceil(ui.viewer.clientWidth / span), ...score.pages.map((p) => turn ? css(p.w) : 0));
     const slotH = Math.max(ui.viewer.clientHeight, ...score.pages.map((p) => turn ? css(p.h) : 0));
     observer = new IntersectionObserver(tilesSeen, { root: ui.viewer, rootMargin: horizontal ? `${ACROSS}px ${NEAR}px` : `${NEAR}px ${ACROSS}px` });
     const scale = pageScale();
@@ -801,15 +830,57 @@ const PINCH_START = 0.08; // the fingers' distance must change by 8% to zoom
 // Tap a note or rest to play from there (a tap, not a scroll or pinch).
 // While stopped, a tapped note also sounds, as in desktop MuseScore.
 let pendingPreview: { page: number; x: number; y: number; radius: number } | null = null;
+// The score point under the screen point, in the engine's units, with a fingertip's reach
+function scoreTap(clientX: number, clientY: number, pageEl: HTMLElement) {
+    const r = pageEl.getBoundingClientRect();
+    const toUnits = (css: number) => css / (CSS_PX_PER_INCH * state.zoom) * UNITS_PER_INCH;
+    // a fingertip is wider than a notehead: accept notes within ~18 px, but
+    // not so far that a neighbouring staff's note is picked
+    const sp = state.score!.spatium;
+    const radius = Math.max(0.75 * sp, Math.min(toUnits(18), 3 * sp));
+    return { page: Number(pageEl.dataset.index), x: toUnits(clientX - r.left), y: toUnits(clientY - r.top), radius };
+}
+// Edit: holding a finger still on the score selects from the selection to there (desktop's Shift+click)
+const HOLD_MS = 450;
 {
     let down: { x: number; y: number; t: number; id: number } | null = null;
+    let holdTimer = 0;
+    let held = false;
+    const cancelHold = () => clearTimeout(holdTimer);
     ui.pages.addEventListener("pointerdown", (e) => {
         down = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null;
+        held = false;
+        cancelHold();
+        const pageEl = (e.target as HTMLElement).closest(".page") as HTMLElement | null;
+        if (down && edit.on && edit.sel && pageEl && state.score && !notes.active) {
+            const at = down;
+            holdTimer = window.setTimeout(() => {
+                if (down !== at) {
+                    return;
+                }
+                held = true;
+                navigator.vibrate?.(15);
+                void editExtendAt(scoreTap(at.x, at.y, pageEl));
+            }, HOLD_MS);
+        }
     });
-    ui.pages.addEventListener("pointercancel", () => (down = null));
+    ui.pages.addEventListener("pointermove", (e) => {
+        if (down && e.pointerId === down.id && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) {
+            cancelHold(); // a scroll, not a hold
+        }
+    });
+    ui.pages.addEventListener("pointercancel", () => {
+        down = null;
+        cancelHold();
+    });
     ui.pages.addEventListener("pointerup", async (e) => {
         const d = down;
         down = null;
+        cancelHold();
+        if (held) {
+            held = false;
+            return; // the hold made a range already
+        }
         // in notes mode a tap draws, except a finger's when it doesn't draw
         if (!d || d.id !== e.pointerId || !state.score || (notes.active && !notes.fingerTapIsFree(e))) {
             return;
@@ -824,13 +895,7 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
             }
             return;
         }
-        const r = pageEl.getBoundingClientRect();
-        const toUnits = (css: number) => css / (CSS_PX_PER_INCH * state.zoom) * UNITS_PER_INCH;
-        // a fingertip is wider than a notehead: accept notes within ~18 px, but
-        // not so far that a neighbouring staff's note is picked
-        const sp = state.score.spatium;
-        const radius = Math.max(0.75 * sp, Math.min(toUnits(18), 3 * sp));
-        const tap = { page: Number(pageEl.dataset.index), x: toUnits(e.clientX - r.left), y: toUnits(e.clientY - r.top), radius };
+        const tap = scoreTap(e.clientX, e.clientY, pageEl);
         if (state.focus && !nearMusic(pageEl, tap, e.clientX, e.clientY)) {
             exitFocus(); // blank paper; a tap on the music plays as usual
             return;
@@ -840,7 +905,7 @@ let pendingPreview: { page: number; x: number; y: number; radius: number } | nul
             return;
         }
         if (edit.on) {
-            void editSelectAt(tap);
+            void (e.shiftKey && edit.sel ? editExtendAt(tap) : editSelectAt(tap));
             return;
         }
         const audioReady = engine.audioRunning && state.playbackReady;
@@ -939,7 +1004,7 @@ let scrollerDragging = false;
         const cy = v.top + v.height / 2;
         if (ui.viewMode.value === "page" || pageTurn()) {
             // page by page: the page it will settle on when let go
-            return `Page ${(pageTurn() ? Math.min(turnedTo(), state.pageEls.length - 1) : pageAtMiddle()) + 1} of ${state.pageEls.length}`;
+            return pageTurn() ? turnLabel() : `Page ${pageAtMiddle() + 1} of ${state.pageEls.length}`;
         }
         const el = state.pageEls[0];
         if (!el || !timeline.length) {
@@ -1106,12 +1171,17 @@ function followCursor(pageEl: HTMLElement) {
         return;
     }
     if (pageTurn()) {
+        if (performance.now() - turning.at < 600) {
+            return; // a turn is still gliding: where the screen "starts" means nothing until it lands
+        }
         const i = Number(pageEl.dataset.index);
-        if (i !== turnedTo()) {
-            turnTo(i); // the music reached another page
+        const first = turnedTo();
+        if (i < first || i >= first + span) {
+            turnTo(i); // the music reached a page not on the screen (two pages: it becomes the left one)
             return;
         }
     }
+    const on = turnedTo(); // before moving: the nudge below must not carry the view to the next page
     const v = ui.viewer.getBoundingClientRect();
     const r = cursorEl.getBoundingClientRect();
     const margin = 0.15;
@@ -1122,7 +1192,7 @@ function followCursor(pageEl: HTMLElement) {
         ui.viewer.scrollLeft += r.left - v.left - v.width * 0.25;
     }
     if (pageTurn()) {
-        keepOnPage(); // zoomed in: within the page
+        keepOnPage(on); // zoomed in: within the page (or the two pages)
     }
 }
 
@@ -1984,25 +2054,53 @@ ui.soundsBack.onclick = () => closeLayer(closeSounds);
 // app: each open panel adds a history entry, and going back closes the top one.
 const layers: (() => void)[] = [];
 
+// popstates of our own history.back(), which close nothing: their panel closed already
+let ownBacks = 0;
+// entries for panels opened while such a back was on its way, added once it has landed
+let laterPushes = 0;
+
 function openLayer(close: () => void) {
     layers.push(close);
-    history.pushState({ pocketscoreLayer: layers.length }, "");
+    if (ownBacks > 0) {
+        laterPushes++;
+    } else {
+        history.pushState({ pocketscoreLayer: layers.length }, "");
+    }
 }
 
-/** Close a panel from the app's own controls. */
+/** Close a panel from the app's own controls: at once, with history following. Leaving the closing to
+ *  the late popstate let a second close in the meantime (the palette's tap-away, then Notes giving way to
+ *  Edit) go back twice, and the second popstate closed the panel just opened. */
 function closeLayer(close: () => void) {
     const i = layers.lastIndexOf(close);
-    if (i < 0) {
-        close();
-    } else if (i === layers.length - 1) {
-        history.back(); // popstate closes it
-    } else {
+    if (i === layers.length - 1 && i >= 0) {
+        layers.pop();
+        ownBacks++;
+        history.back();
+    } else if (i >= 0) {
         layers.splice(i, 1);
-        close();
+    }
+    close();
+}
+
+/** One mode in place of another (Notes and Edit): the new one takes the old one's Back entry. */
+function swapLayer(from: () => void, to: () => void) {
+    const i = layers.lastIndexOf(from);
+    if (i < 0) {
+        openLayer(to);
+    } else {
+        layers[i] = to;
     }
 }
 
 window.addEventListener("popstate", () => {
+    if (ownBacks > 0) {
+        ownBacks--;
+        for (; ownBacks === 0 && laterPushes > 0; laterPushes--) {
+            history.pushState({ pocketscoreLayer: layers.length - laterPushes + 1 }, "");
+        }
+        return;
+    }
     layers.pop()?.();
 });
 
@@ -2038,7 +2136,7 @@ async function enterFocus(fullscreen = true) {
     }
     if (notes.active) {
         // finish writing first (the notes bar would be hidden anyway). Closing the top layer goes
-        // through history.back(), whose popstate comes later: wait for it, or it would close focus.
+        // back in history, whose popstate comes later: wait for it before focus adds its own entry.
         focusStarting = true;
         const closed = layers[layers.length - 1] === closeNotes
             ? new Promise<void>((done) => window.addEventListener("popstate", () => done(), { once: true }))
@@ -2928,17 +3026,19 @@ ui.fileInput.onchange = async () => {
 };
 
 // A score the reader chose (Open score, or shared from another app): asks
-// about unsaved changes first
-async function openChosen(name: string, data: ArrayBuffer) {
+// about unsaved changes first. False when the reader cancelled.
+async function openChosen(name: string, data: ArrayBuffer): Promise<boolean> {
     if (state.playing) {
         await engine.stop();
     }
     if (edit.dirty) {
-        const choice = await ask("Keep your edits?",
-            `You changed the notes of “${ui.title.textContent}”. Opening another score loses those changes unless you save a copy first.`,
+        // desktop's question on closing (ProjectActionsController::askAboutSavingScore), with this app's
+        // Save a copy; asked for a new score even when untouched, as desktop counts it unsaved from the start
+        const choice = await ask(`Save a copy of “${ui.title.textContent}” before closing it?`,
+            "Your changes will be lost if you don't save a copy.",
             [["cancel", "Cancel"], ["discard", "Don't keep"], ["copy", "Save a copy"]]);
         if (choice === "cancel" || (choice === "copy" && !(await saveCopy()))) {
-            return;
+            return false;
         }
         if (choice === "discard") {
             clearTimeout(edit.draftTimer);
@@ -2950,13 +3050,14 @@ async function openChosen(name: string, data: ArrayBuffer) {
             `Your notes or mixer changes for “${ui.title.textContent}” are not saved. Save them before opening another score?`,
             [["cancel", "Cancel"], ["discard", "Don't save"], ["save", "Save"]]);
         if (choice === "cancel" || (choice === "save" && !saveAll())) {
-            return;
+            return false;
         }
         if (choice === "discard") {
             discardAll();
         }
     }
     await openScore(name, data);
+    return true;
 }
 
 async function openScore(name: string, data: ArrayBuffer) {
@@ -3081,7 +3182,7 @@ async function changeView() {
     const view = ui.viewMode.value;
     shownView = view;
     // page by page and page view share a layout: stay on the same page
-    const keepPage = was === "page" || was === "page_turn" ? (was === "page_turn" ? turnedTo() : pageAtMiddle()) : 0;
+    const keepPage = was === "page" || turnView(was) ? (turnView(was) ? turnedTo() : pageAtMiddle()) : 0;
     setStatus("Laying out…");
     state.score = await engine.setViewMode(engineMode(view));
     notes.setMode(engineMode(view)); // notes belong to the layout they were written on
@@ -3089,21 +3190,60 @@ async function changeView() {
     // before fitting: the message above the score takes height, and when it goes within the same
     // frame nothing reports the screen growing back (the page stayed fitted to the shorter screen)
     setStatus("");
-    if (view === "page_turn") {
-        if (was !== "page_turn") {
+    if (turnView(view)) {
+        if (!turnView(was)) {
             zoomBeforeTurn = state.zoom;
         }
         state.zoom = fitPageZoom();
         turnFitted = true;
-    } else if (was === "page_turn") {
+    } else if (turnView(was)) {
         state.zoom = zoomBeforeTurn;
     }
     rerenderAll(false);
-    if (view === "page_turn") {
+    if (turnView(view)) {
         turnTo(keepPage, false);
-    } else if (was === "page_turn" && view === "page") {
+    } else if (turnView(was) && view === "page") {
         state.pageEls[keepPage]?.scrollIntoView({ block: "start" });
     }
+    if (view === "page_pair" && was !== view) {
+        // two pages want a screen on its side; where the device won't be turned for us, say so
+        const turned = await sideways;
+        if (!turned && ui.viewMode.value === "page_pair" && ui.viewer.clientWidth < ui.viewer.clientHeight) {
+            setStatus("Turn your device on its side to read two pages.", "info", 6000);
+        }
+    }
+}
+
+// Two pages: the screen is kept on its side while the view shows, where the device allows it
+// (Android: the installed app, or full screen such as the Focus button's; iPhone and iPad have no
+// way to ask, so there the reader turns it). Given back when another view or score takes over.
+let sidewaysHeld = false;
+let sideways: Promise<boolean> = Promise.resolve(false); // the last request: did the device agree
+function keepSideways(on: boolean) {
+    const o = screen.orientation as any;
+    if (on && !sidewaysHeld) {
+        sideways = !o?.lock ? Promise.resolve(false) : Promise.resolve()
+            .then(() => o.lock("landscape"))
+            .then(() => {
+                if (ui.viewMode.value !== "page_pair") {
+                    o.unlock(); // the reader chose another view meanwhile
+                    return false;
+                }
+                return (sidewaysHeld = true);
+            }, () => false);
+    } else if (!on && sidewaysHeld) {
+        sidewaysHeld = false;
+        try {
+            o?.unlock?.();
+        } catch { /* nothing held */ }
+    }
+}
+// full screen makes it possible in a browser tab, and leaving full screen lets the screen go
+for (const type of ["fullscreenchange", "webkitfullscreenchange"]) {
+    document.addEventListener(type, () => {
+        sidewaysHeld = false;
+        keepSideways(ui.viewMode.value === "page_pair" && !!state.score);
+    });
 }
 let shownView = "page";
 let zoomBeforeTurn = 1;
@@ -3162,7 +3302,7 @@ let turnFitted = true; // page by page at the whole-page zoom (kept that way whe
         if (swipe.moving) {
             // never further than the next page either way
             const [lo, hi] = slotRange(swipe.from);
-            const vw = ui.viewer.clientWidth;
+            const vw = ui.viewer.clientWidth / span * turnStep();
             ui.viewer.scrollLeft = Math.min(Math.max(swipe.left - dx, lo - vw), hi + vw);
             ui.viewer.scrollTop = swipe.top - dy;
         }
@@ -3206,7 +3346,8 @@ document.addEventListener("keydown", (e) => {
     const step = { ArrowRight: 1, PageDown: 1, ArrowLeft: -1, PageUp: -1 }[e.key];
     if (step) {
         e.preventDefault();
-        turnTo(turnedTo() + step);
+        // a key pressed again while the page still glides counts from the page it is going to
+        turnTo(turnFrom(performance.now() - turning.at < 500 ? turning.to : turnedTo(), step));
     }
 });
 
@@ -3636,16 +3777,19 @@ function setNotesActive(on: boolean) {
 }
 
 const closeNotes = () => setNotesActive(false);
+// Notes and Edit are never on together: each one's button switches the other off
 ui.notesToggle.onclick = () => {
-    if (edit.on) {
-        closeLayer(closeEdit);
-    }
     if (notes.active) {
         closeLayer(closeNotes);
+        return;
+    }
+    if (edit.on) {
+        swapLayer(closeEdit, closeNotes);
+        setEditActive(false);
     } else {
-        setNotesActive(true);
         openLayer(closeNotes);
     }
+    setNotesActive(true);
 };
 ui.notesDone.onclick = () => closeLayer(closeNotes);
 
@@ -3663,9 +3807,14 @@ const edit = {
     octave: false,
     undo: 0, // edits that can be undone
     redo: 0,
-    selEl: null as HTMLDivElement | null,
+    selEls: [] as HTMLDivElement[], // the outline: one box, or one per system for a range
+    clip: false, // something was copied (the engine keeps it, across scores, as desktop's clipboard)
     draftTimer: 0,
     fresh: false, // made with New score: no file behind it
+    // note input, as desktop's: the length the next note or rest gets (a quarter to start), and whether the
+    // selection is the place after the one just entered (then the letters stay, even over an existing note)
+    len: { den: 4, dots: 0 },
+    step: false,
 };
 
 const LENGTHS: [number, string][] = [[1, "Whole"], [2, "Half"], [4, "Quarter"], [8, "Eighth"], [16, "16th"], [32, "32nd"]];
@@ -3693,7 +3842,15 @@ for (const [den, name] of LENGTHS) {
     b.setAttribute("aria-label", name + " note");
     b.title = name;
     b.innerHTML = lengthIcon(den);
-    b.onclick = () => void runEdit(() => engine.editDuration(den));
+    b.onclick = () => {
+        if (entering()) { // the length of the notes about to go in, as in desktop's note input
+            edit.len = { den, dots: 0 };
+            updateEditBar();
+        } else {
+            edit.len = { den, dots: edit.sel?.dots ?? 0 };
+            void runEdit(() => engine.editDuration(den));
+        }
+    };
     ui.editLengths.appendChild(b);
 }
 const dotButton = document.createElement("button");
@@ -3703,8 +3860,83 @@ dotButton.disabled = true;
 dotButton.setAttribute("aria-label", "Dotted");
 dotButton.title = "Dotted: half as long again";
 dotButton.textContent = "•";
-dotButton.onclick = () => void runEdit(() => engine.editDot());
+dotButton.onclick = () => {
+    if (entering()) {
+        edit.len = { ...edit.len, dots: edit.len.dots ? 0 : 1 };
+        updateEditBar();
+    } else {
+        void runEdit(() => engine.editDot());
+    }
+};
 ui.editLengths.appendChild(dotButton);
+
+// Paste: at the end of the length row once something was copied (that row has room on a phone)
+const pasteButton = document.createElement("button");
+pasteButton.className = "len paste";
+pasteButton.id = "edit-paste";
+pasteButton.hidden = true;
+pasteButton.title = "Paste what you copied here (it replaces what is there)";
+pasteButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Paste</span>';
+pasteButton.onclick = () => void runEdit(() => engine.editPaste());
+ui.editLengths.appendChild(pasteButton);
+
+// Voice 1-4 (More): entering, the next notes go into that voice here; otherwise the selected notes move to it
+for (let v = 1; v <= 4; v++) {
+    const b = document.createElement("button");
+    b.className = "btn small voice";
+    b.dataset.voice = String(v);
+    b.textContent = String(v);
+    b.disabled = true;
+    b.setAttribute("aria-label", `Voice ${v}`);
+    b.title = v === 1 ? "Voice 1: the main tune of the line" : `Voice ${v}: another tune on the same line`;
+    b.onclick = async () => {
+        const input = entering();
+        const len = edit.len;
+        if (await runEdit(() => engine.editVoice(v, input)) && input) {
+            edit.step = true; // carry on entering, now in that voice
+            edit.len = len;
+            updateEditBar();
+        }
+    };
+    $("edit-voices").appendChild(b);
+}
+$("edit-marks").querySelectorAll<HTMLButtonElement>(".mark").forEach((b) => {
+    b.onclick = () => void runEdit(() => engine.editMark(Number(b.dataset.mark)));
+});
+$("edit-slur").onclick = () => void runEdit(() => engine.editSlur());
+$("edit-cresc").onclick = () => void runEdit(() => engine.editHairpin(0));
+$("edit-dim").onclick = () => void runEdit(() => engine.editHairpin(1));
+$("edit-insertbars").onclick = () => void runEdit(() => engine.editInsertBars(Math.max(1, Math.min(100, Number(em.bars.value) || 1))));
+$("edit-deletebars").onclick = async () => {
+    const s = edit.sel;
+    const what = s?.kind === "range" && s.barEnd !== s.bar ? `bars ${s.bar}–${s.barEnd}` : `bar ${s?.bar}`;
+    const choice = await ask(`Delete ${what}?`, "The bar goes from every line, with what is in it. Undo brings it back.",
+        [["cancel", "Cancel"], ["delete", "Delete"]]);
+    if (choice === "delete") {
+        void runEdit(() => engine.editDeleteBars());
+    }
+};
+
+$("edit-copysel").onclick = async () => {
+    const s = edit.sel;
+    const r = await engine.editCopy(false);
+    if (!r.ok) {
+        setStatus(r.error || "That could not be copied.", "error", 4000);
+        return;
+    }
+    edit.clip = true;
+    updateEditBar();
+    if (s?.kind === "range") {
+        const what = s.bar === s.barEnd ? `bar ${s.bar}` : `bars ${s.bar}–${s.barEnd}`;
+        setStatus(`Copied ${what}. Tap where it should go, then Paste.`, "info", 5000);
+    }
+};
+$("edit-cut").onclick = async () => {
+    if (await runEdit(() => engine.editCopy(true))) {
+        edit.clip = true;
+        updateEditBar();
+    }
+};
 
 const lengthName = (den: number, dots: number) =>
     (dots ? "dotted " : "") + (LENGTHS.find(([d]) => d === den)?.[1].toLowerCase() ?? "long");
@@ -3715,10 +3947,28 @@ LETTERS.forEach((name, i) => {
     b.className = "btn small letter";
     b.textContent = name;
     b.setAttribute("aria-label", `Put a ${name} here`);
-    b.title = `Put a ${name} on this rest`;
-    b.onclick = () => void runEdit(() => engine.editEnterNote(i));
+    b.title = `Put a ${name} here, then go on to the next place`;
+    b.onclick = () => void enterStep(() => engine.editEnterNote(i, edit.len.den, edit.len.dots));
     $("edit-letters").appendChild(b);
 });
+// a rest of the chosen length, as desktop's 0 key: rhythms with rests go in without leaving the letters
+const restButton = document.createElement("button");
+restButton.className = "btn small letter rest-key";
+restButton.id = "edit-rest";
+restButton.setAttribute("aria-label", "Put a rest here");
+restButton.title = "Put a rest here, then go on to the next place";
+restButton.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="20" aria-hidden="true"><path d="M10 3l4.5 5.2-3 3.6 3.6 4.7c-2.4-.9-4.6-.5-4.2 2.5L8.5 21c-2-2.2-1.4-5.2 2.4-4.6L7.6 12.5l3.2-3.7z" fill="currentColor"/></svg>';
+restButton.onclick = () => void enterStep(() => engine.editEnterRest(edit.len.den, edit.len.dots));
+$("edit-letters").appendChild(restButton);
+
+// Note input shows the letters: on a rest, and on the place after a note just entered
+const entering = () => !!edit.sel && (edit.sel.kind === "rest" || edit.step);
+async function enterStep(change: () => Promise<EditResult>) {
+    if (await runEdit(change)) {
+        edit.step = true;
+        updateEditBar();
+    }
+}
 
 // ---- More: the tools a composer needs less often, behind one button
 const em = {
@@ -3827,6 +4077,15 @@ function updateMore(s: EditSelection | null, idle: boolean) {
     em.key.disabled = em.time.disabled = !any;
     $("edit-chord").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !note));
     $("edit-dynamics").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !any));
+    const range = s?.kind === "range";
+    $("edit-voices").querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
+        b.disabled = !s || idle;
+        b.setAttribute("aria-pressed", String(!!s && !range && Number(b.dataset.voice) === s.voice));
+    });
+    $("edit-marks").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !(note || range) || idle));
+    set(["edit-slur", "edit-cresc", "edit-dim"], (note || range) && !idle);
+    set(["edit-insertbars", "edit-deletebars"], !!s && !idle);
+    $("edit-deletebars").textContent = range && s?.barEnd !== s?.bar ? "Delete bars" : "Delete bar";
     set(["edit-addbars", "edit-addline"], !idle);
     $("edit-tie").setAttribute("aria-pressed", String(!!s?.tie));
 }
@@ -3835,61 +4094,87 @@ function updateEditBar() {
     const s = edit.sel;
     const note = s?.kind === "note";
     ui.editInfo.innerHTML = "";
-    if (s) {
+    const range = s?.kind === "range";
+    if (s && range) {
+        const b = document.createElement("b");
+        b.textContent = s.bar === s.barEnd ? `Bar ${s.bar}` : `Bars ${s.bar}–${s.barEnd}`;
+        const rest = document.createElement("span");
+        rest.className = "dim";
+        rest.textContent = ` · ${s.staves === 1 ? "1 line" : `${s.staves} lines`} selected`;
+        ui.editInfo.append(b, rest);
+    } else if (s) {
         const b = document.createElement("b");
         b.textContent = note ? (s.name ?? "Note") : "Rest";
         const rest = document.createElement("span");
         rest.className = "dim";
         const lines = state.tracks.filter((t) => !t.metronome).length;
-        rest.textContent = ` · ${lengthName(s.den, s.dots)}${s.tuplet ? " · triplet" : ""} · bar ${s.bar}${lines > 1 && s.part ? " · " + s.part : ""}`;
+        // entering: the length the next note gets, as the length buttons show
+        const len = entering() ? edit.len : s;
+        rest.textContent = ` · ${lengthName(len.den, len.dots)}${s.voice > 1 ? ` · voice ${s.voice}` : ""}${s.tuplet ? " · triplet" : ""} · bar ${s.bar}${lines > 1 && s.part ? " · " + s.part : ""}`;
         ui.editInfo.append(b, rest);
     } else {
-        ui.editInfo.textContent = "Tap a note or rest to change it";
+        ui.editInfo.textContent = "Tap a note or rest to change it; hold another to select up to it";
     }
     const idle = edit.busy;
-    $("edit-letters").parentElement!.classList.toggle("on-rest", s?.kind === "rest");
+    const input = entering();
+    $("edit-letters").parentElement!.classList.toggle("on-rest", input);
+    $("edit-letters").parentElement!.classList.toggle("on-range", range);
+    $<HTMLButtonElement>("edit-copysel").disabled = $<HTMLButtonElement>("edit-cut").disabled = !range || idle;
+    pasteButton.hidden = !edit.clip;
+    pasteButton.disabled = !s || idle;
     $("edit-letters").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = idle));
     updateMore(s, idle);
     $("edit-voice").toggleAttribute("disabled", !s || idle);
     $("edit-voice").title = s ? "Sing or hum a tune and put it in as notes" : "Pick the note or rest where the tune should start";
     ui.editPrev.disabled = ui.editNext.disabled = ui.editDelete.disabled = !s || idle;
-    ui.editUp.disabled = ui.editDown.disabled = ui.editOctave.disabled = !note || idle;
+    ui.editUp.disabled = ui.editDown.disabled = ui.editOctave.disabled = !(note || range) || idle;
     ui.editOctave.title = note ? "Move by an octave instead of a step" : "Select a note to move it";
     ui.editUndo.disabled = edit.undo === 0 || idle;
     ui.editRedo.disabled = edit.redo === 0 || idle;
     ui.editCopy.disabled = !edit.dirty || idle;
-    ui.editLengths.querySelectorAll<HTMLButtonElement>(".len").forEach((b) => {
-        b.disabled = !s || idle;
+    ui.editLengths.querySelectorAll<HTMLButtonElement>(".len:not(.paste)").forEach((b) => {
+        b.disabled = !s || range || idle;
         if (b.dataset.den) {
-            b.setAttribute("aria-checked", String(!!s && Number(b.dataset.den) === s.den));
+            // entering: the length the next note gets; otherwise the selected one's
+            b.setAttribute("aria-checked", String(!!s && Number(b.dataset.den) === (input ? edit.len.den : s.den)));
             b.setAttribute("role", "radio");
         }
     });
-    dotButton.setAttribute("aria-pressed", String(!!s && s.dots > 0));
+    dotButton.setAttribute("aria-pressed", String(!!s && (input ? edit.len.dots : s.dots) > 0));
 }
 
 // The box round the selected note: placed on its page, kept in view
+function clearEditSel() {
+    edit.selEls.forEach((el) => el.remove());
+}
 function showEditSel(scroll: boolean) {
     const s = edit.sel;
-    const pageEl = s ? state.pageEls[s.page] : undefined;
-    if (!s || !pageEl) {
-        edit.selEl?.remove();
+    const boxes = (s?.boxes ?? (s ? [s] : [])).filter((b) => state.pageEls[b.page]);
+    if (!s || !boxes.length) {
+        clearEditSel();
         return;
     }
-    if (!edit.selEl) {
-        edit.selEl = document.createElement("div");
-        edit.selEl.className = "edit-sel";
+    while (edit.selEls.length < boxes.length) {
+        const el = document.createElement("div");
+        el.className = "edit-sel";
+        edit.selEls.push(el);
     }
-    if (edit.selEl.parentElement !== pageEl) {
-        pageEl.appendChild(edit.selEl);
-    }
+    edit.selEls.slice(boxes.length).forEach((el) => el.remove());
     const pad = 3;
-    edit.selEl.style.transform = `translate(${unitsToCss(s.x) - pad}px, ${unitsToCss(s.y) - pad}px)`;
-    edit.selEl.style.width = unitsToCss(s.w) + 2 * pad + "px";
-    edit.selEl.style.height = unitsToCss(s.h) + 2 * pad + "px";
+    boxes.forEach((b, i) => {
+        const el = edit.selEls[i];
+        const pageEl = state.pageEls[b.page]!;
+        if (el.parentElement !== pageEl) {
+            pageEl.appendChild(el);
+        }
+        el.classList.toggle("range", s.kind === "range");
+        el.style.transform = `translate(${unitsToCss(b.x) - pad}px, ${unitsToCss(b.y) - pad}px)`;
+        el.style.width = unitsToCss(b.w) + 2 * pad + "px";
+        el.style.height = unitsToCss(b.h) + 2 * pad + "px";
+    });
     if (scroll) {
         const v = ui.viewer.getBoundingClientRect();
-        const r = edit.selEl.getBoundingClientRect();
+        const r = edit.selEls[0].getBoundingClientRect();
         const margin = 80;
         if (r.top < v.top + margin || r.bottom > v.bottom - margin) {
             ui.viewer.scrollTop += r.top + r.height / 2 - (v.top + v.height / 2);
@@ -3900,16 +4185,37 @@ function showEditSel(scroll: boolean) {
     }
 }
 
-async function editSelectAt(tap: { page: number; x: number; y: number; radius: number }) {
-    if (edit.busy) {
-        return;
-    }
-    if (!(engine.audioRunning && state.playbackReady) && !state.playing) {
-        await startAudioFromTap(); // the first tap starts the sound, and waits for it, so this note sounds too
-    }
-    edit.sel = await engine.editSelect(tap.page, tap.x, tap.y, tap.radius);
-    showEditSel(false);
-    updateEditBar();
+// Taps and holds on the score are handled one after another: the first tap waits for the sound to start, and a
+// hold made meanwhile extended from the old selection, then the late tap replaced the range
+let editPicks: Promise<void> = Promise.resolve();
+function editPick(pick: () => Promise<EditSelection | null>) {
+    editPicks = editPicks.then(async () => {
+        if (edit.busy) {
+            return;
+        }
+        edit.sel = await pick();
+        edit.step = false;
+        showEditSel(false);
+        updateEditBar();
+    }).catch((err) => console.warn("pick failed:", err));
+    return editPicks;
+}
+function editSelectAt(tap: { page: number; x: number; y: number; radius: number }) {
+    return editPick(async () => {
+        if (!(engine.audioRunning && state.playbackReady) && !state.playing) {
+            await startAudioFromTap(); // the first tap starts the sound, and waits for it, so this note sounds too
+        }
+        const s = await engine.editSelect(tap.page, tap.x, tap.y, tap.radius);
+        // as desktop (InputState::update): picking a note or rest makes its length the one notes go in with;
+        // a whole-bar rest keeps the length chosen before
+        if (s && s.kind !== "range" && s.den > 0) {
+            edit.len = { den: s.den, dots: s.dots };
+        }
+        return s;
+    });
+}
+function editExtendAt(tap: { page: number; x: number; y: number; radius: number }) {
+    return editPick(() => engine.editExtend(tap.page, tap.x, tap.y, tap.radius));
 }
 
 // The score changed: its size, the time of each note and the pages are all new
@@ -3929,11 +4235,12 @@ async function afterEdit() {
     showEditSel(true);
 }
 
-async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" | "redo" = "edit") {
+async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" | "redo" = "edit"): Promise<boolean> {
     if (edit.busy || !edit.on) {
-        return;
+        return false;
     }
     edit.busy = true;
+    edit.step = false; // any other change ends a run of note input (enterStep sets it again)
     updateEditBar();
     try {
         if (state.playing) {
@@ -3942,7 +4249,7 @@ async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" 
         const r = await change();
         if (!r.ok) {
             setStatus(r.error || "That could not be changed.", "error", 4000);
-            return;
+            return false;
         }
         edit.dirty = true;
         if (kind === "edit") {
@@ -3957,9 +4264,11 @@ async function runEdit(change: () => Promise<EditResult>, kind: "edit" | "undo" 
         }
         await afterEdit();
         scheduleEditDraft();
+        return true;
     } catch (err) {
         console.warn("edit failed:", err);
         setStatus("That could not be changed. Your score is as it was; try again.", "error", 5000);
+        return false;
     } finally {
         edit.busy = false;
         updateEditBar();
@@ -3990,11 +4299,79 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
+// Edit by keyboard, with desktop's keys (computers, iPads with a keyboard): A-G and 0 note input, 1-7 the
+// lengths (64th to whole), "." dot, arrows move (Shift: a range), Up/Down pitch (Ctrl: octave), Delete,
+// Ctrl+C/X/V, Ctrl+Z/Y. Not while typing in a field, and not with a panel or question open over Edit.
+document.addEventListener("keydown", (e) => {
+    const t = e.target as HTMLElement;
+    if (!edit.on || edit.busy || ui.ask.open || layers[layers.length - 1] !== closeEdit || t.closest("input, select, textarea, [contenteditable]")) {
+        return;
+    }
+    const ctrl = e.ctrlKey || e.metaKey;
+    const key = e.key;
+    const lower = key.toLowerCase();
+    const s = edit.sel;
+    let handled = true;
+    if (ctrl && lower === "z") {
+        (e.shiftKey ? ui.editRedo : ui.editUndo).click();
+    } else if (ctrl && lower === "y") {
+        ui.editRedo.click();
+    } else if (ctrl && lower === "c") {
+        $("edit-copysel").click();
+        if (s?.kind !== "range") { // a single note or rest copies too, as on desktop
+            void engine.editCopy(false).then((r) => { edit.clip = r.ok || edit.clip; updateEditBar(); });
+        }
+    } else if (ctrl && lower === "x") {
+        $("edit-cut").click();
+    } else if (ctrl && lower === "v") {
+        pasteButton.click();
+    } else if (ctrl && (key === "ArrowUp" || key === "ArrowDown") && s) {
+        void runEdit(() => engine.editPitch(key === "ArrowUp" ? 2 : 3));
+    } else if (ctrl || e.altKey) {
+        handled = false; // the browser's and the system's own shortcuts
+    } else if (/^[a-g]$/.test(lower) && s && s.kind !== "range") {
+        void enterStep(() => engine.editEnterNote("cdefgab".indexOf(lower), edit.len.den, edit.len.dots));
+    } else if (key === "0" && s && s.kind !== "range") {
+        void enterStep(() => engine.editEnterRest(edit.len.den, edit.len.dots));
+    } else if (/^[1-7]$/.test(key) && s && s.kind !== "range") {
+        const den = [64, 32, 16, 8, 4, 2, 1][Number(key) - 1];
+        if (den > 32) {
+            handled = false; // no 64th button; desktop's 1 is a 64th
+        } else {
+            ui.editLengths.querySelector<HTMLButtonElement>(`.len[data-den="${den}"]`)?.click();
+        }
+    } else if (key === "." && s && s.kind !== "range") {
+        dotButton.click();
+    } else if ((key === "ArrowRight" || key === "ArrowLeft") && s) {
+        const dir = key === "ArrowRight" ? "next" : "prev";
+        if (e.shiftKey) {
+            void (async () => {
+                edit.sel = await engine.editMove(`extend-${dir}-chord`);
+                edit.step = false;
+                showEditSel(true);
+                updateEditBar();
+            })();
+        } else {
+            void moveSelection(`${dir}-chord`);
+        }
+    } else if ((key === "ArrowUp" || key === "ArrowDown") && (s?.kind === "note" || s?.kind === "range")) {
+        void runEdit(() => engine.editPitch(key === "ArrowUp" ? 0 : 1));
+    } else if ((key === "Delete" || key === "Backspace") && s) {
+        ui.editDelete.click();
+    } else {
+        handled = false;
+    }
+    if (handled) {
+        e.preventDefault();
+    }
+});
+
 async function moveSelection(to: "next-chord" | "prev-chord") {
     if (edit.busy) {
         return;
     }
     const s = await engine.editMove(to);
+    edit.step = false;
     if (s) {
         edit.sel = s;
     }
@@ -4051,14 +4428,15 @@ function setEditActive(on: boolean) {
     document.documentElement.classList.toggle("editing", on);
     if (on) {
         if (notes.active) {
-            closeLayer(closeNotes);
+            swapLayer(closeNotes, closeEdit);
+            setNotesActive(false);
         }
         if (state.playing) {
             void engine.pause();
         }
     } else {
         edit.sel = null;
-        edit.selEl?.remove();
+        clearEditSel();
         void engine.editClearSelection();
     }
     updateEditBar();
@@ -4072,7 +4450,9 @@ function resetEdit() {
     edit.sel = null;
     edit.dirty = false;
     edit.undo = edit.redo = 0;
-    edit.selEl?.remove();
+    edit.step = false;
+    edit.len = { den: 4, dots: 0 }; // each score starts note input on quarters, as desktop does
+    clearEditSel();
     ui.editbar.hidden = true;
     ui.editToggle.setAttribute("aria-pressed", "false");
     document.documentElement.classList.remove("editing");
@@ -4084,7 +4464,9 @@ ui.editToggle.onclick = () => {
         closeLayer(closeEdit);
     } else {
         setEditActive(true);
-        openLayer(closeEdit);
+        if (!layers.includes(closeEdit)) { // unless it took the Notes' Back entry
+            openLayer(closeEdit);
+        }
     }
 };
 ui.editDone.onclick = () => closeLayer(closeEdit);
@@ -4453,6 +4835,8 @@ KEYS.forEach(([k, name]) => ns.key.add(new Option(name, String(k))));
 TIMES.forEach(([n, d]) => ns.time.add(new Option(`${n}/${d}`, `${n}/${d}`)));
 
 $("new-score").onclick = () => ns.dlg.showModal();
+// from inside a score too, behind Edit's More (no room for it in the top bar on a phone)
+$("edit-newscore").onclick = () => ns.dlg.showModal();
 $("ns-cancel").onclick = () => ns.dlg.close();
 $("ns-create").onclick = async () => {
     const lines: LineChoice[] = [...ns.lines.children].map((row) => ({
@@ -4468,8 +4852,8 @@ $("ns-create").onclick = async () => {
     });
     ns.dlg.close();
     const bytes = new TextEncoder().encode(text);
-    await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer);
-    if (openedScore?.name && state.score) {
+    // cancelled at "Save a copy … before closing it?": the open score must not become a new one
+    if (await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer) && state.score) {
         await beginFresh();
     }
 };
@@ -4478,8 +4862,13 @@ $("ns-create").onclick = async () => {
 async function beginFresh() {
     edit.fresh = true;
     edit.dirty = true;
+    em.panel.hidden = true; // the new score shows, not the More panel it was made from
+    em.btn.setAttribute("aria-pressed", "false");
+    em.btn.setAttribute("aria-expanded", "false");
     if (!edit.on) {
         setEditActive(true);
+    }
+    if (!layers.includes(closeEdit)) { // made from inside Edit: its Back entry is still there
         openLayer(closeEdit);
     }
     edit.sel = await engine.editSelectStart();
@@ -4488,43 +4877,79 @@ async function beginFresh() {
     void saveEditDraft(); // so even an untouched new score can be resumed
 }
 
-// The start screen offers the newest unsaved new score
-const resume = { row: $("resume-row"), btn: $<HTMLButtonElement>("resume-score"), drop: $<HTMLButtonElement>("resume-drop"), key: "" };
+// The start screen offers the newest unsaved new score, and the others behind a small "N more" (desktop
+// restores every unsaved score of a session; the list stays out of the way until asked for)
+const resume = {
+    row: $("resume-row"), btn: $<HTMLButtonElement>("resume-score"), drop: $<HTMLButtonElement>("resume-drop"),
+    more: $<HTMLButtonElement>("resume-more"), list: $("resume-list"), key: "",
+};
+const draftName = (d: EditDraft) => d.name.replace(/\.(mscz|mscx)$/i, "");
 async function showResume() {
     if (embedded) {
         return;
     }
-    const d = (await editDraft.fresh())[0];
+    const [d, ...others] = await editDraft.fresh();
     resume.row.hidden = !d || !!state.score;
     if (d) {
         resume.key = d.key ?? "";
-        resume.btn.textContent = `Continue “${d.name.replace(/\.(mscz|mscx)$/i, "")}”`;
+        resume.btn.textContent = `Continue “${draftName(d)}”`;
     }
+    resume.more.hidden = !others.length;
+    resume.more.textContent = `${others.length} more`;
+    if (!others.length) {
+        resume.list.hidden = true;
+        resume.more.setAttribute("aria-expanded", "false");
+    }
+    resume.list.replaceChildren(...others.map((o) => {
+        const row = document.createElement("span");
+        row.className = "resume-item";
+        const go = document.createElement("button");
+        go.className = "btn small";
+        go.textContent = `Continue “${draftName(o)}”`;
+        go.onclick = () => void continueDraft(o.key ?? "");
+        const when = document.createElement("span");
+        when.className = "hint";
+        when.textContent = new Date(o.at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+        const drop = document.createElement("button");
+        drop.className = "btn small plain";
+        drop.textContent = "Discard";
+        drop.setAttribute("aria-label", `Discard “${draftName(o)}”`);
+        drop.onclick = () => void dropDraft(o.key ?? "");
+        row.append(go, when, drop);
+        return row;
+    }));
 }
-resume.btn.onclick = async () => {
-    const d = await editDraft.get(resume.key);
+async function continueDraft(key: string) {
+    const d = await editDraft.get(key);
     if (!d) {
         return;
     }
-    const old = resume.key;
     resume.row.hidden = true;
-    await openChosen(d.name, d.data);
-    await editDraft.remove(old); // its draft is kept again, under the new key, by the next change
+    if (!(await openChosen(d.name, d.data))) {
+        void showResume();
+        return;
+    }
+    await editDraft.remove(key); // its draft is kept again, under the new key, by the next change
     if (state.score) {
         await beginFresh();
     }
-};
-resume.drop.onclick = async () => {
-    await editDraft.remove(resume.key);
-    resume.row.hidden = true;
+}
+async function dropDraft(key: string) {
+    await editDraft.remove(key);
     void showResume();
+}
+resume.btn.onclick = () => void continueDraft(resume.key);
+resume.drop.onclick = () => void dropDraft(resume.key);
+resume.more.onclick = () => {
+    resume.list.hidden = !resume.list.hidden;
+    resume.more.setAttribute("aria-expanded", String(!resume.list.hidden));
 };
 void showResume();
 
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, settings, edit, updateEditBar, showEditSel, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
+(window as any).app = { engine, state, settings, edit, layers, updateEditBar, showEditSel, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
     // update-restart-test.mjs: an update can't be produced on demand there
     markUpdateReady: () => (updateReady = true), restartForUpdate };
 
@@ -4578,9 +5003,9 @@ function tourSteps(): TourStep[] {
         { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
         { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        { target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. Tap a rest and a row of letters C to B puts a note on it. The three dots (More) hold sharps and flats, ties, triplets, chords, dynamics, words and lyrics, key and time, extra bars and lines, and the microphone that turns a tune you sing into notes. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." },
+        { target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes, and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." },
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
-        { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Continuous lays the music out in one long line." },
+        { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Two pages shows two side by side with the device on its side; each swipe moves on one page, so the right page becomes the left (Settings can make a swipe turn both). Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },
         tipStep,
     ];

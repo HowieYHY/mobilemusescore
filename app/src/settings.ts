@@ -2,7 +2,7 @@
 // Every default is how PocketScore behaved before there were settings. A preview inside the Reso
 // website keeps nothing on the device, so it always uses the defaults.
 
-export type StartView = "page" | "page_turn" | "continuous_h" | "continuous_v";
+export type StartView = "page" | "page_turn" | "page_pair" | "continuous_h" | "continuous_v";
 
 export interface Settings {
     keepPlaying: boolean;      // music goes on when the app is left
@@ -15,6 +15,7 @@ export interface Settings {
     startView: StartView;      // the view a score opens in
     follow: boolean;           // the view follows the music
     keepAwake: boolean;        // the screen stays on while playing
+    pairSwipeTwo: boolean;     // Two pages: a swipe turns both pages (off: it moves on by one)
 }
 
 export const DEFAULTS: Readonly<Settings> = {
@@ -28,6 +29,7 @@ export const DEFAULTS: Readonly<Settings> = {
     startView: "page",
     follow: true,
     keepAwake: false,
+    pairSwipeTwo: false,
 };
 
 const KEY = "pocketscore.settings";
@@ -43,7 +45,7 @@ function sanitize(raw: unknown): Settings {
             }
         }
     }
-    if (!["page", "page_turn", "continuous_h", "continuous_v"].includes(s.startView)) {
+    if (!["page", "page_turn", "page_pair", "continuous_h", "continuous_v"].includes(s.startView)) {
         s.startView = DEFAULTS.startView;
     }
     return s;

@@ -35,6 +35,7 @@
     <select id="view-mode" aria-label="View mode" disabled>
       <option value="page">Page view</option>
       <option value="page_turn">Page by page</option>
+      <option value="page_pair">Two pages</option>
       <option value="continuous_h">Continuous (vertical)</option>
       <option value="continuous_v">Continuous (horizontal)</option>
     </select>
@@ -70,8 +71,10 @@
       <button class="btn small primary" id="edit-done">Done</button>
     </div>
     <div class="edit-tools" role="group" aria-label="Move and change the note">
-      <button class="btn small" id="edit-prev" disabled aria-label="Previous note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="btn small" id="edit-next" disabled aria-label="Next note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small range-only" id="edit-copysel" aria-label="Copy" title="Copy these bars, to paste somewhere else"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      <button class="btn small range-only" id="edit-cut" aria-label="Cut" title="Cut: copy these bars and leave rests"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.2 16L18 4M15.8 16L6 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button class="btn small single-only" id="edit-prev" disabled aria-label="Previous note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn small single-only" id="edit-next" disabled aria-label="Next note"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <span class="edit-gap note-only"></span>
       <button class="btn small note-only" id="edit-down" disabled aria-label="Lower"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="btn small note-only" id="edit-up" disabled aria-label="Higher"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -91,6 +94,23 @@
           <button class="btn small" id="edit-tie" disabled title="Tie to the next note of the same pitch">Tie</button>
           <button class="btn small" id="edit-triplet" disabled title="Make this three in the time of two">Triplet</button>
         </span></div>
+      <div class="em-row"><span class="em-h">Voice</span><span class="em-set" id="edit-voices" role="group" aria-label="Voice: two or more tunes on one line"></span></div>
+      <div class="em-row"><span class="em-h">Marks</span>
+        <span class="em-set" id="edit-marks" role="group" aria-label="Marks on the note">
+          <button class="btn small mark" data-mark="0" disabled aria-label="Staccato" title="Staccato: short (again to take it off)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></button>
+          <button class="btn small mark" data-mark="1" disabled aria-label="Accent" title="Accent (again to take it off)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 7l14 5-14 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg></button>
+          <button class="btn small mark" data-mark="2" disabled aria-label="Tenuto" title="Tenuto: held full length (again to take it off)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+          <button class="btn small mark" data-mark="3" disabled aria-label="Marcato" title="Marcato: strongly accented (again to take it off)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 18l6-12 6 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg></button>
+          <button class="btn small mark" data-mark="4" disabled aria-label="Fermata" title="Fermata: hold the note"><svg viewBox="0 0 24 24" width="20" height="18" aria-hidden="true"><path d="M3 17a9 9 0 0 1 18 0" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="15" r="1.8" fill="currentColor"/></svg></button>
+          <button class="btn small mark" data-mark="5" disabled aria-label="Breath mark" title="Breath mark after the note">’</button>
+          <button class="btn small mark" data-mark="6" disabled aria-label="Caesura" title="Caesura: a break after the note">//</button>
+        </span></div>
+      <div class="em-row"><span class="em-h">Phrasing</span>
+        <span class="em-set">
+          <button class="btn small" id="edit-slur" disabled title="Slur: over the selected bars, or from this note to the next"><svg viewBox="0 0 24 24" width="22" height="18" aria-hidden="true"><path d="M3 15c5-7 13-7 18 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Slur</span></button>
+          <button class="btn small" id="edit-cresc" disabled title="Crescendo: under the selected bars, or this note"><svg viewBox="0 0 24 24" width="22" height="18" aria-hidden="true"><path d="M21 6L3 12l18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>cresc.</span></button>
+          <button class="btn small" id="edit-dim" disabled title="Diminuendo: under the selected bars, or this note"><svg viewBox="0 0 24 24" width="22" height="18" aria-hidden="true"><path d="M3 6l18 6-18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>dim.</span></button>
+        </span></div>
       <div class="em-row"><span class="em-h">Add to chord</span><span class="em-set" id="edit-chord" role="group" aria-label="Add a note to this one"></span></div>
       <div class="em-row"><span class="em-h">Dynamics</span><span class="em-set" id="edit-dynamics" role="group" aria-label="Loudness mark"></span></div>
       <div class="em-row"><span class="em-h">Words</span>
@@ -105,7 +125,7 @@
           <select id="edit-time" disabled aria-label="Time signature"></select>
         </span></div>
       <div class="em-row"><span class="em-h">Bars</span>
-        <span class="em-set"><input type="number" id="edit-bars" min="1" max="100" value="4" aria-label="How many bars"><button class="btn small" id="edit-addbars" title="Add bars at the end">Add at the end</button></span></div>
+        <span class="em-set"><input type="number" id="edit-bars" min="1" max="100" value="4" aria-label="How many bars"><button class="btn small" id="edit-insertbars" disabled title="Put that many empty bars before the selected one">Before this bar</button><button class="btn small" id="edit-addbars" title="Add bars at the end">At the end</button><button class="btn small" id="edit-deletebars" disabled title="Take out the selected bar (or bars), on every line">Delete bar</button></span></div>
       <div class="em-row"><span class="em-h">Lines</span>
         <span class="em-set em-words">
           <input type="text" id="edit-line" maxlength="30" autocomplete="off" aria-label="Name of the line" placeholder="Name">
@@ -113,6 +133,8 @@
           <select id="edit-clef" aria-label="Clef of a new line"></select>
           <button class="btn small" id="edit-addline" title="Add a line at the bottom">Add a line</button>
         </span></div>
+      <div class="em-row"><span class="em-h">Score</span>
+        <span class="em-set"><button class="btn small" id="edit-newscore" title="Start another score from a blank page">New score</button></span></div>
     </div>
   </div>
 
@@ -126,7 +148,7 @@
   <main class="viewer" id="viewer">
     <div class="empty" id="empty">
       <p><strong>Open a MuseScore file (.mscz)</strong> to view and play it.</p>
-      <p class="new-row" id="resume-row" hidden><span class="new-btns"><button class="btn primary" id="resume-score">Continue</button><button class="btn plain" id="resume-drop">Discard</button></span><span class="hint">Your unsaved new score, kept on this device.</span></p>
+      <p class="new-row" id="resume-row" hidden><span class="new-btns"><button class="btn primary" id="resume-score">Continue</button><button class="btn plain" id="resume-drop">Discard</button></span><span class="hint">Your unsaved new score, kept on this device. <button class="resume-more" id="resume-more" aria-expanded="false" aria-controls="resume-list" hidden>2 more</button></span><span class="resume-list" id="resume-list" hidden></span></p>
       <p class="new-row"><button class="btn" id="new-score">New score</button><span class="hint">Or start from a blank page and build it up part by part.</span></p>
       <p class="install" id="install-row" hidden>
         <button class="btn primary" id="install">Install PocketScore</button>
@@ -249,9 +271,14 @@
         <select data-set="startView">
           <option value="page">Page view</option>
           <option value="page_turn">Page by page</option>
+          <option value="page_pair">Two pages</option>
           <option value="continuous_h">Continuous (vertical)</option>
           <option value="continuous_v">Continuous (horizontal)</option>
         </select>
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Two pages: a swipe turns both</span><span class="set-hint">Pages 1-2, then 3-4. Off: one page at a time (1-2, then 2-3).</span></span>
+        <input type="checkbox" role="switch" data-set="pairSwipeTwo">
       </label>
       <label class="set-row">
         <span class="set-text"><span class="set-name">Follow the music</span><span class="set-hint">The score moves along as it plays.</span></span>

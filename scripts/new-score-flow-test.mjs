@@ -158,6 +158,8 @@ check((await walk(0)).join() === s1.join(), "and the Melody is as it was");
 // one letter on the third line
 await pickStart(2);
 await tap('#edit-letters button[aria-label="Put a G here"]');
+await page.waitForFunction(() => !app.edit.busy && app.edit.step);
+await tap("#edit-prev"); // note input moved on: back to the G
 await page.waitForFunction(() => !app.edit.busy && app.edit.sel && app.edit.sel.kind === "note");
 check(await page.evaluate(() => app.edit.sel.staff === 2 && /^G/.test(app.edit.sel.name)), "a letter puts a note into the third line: " + await page.evaluate(() => app.edit.sel.name));
 await pause(1500);

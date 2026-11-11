@@ -112,8 +112,11 @@ Found on the way: Previous/Next (`mss_edit_move`) never moved the selection in p
 reads it like any file; desktop MuseScore 4.7 reads it too, `new-score-test.mjs`). The start screen's *New score*
 dialog opens it and `beginFresh` turns on Edit with the first rest picked (`mss_edit_select_start`). A fresh score has
 no file to reopen, so its silent draft is flagged `fresh` and the start screen offers *Continue* until a copy is
-saved (`new-score-flow-test.mjs`: New score, Soprano, Alto, a Tenor letter, close the page, Continue, Save a copy;
-`VIDEO=dir` films it). Chromatic notes are spelled as desktop spells them (a C in E major shows as B sharp).
+saved (every such draft: the newest first, the others behind a small *N more*, `resume-list-test.mjs`; desktop restores every unsaved score of a session) (`new-score-flow-test.mjs`: New score, Soprano, Alto, a Tenor letter, close the page, Continue, Save a copy;
+`VIDEO=dir` films it). With a score open, the same dialog is in Edit's More (*Score → New score*), not in the
+top bar, to keep the phone's bars as they are; `openChosen` returns false when the reader cancels at *Keep your
+edits?*, so the open score is never turned into a new one, and Edit's Back entry is reused
+(`new-score-inside-test.mjs`). Chromatic notes are spelled as desktop spells them (a C in E major shows as B sharp).
 **Phase 3: More** (the three dots in the edit bar; the mic lives there too). Engine (`session.cpp`, `mss_edit_*`):
 `editAddBars`, `editSetKey`/`editSetTime` (every line, from the picked bar), `editTie` (`cmdToggleTie` runs its own
 command), `editAccidental`, `editTriplet`, `editAddToChord`, `editStaffText`, `editDynamic` (use the string
@@ -125,10 +128,46 @@ playback (`rebuildPlayback`, keeping volumes, mutes and solos per line; **sounds
 score's**); a rename only renames the tracks (`syncTracks`). The selection also reports `tie`, `tuplet` and `part`.
 Tests: `edit-more-test.mjs` (engine, read back through desktop MuseScore) and `edit-more-ui-test.mjs` (real touch,
 every button's effect, layout of the open panel at 320/412/820/1280 px).
-The pen Notes stay a read-only-mode tool (Edit closes them); composers write text with More → Words.
+The pen Notes stay a read-only-mode tool; Notes and Edit are never on together (each one's button closes the other, the new mode taking the old one's Back entry, `swapLayer`; `notes-edit-switch-test.mjs`). Composers write text with More → Words.
 The first tap that starts the audio now waits for it, so its note sounds (written, not yet heard on a device).
-Not built: hearing the other lines while recording; New score from inside an open score; choosing the clef or
+Not built: hearing the other lines while recording; choosing the clef or
 sound of an existing line; several voices in one staff; the panel scrolls on a short phone (40% of the height).
+
+**Phase 4 (4 Nov 2026), in the order the user approved** (the list: essential first, then low clutter):
+
+- **#2 Note input that moves on** (`editEnterNote(letter, den, dots)`, `editEnterRest`): desktop's note input, one
+  step per call. The input position is the selection; the length is the one chosen (`edit.len`, a quarter at each
+  score's start, as desktop; tapping a note or rest makes its length the input length, as `InputState::update`
+  does on desktop, while ‹ › during note input leave it); `InputState::moveToNextInputPos` gives the next place, which is selected. With a rest
+  (or the place after a note just entered, `edit.step`) selected, the length buttons set the next notes' length
+  instead of changing the rest. A rest key joins C to B (desktop's 0). The just-entered note is fixed with ‹, ⌄ ⌃, ›.
+  `step-entry-test.mjs` (read back by desktop MuseScore).
+- **#1 Ranges, Copy, Cut, Paste** (`editExtend`, `editCopy(cut)`, `editPaste`): holding a finger still for 450 ms
+  on the score (or Shift+click) selects from the selection to there, `Score::select(RANGE)` as desktop's Shift+click.
+  The engine reports a range as one box per system (`rangeJson`), drawn as a light wash. ‹ › give way to Copy and
+  Cut while a range is selected; Paste sits at the end of the length row once something is copied (beside ‹ › it
+  would have shrunk the letters to 21 px at 360). The clipboard is the engine's own, in desktop's format
+  (`Selection::mimeData`, pasted through `Score::cmdPaste` with a small `IMimeData`), so it carries across scores.
+  Delete and ⌄ ⌃ work on a range. `range-copy-test.mjs`.
+- **#3 Voices** (`editVoice(v, input)`): More → Voice 1-4. On a note: `changeSelectedElementsVoice`. While entering:
+  the place in that voice (`expandVoice` fills it with rests first, as desktop's note input does), so letters go on.
+- **#4 Bars anywhere** (`editInsertBars`, `editDeleteBars`): MasterScore's `insertMeasure` before the picked bar
+  (in the parts too), `deleteMeasures` for the picked bar or the range's bars, after asking.
+- **#5 Marks** (`editMark`): staccato, accent, tenuto, marcato by `toggleArticulation` (every note of a range;
+  again to remove); fermata, breath and caesura dropped on the chord as the palette does (`ChordRest::drop`).
+- **#6 Slurs and hairpins** (`editSlur`, `editHairpin`): desktop's `doAddSlur` rules (a range: one per line, first
+  to last chord; a note: to the next chord), `Score::addHairpins`.
+- **#10 Keys** (main.ts "Edit by keyboard"): A-G, 0, 1-7 (desktop's lengths, no 64th), ".", arrows, Shift+arrows
+  (`editMove("extend-…")`), ↑ ↓ and Ctrl+↑ ↓, Delete, Ctrl+C/X/V/Z/Y; only while Edit is the top layer and no field
+  has focus. `composer-tools-test.mjs` covers #3-#6 and #10.
+
+Still to come, by the same list: #7 transpose, #8 a line's clef and sound, delete and reorder lines, #9 title and
+composer text, then #11-#19 (tempo, repeats, rehearsal marks, breath marks done in #5, pickup bar, verse 2, respell,
+play from the selection, PDF and MusicXML export).
+
+`RuntimeError: null function` from the engine (seen three times, 4 Nov 2026) came each time from the dev server
+reloading the page while a test ran (an app file was changed mid-run; once the page also lost `app`). Don't edit app
+files while tests run against the dev server.
 
 Not done yet: the edit bar is three rows high on a phone, and the open More panel leaves little of the score on a 640 px phone.
 

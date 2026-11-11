@@ -95,6 +95,8 @@ check(await page.evaluate(() => !document.getElementById("edit-triplet").disable
 
 // bar 1: E, sharpened, with a G in its chord, mezzo forte, words above and a lyric; then the second note
 await page.evaluate(() => { document.querySelector("#edit-letters button[aria-label='Put a E here']").click(); });
+await page.waitForFunction(() => app.edit.sel && !app.edit.busy && app.edit.step);
+await page.evaluate(() => document.getElementById("edit-prev").click()); // note input moved on: back to the E
 await page.waitForFunction(() => app.edit.sel && app.edit.sel.kind === "note" && !app.edit.busy);
 const e0 = await page.evaluate(() => app.edit.sel.pitch);
 await press("#edit-sharp", "Sharp");
@@ -121,9 +123,10 @@ const step = async (id) => {
 };
 for (let i = 0; i < 12 && !(await page.evaluate(() => app.edit.sel.kind === "rest" && app.edit.sel.bar === 2)); i++) await step("#edit-next");
 check(await page.evaluate(() => app.edit.sel.kind === "rest" && app.edit.sel.bar === 2), "walked to the rest of bar 2 with the arrows");
+// note input: the second C goes straight after the first, at the same height (nearest the note before)
 await press('#edit-letters button[aria-label="Put a C here"]', "C on bar 2");
-await step("#edit-next");
-await press('#edit-letters button[aria-label="Put a C here"]', "C on bar 3");
+await press('#edit-letters button[aria-label="Put a C here"]', "a second C after it");
+await step("#edit-prev");
 const pitches = await page.evaluate(() => app.edit.sel.pitch);
 await step("#edit-prev");
 check(await page.evaluate((p) => app.edit.sel.kind === "note" && app.edit.sel.pitch === p && !app.edit.sel.tie, pitches), "two Cs of one height, not tied yet");

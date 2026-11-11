@@ -444,8 +444,25 @@ export class Engine {
     /** The first note or rest of the first staff (a score that was just made). */
     editSelectStart(): Promise<EditSelection | null> { return this.request({ cmd: "editSelectStart" }); }
     editSelection(): Promise<EditSelection | null> { return this.request({ cmd: "editSelection" }); }
+    /** Shift+click: a range from the selection to the note or rest nearest the point */
+    editExtend(page: number, x: number, y: number, radius: number): Promise<EditSelection | null> { return this.request({ cmd: "editExtend", page, x, y, radius }); }
+    /** Copy (or Cut) the selection into the engine's own clipboard, in desktop's format */
+    editCopy(cut = false): Promise<EditResult> { return this.request({ cmd: "editCopy", cut }); }
+    editPaste(): Promise<EditResult> { return this.request({ cmd: "editPaste" }); }
+    editHasClip(): Promise<boolean> { return this.request({ cmd: "editHasClip" }); }
+    /** Voice 1-4: input carries on entering in that voice here; otherwise the selection moves to it */
+    editVoice(voice: number, input: boolean): Promise<EditResult> { return this.request({ cmd: "editVoice", voice, input }); }
+    /** Bars before the selected one (all lines), and taking out the selected bars */
+    editInsertBars(count: number): Promise<EditResult> { return this.request({ cmd: "editInsertBars", count }); }
+    editDeleteBars(): Promise<EditResult> { return this.request({ cmd: "editDeleteBars" }); }
+    /** 0 staccato, 1 accent, 2 tenuto, 3 marcato (each toggles), 4 fermata, 5 breath mark, 6 caesura */
+    editMark(kind: number): Promise<EditResult> { return this.request({ cmd: "editMark", kind }); }
+    editSlur(): Promise<EditResult> { return this.request({ cmd: "editSlur" }); }
+    /** 0 crescendo, 1 diminuendo */
+    editHairpin(kind: number): Promise<EditResult> { return this.request({ cmd: "editHairpin", kind }); }
     editClearSelection(): Promise<null> { return this.request({ cmd: "editClearSelection" }); }
-    editMove(to: "next-chord" | "prev-chord" | "next-measure" | "prev-measure"): Promise<EditSelection | null> { return this.request({ cmd: "editMove", to }); }
+    /** extend-…: Shift+arrow, the selection grows into a range as on desktop */
+    editMove(to: "next-chord" | "prev-chord" | "next-measure" | "prev-measure" | "extend-next-chord" | "extend-prev-chord" | "extend-next-measure" | "extend-prev-measure"): Promise<EditSelection | null> { return this.request({ cmd: "editMove", to }); }
     /** mode: 0 semitone up, 1 semitone down, 2 octave up, 3 octave down */
     editPitch(mode: 0 | 1 | 2 | 3): Promise<EditResult> { return this.request({ cmd: "editPitch", mode }); }
     /** den: 1 whole, 2 half, 4 quarter, 8 eighth, 16, 32 */
@@ -463,7 +480,9 @@ export class Engine {
     editLyric(text: string): Promise<EditResult> { return this.request({ cmd: "editLyric", text }); }
     editRenameLine(text: string): Promise<EditResult> { return this.request({ cmd: "editRenameLine", text }); }
     editAddLine(name: string, clef: number): Promise<EditResult> { return this.request({ cmd: "editAddLine", name, clef }); }
-    editEnterNote(letter: number): Promise<EditResult> { return this.request({ cmd: "editEnterNote", letter }); }
+    /** Note input, one step: a note as long as den/dots at the selected place, then the next place is selected */
+    editEnterNote(letter: number, den: number, dots: number): Promise<EditResult> { return this.request({ cmd: "editEnterNote", letter, den, dots }); }
+    editEnterRest(den: number, dots: number): Promise<EditResult> { return this.request({ cmd: "editEnterRest", den, dots }); }
     /** A tune from the selection on: [midi, sixteenths] pairs, midi -1 for a rest. One undo step. */
     editInsertNotes(events: [number, number][]): Promise<EditResult & { done?: number; total?: number }> {
         return this.request({ cmd: "editInsertNotes", spec: events.map(([m, u]) => `${m}:${u}`).join(",") });

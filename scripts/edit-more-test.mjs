@@ -40,7 +40,8 @@ const goBar = (n) => E(`(async () => { let s = await app.engine.editSelectStart(
 
 await E("app.engine.editSelectStart()");
 // bar 1: a note, a second note on its chord, a sharp on the top one, a dynamic, words, a lyric
-await ok("enter C", "app.engine.editEnterNote(0)");
+await ok("enter C", "app.engine.editEnterNote(0, 4, 0)");
+await E('app.engine.editMove("prev-chord")'); // note input moved on: back to the C
 await ok("add E to the chord", "app.engine.editAddToChord(2)");
 await ok("sharp", "app.engine.editAccidental(0)");
 await ok("dynamic mf", "app.engine.editDynamic(4)");

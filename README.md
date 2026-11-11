@@ -82,8 +82,9 @@ No app store needed.
 | Zoom | Pinch, or use **−** and **+** |
 | Scroll | Drag with one or two fingers |
 | Move quickly through a long score | Start scrolling, then drag the handle that appears at the right edge (along the bottom in *Continuous (horizontal)*). It shows the page, or in the continuous views the time in the music, and fades away when you stop |
-| Change the layout | Menu at the top right: *Page view*, *Page by page* or *Continuous* |
+| Change the layout | Menu at the top right: *Page view*, *Page by page*, *Two pages* or *Continuous* |
 | Read one page at a time | Choose *Page by page*: each page fills the screen whole; swipe left or right (or use the arrow keys) to turn one page. The page turns by itself as the music reaches the next one. You can zoom in (pinch, or **+**), but never out past the whole page; zoomed in, drag to move around the page, and keep swiping past its edge to turn. In notes mode, use two fingers |
+| Read two pages side by side | Choose *Two pages*, with the phone or tablet on its side: pages 1 and 2 fill the screen. Swipe left and the right page moves to the left, with the next page beside it (2 and 3, then 3 and 4); swipe right to go back. The arrow keys do the same, and the pages move on by themselves as the music plays. To turn both pages at once instead (1-2, then 3-4), switch on **Two pages: a swipe turns both** in Settings. On Android the installed app turns the screen on its side for you, and so does **⛶** (Focus) in Chrome; on an iPhone or iPad, turn it yourself |
 | Read with nothing in the way | Tap **⛶** (Focus) at the top |
 | Change how PocketScore works | Tap the **gear** (Settings) at the top. See [Settings](#settings) |
 | Close a panel | Tap **Done**, or your phone's **Back** |
@@ -197,7 +198,7 @@ Tap the **pencil** at the top, then tap **Done** when finished.
 
 ### Start a new score
 
-On the start screen, **New score** makes a blank score to build up part by part. Choose a title, then add the lines you want with **Add a line**: give each line a name (rename it as you like) and a clef (treble, an octave lower, or bass). Then the key, the time signature, the speed and the number of bars, and **Create**. It opens straight in **Edit** with the first rest picked. Build it layer by layer: pick a rest in one line, put notes in with the letters or **Sing it in**, then pick the next line's rest and do the same. Everything is kept quietly on this device as you go: if you close the app, the start screen offers **Continue “Your title”** next time. **Save a copy** makes `Your title.mscz`, which opens in MuseScore. The key, time signature, bars and lines can all be changed later with **More** in the Edit bar (below).
+On the start screen, **New score** makes a blank score to build up part by part (with a score already open: **Edit → More → New score**). Choose a title, then add the lines you want with **Add a line**: give each line a name (rename it as you like) and a clef (treble, an octave lower, or bass). Then the key, the time signature, the speed and the number of bars, and **Create**. It opens straight in **Edit** with the first rest picked. Build it layer by layer: pick a rest in one line, put notes in with the letters or **Sing it in**, then pick the next line's rest and do the same. Everything is kept quietly on this device as you go: if you close the app, the start screen offers **Continue “Your title”** next time. Several unsaved new scores are all kept: the newest is offered first, and the others are under **N more** below it. **Save a copy** makes `Your title.mscz`, which opens in MuseScore. The key, time signature, bars and lines can all be changed later with **More** in the Edit bar (below).
 
 ### Change the notes (Edit)
 
@@ -210,22 +211,28 @@ On the start screen, **New score** makes a blank score to build up part by part.
    - **⌄ ⌃** move the note down or up a step; turn on **Octave** to move by an octave instead;
    - the note shapes (whole to 32nd) set how long it is, and the dot makes it half as long again;
    - the bin turns a note into a rest.
-   - **On a rest**, the letters **C D E F G A B** take the place of those buttons: tap one to put that note on the rest, as long as the rest. It lands in the key of the piece, in the octave nearest the note before it; then use **⌄ ⌃** to fix the height.
+   - **On a rest**, the letters **C D E F G A B** and a rest key take the place of those buttons. This is note input, as in MuseScore: pick a length first (the note shapes now set the length of the notes about to go in, a quarter to start), then tap letters one after another. Each note goes in after the last and the letters stay, so a tune goes in letter by letter; the rest key puts in a rest of that length. A note lands in the key of the piece, in the octave nearest the note before it. To fix one, tap **‹** to go back to it, use **⌄ ⌃** (or **Octave**), then **›** to carry on. Letters over existing music replace it.
+   - **Several notes at once (a range):** pick a note, then **hold your finger on another** for a moment (with a mouse: Shift+click). Everything between them is selected, on every line in between, and the bar shows *Bars 3–5 · 2 lines selected*. Then **Copy** or **Cut** (they take the place of **‹ ›**), **⌄ ⌃** to move it all up or down, or the bin to clear it. After copying, **Paste** appears at the end of the note shapes: pick where it should start and tap it. What you copy stays ready to paste into another score too. A plain tap ends the range.
 4. **Sing it in** (the microphone button in the bar) turns a tune you sing or hum into notes. First pick the note or rest where the tune should start. Then **Record** (or **Choose a recording**), sing one tune, one note at a time, and tap **Stop**. PocketScore finds the notes on your device (nothing is uploaded) and draws them. Check them with **Listen**, change the **speed** or the **shortest note** if they look wrong, use **Octave** to move them, then **Put in the score**. They go in from the picked note on and replace what is there; **Undo** takes the whole tune out in one step. This is new: it works best with a clear voice, one note at a time, and it can get notes wrong, so always listen back. Only one voice at a time for now.
 5. **More** (the three dots in the bar) opens the less-used tools:
    - **Sing it in** (the microphone) is here too;
    - **♯ ♭ ♮** change the picked note's accidental, **Tie** joins it to the next note of the same height, **Triplet** turns it into three in the time of two;
+   - **Voice 1 2 3 4** puts two or more tunes on one line (soprano and alto on one staff, say). On a note, it moves the note to that voice. On a rest, while putting notes in, it starts that voice at the same place, so the next letters go into it;
+   - **Marks**: staccato, accent, tenuto and marcato on the picked note or every note of a range (tap again to take one off), a fermata, a breath mark or a caesura;
+   - **Phrasing**: a **Slur** over a range (or from the picked note to the next), a **cresc.** or **dim.** hairpin under it;
    - **Add to chord** puts another note (C to B) on the picked note, above it;
    - **Dynamics** (ppp to fff) goes under the picked note, **Words → Above** puts text above it, and **Lyric** puts a syllable under it (end it with **-** when the word goes on) and picks the next note so you can type on;
    - **From this bar**, **Key** and **Time** change the key or the time signature from the picked bar on, on every line;
-   - **Bars → Add at the end** adds bars;
-   - **Lines**: type a name and **Rename** the picked note's line, or choose a clef and **Add a line** at the bottom (it plays with the same sound as the line above; its sound can be changed in the Mixer).
+   - **Bars**: type how many, then **Before this bar** (empty bars before the picked one) or **At the end**; **Delete bar** takes the picked bar (or the bars of a range) out of every line, after asking;
+   - **Lines**: type a name and **Rename** the picked note's line, or choose a clef and **Add a line** at the bottom (it plays with the same sound as the line above; its sound can be changed in the Mixer);
+   - **Score → New score** starts another score from a blank page without going back to the start screen (the same as **New score** there, above). If this score has changes, PocketScore first asks whether to keep them.
    Adding or taking away a line reloads the sounds for a moment, and sounds you picked for lines in the Mixer go back to the score's own.
 6. **Undo** and **Redo** are at the top right of the bar. **Done** closes the bar.
+7. **With a keyboard** (a computer, or an iPad with one), MuseScore's keys work: **A–G** put notes in, **0** a rest, **5** quarter, **4** eighth, **3** 16th, **6** half, **7** whole, **.** a dot, **← →** move, **Shift+← →** make a range, **↑ ↓** move a note up or down (**Ctrl+↑ ↓** an octave), **Delete**, **Ctrl+C / X / V**, **Ctrl+Z**, **Ctrl+Y**.
 
-**Save a copy** (the download arrow) makes a new `.mscz` file called *Your score (edited).mscz*. It opens in MuseScore or in PocketScore. **It never replaces the file you opened.** If you open another score first, PocketScore asks whether to save a copy.
+**Save a copy** (the download arrow) makes a new `.mscz` file called *Your score (edited).mscz*. It opens in MuseScore or in PocketScore. **It never replaces the file you opened.** If you open another score or start a new one first, PocketScore asks whether to save a copy, as MuseScore does when a score is closed (a new score counts as unsaved even before anything is put in). **Don't keep** throws a new score away for good, since it has no file behind it.
 
-Good to know: until you save a copy, your changes are kept quietly on this device. If the app closes, opening the same score again asks whether to **Continue my edits** or **Start again** from the file as it is. The pen (**Notes**) is for marking up a score you are reading, so it is a separate mode: opening Edit closes it, and drawings stay where they were drawn and may not line up once the music is changed. To write something on the score as a composer would, use **More → Words** (real text in the score).
+Good to know: until you save a copy, your changes are kept quietly on this device. If the app closes, opening the same score again asks whether to **Continue my edits** or **Start again** from the file as it is. The pen (**Notes**) is for marking up a score you are reading, so it is a separate mode: Notes and Edit are never on together (opening one closes the other), and drawings stay where they were drawn and may not line up once the music is changed. To write something on the score as a composer would, use **More → Words** (real text in the score).
 
 ### Save
 **Save** (top bar) keeps your notes and mixer changes for this score, on this device.
@@ -258,7 +265,8 @@ every score. Until you change them, PocketScore works as described above.
 | **Start focus by itself** | Hides the bars when you leave the screen alone |
 | **Wait while playing** / **while stopped** | How long before focus starts by itself (4 and 10 seconds at first) |
 | **Full screen with the Focus button** | The phone's or browser's own bars go too. Not on iPhone, which doesn't allow it |
-| **Open scores in** | The view every score opens in: *Page view*, *Page by page* or *Continuous* |
+| **Open scores in** | The view every score opens in: *Page view*, *Page by page*, *Two pages* or *Continuous* |
+| **Two pages: a swipe turns both** | In *Two pages*, each swipe shows the next two pages (1-2, then 3-4). Off: it moves on one page, the right page going to the left (1-2, then 2-3) |
 | **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
 | **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
 | **Playback report**, *Send* | If the music stutters or lags, tap **Send** soon after. Your phone's share menu opens, and the report is also copied, so you can paste it into a [GitHub issue](https://github.com/HowieYHY/mobilemusescore/issues) or a message. It tells how the device kept up during your recent plays: times, score names and the device's own figures, never your notes or files. It works offline and later too: the log stays on the device after the app is closed. Please add what you were doing and whether battery saver was on or the phone was warm, which apps can't see |

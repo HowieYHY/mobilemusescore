@@ -59,6 +59,15 @@
 #include "engraving/dom/staff.h"
 #include "engraving/dom/stafftype.h"
 #include "engraving/dom/system.h"
+#include "engraving/dom/select.h"
+#include "engraving/dom/navigate.h"
+#include "engraving/editing/editdata.h"
+#include "engraving/dom/articulation.h"
+#include "engraving/dom/hairpin.h"
+#include "engraving/dom/slur.h"
+#include "engraving/dom/breath.h"
+#include "engraving/dom/fermata.h"
+#include "engraving/infrastructure/imimedata.h"
 #include "engraving/dom/utils.h"
 #ifndef MSS_MUSESCORE_4_7
 #include "engraving/dom/tempotimeline.h"
@@ -1262,9 +1271,69 @@ static int durationDenominator(DurationType t)
     }
 }
 
+// A range: its outline, one box per system it covers (pages are drawn system by system), from the first
+// selected place to the last, over the selected staves
+static std::string rangeJson(const MasterScore* ms)
+{
+    const Selection& sel = ms->selection();
+    Segment* s1 = sel.startSegment();
+    if (!s1) {
+        return "null";
+    }
+    Segment* s2 = sel.endSegment(); // exclusive; null at the end of the score
+    const staff_idx_t st1 = sel.staffStart(), st2 = sel.staffEnd();
+    struct Box { const System* sys; double x0, x1; };
+    std::vector<Box> boxes;
+    for (Measure* m = s1->measure(); m; m = m->nextMeasure()) {
+        if (s2 && m->tick() >= s2->tick()) {
+            break;
+        }
+        const System* sys = m->system();
+        if (!sys || !sys->page()) {
+            continue;
+        }
+        double x0 = m->pageX(), x1 = m->pageX() + m->width();
+        if (m == s1->measure()) {
+            x0 = s1->pageX();
+        }
+        if (s2 && s2->measure() == m) {
+            x1 = s2->pageX();
+        }
+        if (!boxes.empty() && boxes.back().sys == sys) {
+            boxes.back().x1 = x1;
+        } else {
+            boxes.push_back({ sys, x0, x1 });
+        }
+    }
+    if (boxes.empty() || st2 <= st1) {
+        return "null";
+    }
+    auto top = [&](const System* sys) { return sys->staffYpage(st1); };
+    auto height = [&](const System* sys) { return sys->staffYpage(st2 - 1) + sys->staff(st2 - 1)->bbox().height() - sys->staffYpage(st1); };
+    std::string list;
+    for (const Box& b : boxes) {
+        list += std::string(list.empty() ? "" : ",") + "{\"page\":" + std::to_string(b.sys->page()->pageNumber())
+                + ",\"x\":" + num(b.x0) + ",\"y\":" + num(top(b.sys)) + ",\"w\":" + num(std::max(b.x1 - b.x0, 1.0)) + ",\"h\":" + num(height(b.sys)) + "}";
+    }
+    const Measure* first = s1->measure();
+    const Measure* last = first;
+    for (Measure* m = s1->measure(); m && !(s2 && m->tick() >= s2->tick()); m = m->nextMeasure()) {
+        last = m;
+    }
+    const Box& f = boxes.front();
+    return std::string("{\"kind\":\"range\",\"page\":") + std::to_string(f.sys->page()->pageNumber())
+           + ",\"x\":" + num(f.x0) + ",\"y\":" + num(top(f.sys)) + ",\"w\":" + num(std::max(f.x1 - f.x0, 1.0)) + ",\"h\":" + num(height(f.sys))
+           + ",\"bar\":" + std::to_string(first->no() + 1) + ",\"barEnd\":" + std::to_string(last->no() + 1)
+           + ",\"staff\":" + std::to_string(st1) + ",\"staves\":" + std::to_string(st2 - st1)
+           + ",\"den\":0,\"dots\":0,\"voice\":1,\"tuplet\":false,\"mid\":0,\"boxes\":[" + list + "]}";
+}
+
 std::string Session::editSelectionJson() const
 {
     const MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (ms && ms->selection().isRange()) {
+        return rangeJson(ms);
+    }
     Note* note = nullptr;
     ChordRest* cr = ms ? selectedChordRest(ms, &note) : nullptr;
     if (!cr || !cr->measure() || !cr->measure()->system() || !cr->measure()->system()->page()) {
@@ -1292,14 +1361,9 @@ std::string Session::editSelectionJson() const
     return json + "}";
 }
 
-std::string Session::editSelect(int pageIndex, double x, double y, double radius)
+// the note or rest nearest a tap, within `radius`; a note wins a tie with a rest
+static EngravingItem* nearestNoteOrRest(Page* page, double x, double y, double radius)
 {
-    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
-    if (!ms || pageIndex < 0 || pageIndex >= int(ms->pages().size())) {
-        return "null";
-    }
-    Page* page = ms->pages()[pageIndex];
-    // the note or rest nearest the tap, within `radius`; a note wins a tie with a rest
     EngravingItem* best = nullptr;
     double bestD = radius;
     for (EngravingItem* item : page->items(RectF(x - radius, y - radius, 2 * radius, 2 * radius))) {
@@ -1315,6 +1379,16 @@ std::string Session::editSelect(int pageIndex, double x, double y, double radius
             best = item;
         }
     }
+    return best;
+}
+
+std::string Session::editSelect(int pageIndex, double x, double y, double radius)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || pageIndex < 0 || pageIndex >= int(ms->pages().size())) {
+        return "null";
+    }
+    EngravingItem* best = nearestNoteOrRest(ms->pages()[pageIndex], x, y, radius);
     if (!best) {
         ms->deselectAll();
         return "null";
@@ -1342,6 +1416,11 @@ std::string Session::editMove(const std::string& cmd)
     if (!ms || !ms->selection().element()) {
         return "null";
     }
+    // "extend-next-chord": Shift+arrow, the range grows as on desktop (selectMove leaves a range)
+    if (cmd.rfind("extend-", 0) == 0) {
+        ms->selectMove(String(u"select-") + String::fromStdString(cmd.substr(7)));
+        return editSelectionJson();
+    }
     // selectMove wants desktop's command names ("select-next-chord") and leaves a range: pick the note itself
     if (EngravingItem* moved = ms->selectMove(String(u"select-") + String::fromStdString(cmd))) {
         EngravingItem* pick = moved->isChord() ? static_cast<EngravingItem*>(toChord(moved)->upNote()) : moved;
@@ -1359,7 +1438,8 @@ std::string Session::editPitch(int mode)
 {
     MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
     Note* note = nullptr;
-    if (!ms || !selectedChordRest(ms, &note) || !note) {
+    // a range moves as a whole, as desktop's arrow keys do
+    if (!ms || ((!selectedChordRest(ms, &note) || !note) && !ms->selection().isRange())) {
         return editResult(false, "Select a note first.");
     }
     ms->startCmd(TranslatableString::untranslatable("Change pitch"));
@@ -1428,7 +1508,7 @@ std::string Session::editDot()
 std::string Session::editDelete()
 {
     MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
-    if (!ms || !selectedChordRest(ms)) {
+    if (!ms || (!selectedChordRest(ms) && !ms->selection().isRange())) {
         return editResult(false, "Select a note first.");
     }
     ms->startCmd(TranslatableString::untranslatable("Delete"));
@@ -1438,25 +1518,64 @@ std::string Session::editDelete()
     return editResult(true);
 }
 
-// Puts a note on the selected rest, as typing C D E F G A B does in desktop's note input: the letter
-// is in the key signature, in the octave nearest the note before it (Score::resolveNoteInputParams).
-// The rest's own length is kept (a whole-bar rest gets a quarter); the new note stays selected.
-std::string Session::editEnterNote(int letter)
+static DurationType durationTypeFor(int den)
 {
-    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
-    EngravingItem* el = ms ? ms->selection().element() : nullptr;
-    if (!ms || !el || !el->isRest() || letter < 0 || letter > 6) {
-        return editResult(false, "Select a rest first.");
+    switch (den) {
+    case 1: return DurationType::V_WHOLE;
+    case 2: return DurationType::V_HALF;
+    case 8: return DurationType::V_EIGHTH;
+    case 16: return DurationType::V_16TH;
+    case 32: return DurationType::V_32ND;
+    case 64: return DurationType::V_64TH;
+    default: return DurationType::V_QUARTER;
     }
-    Rest* rest = toRest(el);
-    const Fraction tick = rest->tick();
-    const track_idx_t track = rest->track();
+}
+
+// Desktop's note input, one step: the input position is the selected note or rest, the length the one
+// chosen (den, dots). Afterwards the input position has moved on (InputState::moveToNextInputPos), and that
+// place is selected, so the next step goes after this one; at the end of the score the new item stays picked.
+static bool startStep(MasterScore* ms, int den, int dots, track_idx_t& track)
+{
+    ChordRest* cr = selectedChordRest(ms);
+    if (!cr) {
+        return false;
+    }
+    track = cr->track();
     InputState& is = ms->inputState();
     is.setTrack(track);
-    is.setSegment(rest->segment());
-    is.setDuration(rest->durationType().type() == DurationType::V_MEASURE ? TDuration(DurationType::V_QUARTER) : rest->durationType());
+    is.setSegment(cr->segment());
+    TDuration d(durationTypeFor(den));
+    d.setDots(std::clamp(dots, 0, 2));
+    is.setDuration(d);
     is.setRest(false);
     is.setNoteEntryMode(true);
+    return true;
+}
+static void selectNextStep(MasterScore* ms, track_idx_t track, const Fraction& enteredAt)
+{
+    const InputState& is = ms->inputState();
+    EngravingItem* next = is.segment() && is.segment()->tick() > enteredAt ? is.segment()->element(track) : nullptr;
+    if (!next) {
+        Segment* seg = ms->tick2segment(enteredAt, false, SegmentType::ChordRest);
+        next = seg ? seg->element(track) : nullptr; // the end of the score: what was just entered
+    }
+    if (next) {
+        ms->select(next->isChord() ? static_cast<EngravingItem*>(toChord(next)->upNote()) : next);
+    }
+}
+
+// Puts a note at the selected place, as typing C D E F G A B does in desktop's note input: the letter is
+// in the key signature, in the octave nearest the note before it (Score::resolveNoteInputParams), as long
+// as the chosen length, replacing what is there; then the next place is selected.
+std::string Session::editEnterNote(int letter, int den, int dots)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    track_idx_t track = 0;
+    if (!ms || letter < 0 || letter > 6 || !startStep(ms, den, dots, track)) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    InputState& is = ms->inputState();
+    const Fraction tick = is.segment()->tick();
     NoteInputParams params;
     if (!ms->resolveNoteInputParams(letter, false, params)) {
         is.setNoteEntryMode(false);
@@ -1466,7 +1585,7 @@ std::string Session::editEnterNote(int letter)
     ms->cmdAddPitch(params, false, false);
     ms->endCmd();
     is.setNoteEntryMode(false);
-    // the new note, by where the rest was
+    // the new note, by where the input position was
     Note* note = nullptr;
     if (Segment* seg = ms->tick2segment(tick, false, SegmentType::ChordRest)) {
         if (EngravingItem* e = seg->element(track); e && e->isChord()) {
@@ -1476,7 +1595,7 @@ std::string Session::editEnterNote(int letter)
     if (!note) {
         return editResult(false, "The note could not be added.");
     }
-    ms->select(note);
+    selectNextStep(ms, track, tick);
     afterEdit(ms, m_playbackModel.get(), [this, ms]() {
         m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
         if (m_audio && m_audioReady) {
@@ -1487,6 +1606,407 @@ std::string Session::editEnterNote(int letter)
     if (!playing && m_playbackModel) {
         m_playbackModel->triggerEventsForItems({ note }, 500000, true);
     }
+    return editResult(true);
+}
+
+// A rest of the chosen length at the selected place, as desktop's 0 key in note input; then the next place
+std::string Session::editEnterRest(int den, int dots)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    track_idx_t track = 0;
+    if (!ms || !startStep(ms, den, dots, track)) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    InputState& is = ms->inputState();
+    const Fraction tick = is.segment()->tick();
+    ms->startCmd(TranslatableString::untranslatable("Enter rest"));
+    ms->enterRest(is.duration());
+    ms->endCmd();
+    is.setNoteEntryMode(false);
+    selectNextStep(ms, track, tick);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+// ---- ranges, copy and paste
+
+std::string Session::editExtend(int pageIndex, double x, double y, double radius)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || pageIndex < 0 || pageIndex >= int(ms->pages().size())) {
+        return "null";
+    }
+    EngravingItem* to = nearestNoteOrRest(ms->pages()[pageIndex], x, y, radius);
+    if (!to) {
+        return editSelectionJson();
+    }
+    if (ms->selection().isNone()) {
+        ms->select(to);
+    } else {
+        // as Shift+click on desktop: Score::select(RANGE) spans from what is selected to here
+        ms->select(to, SelectType::RANGE, to->staffIdx());
+    }
+    return editSelectionJson();
+}
+
+namespace {
+// the clipboard as Score::cmdPaste reads it
+class ClipData : public IMimeData
+{
+public:
+    ClipData(const std::string& type, const muse::ByteArray& data)
+        : m_type(type), m_data(data) {}
+    std::vector<std::string> formats() const override { return { m_type }; }
+    bool hasFormat(const std::string& t) const override { return t == m_type; }
+    muse::ByteArray data(const std::string& t) const override { return t == m_type ? m_data : muse::ByteArray(); }
+    bool hasImage() const override { return false; }
+    std::shared_ptr<muse::draw::Pixmap> imageData() const override { return nullptr; }
+private:
+    std::string m_type;
+    muse::ByteArray m_data;
+};
+}
+
+// Copy (and Cut: copy, then delete as desktop does) the selected range, or the single note or rest
+std::string Session::editCopy(bool cut)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->selection().isNone() || !ms->selection().canCopy()) {
+        return editResult(false, "Select the notes to copy first.");
+    }
+    m_clip = ms->selection().mimeData();
+    m_clipType = ms->selection().mimeType().toStdString();
+    if (m_clip.empty()) {
+        return editResult(false, "Nothing to copy there.");
+    }
+    if (cut) {
+        ms->startCmd(TranslatableString::untranslatable("Cut"));
+        ms->cmdDeleteSelection();
+        ms->endCmd();
+        afterEdit(ms, m_playbackModel.get(), []() {});
+    }
+    return editResult(true);
+}
+
+// Paste at the selected note or rest (a range: at its start), replacing what is there, as desktop's Paste
+std::string Session::editPaste()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->selection().isNone()) {
+        return editResult(false, "Select where to paste first.");
+    }
+    if (m_clip.empty()) {
+        return editResult(false, "Copy something first.");
+    }
+    ClipData clip(m_clipType, m_clip);
+    ms->startCmd(TranslatableString::untranslatable("Paste"));
+    const bool ok = ms->cmdPaste(&clip, nullptr, Fraction(1, 1));
+    if (!ok) {
+        ms->endCmd(true); // rolled back
+        return editResult(false, "It can't be pasted there (not enough room, or a different kind of line).");
+    }
+    ms->endCmd();
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+// Editing that rebuilds bars or lines drops the selection: pick the same place again
+struct SelectedPlace {
+    Fraction tick;
+    track_idx_t track = muse::nidx;
+    bool valid = false;
+};
+static SelectedPlace placeOf(const MasterScore* ms)
+{
+    SelectedPlace p;
+    if (ChordRest* cr = selectedChordRest(ms)) {
+        p.tick = cr->tick();
+        p.track = cr->track();
+        p.valid = true;
+    }
+    return p;
+}
+static void reselect(MasterScore* ms, const SelectedPlace& p)
+{
+    if (!p.valid) {
+        return;
+    }
+    Segment* seg = ms->tick2segment(p.tick, false, SegmentType::ChordRest);
+    EngravingItem* e = seg ? seg->element(p.track) : nullptr;
+    if (e) {
+        ms->select(e->isChord() ? static_cast<EngravingItem*>(toChord(e)->upNote()) : e);
+    }
+}
+
+// ---- voices, bars anywhere, marks, slurs and hairpins (composer #3-#6)
+
+static std::string afterBigEdit(Session* s, MasterScore* ms, PlaybackModel* model, std::function<void()> updatePlayTime)
+{
+    afterEdit(ms, model, updatePlayTime);
+    (void)s;
+    return editResult(true);
+}
+
+std::string Session::editVoice(int voice, bool input)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || voice < 1 || voice > int(VOICES) || ms->selection().isNone()) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    if (!input) {
+        // move the selected notes to that voice, as desktop's voice buttons do outside note input
+        ms->startCmd(TranslatableString::untranslatable("Change voice"));
+        ms->changeSelectedElementsVoice(voice_idx_t(voice - 1));
+        ms->endCmd();
+        afterEdit(ms, m_playbackModel.get(), []() {});
+        return editResult(true);
+    }
+    ChordRest* cr = selectedChordRest(ms);
+    if (!cr) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    const track_idx_t track = cr->staffIdx() * VOICES + track_idx_t(voice - 1);
+    Segment* seg = cr->segment();
+    if (!seg->element(track) && !ms->findCR(seg->tick(), track)) {
+        // nothing in that voice here yet: rests to enter over, as desktop makes when note input switches voice
+        ms->startCmd(TranslatableString::untranslatable("Voice"));
+        ms->expandVoice(seg, track);
+        ms->endCmd();
+        afterEdit(ms, m_playbackModel.get(), []() {});
+    }
+    EngravingItem* e = seg->element(track);
+    if (!e) {
+        e = ms->findCR(seg->tick(), track); // a note in that voice already covers this place
+    }
+    if (!e) {
+        return editResult(false, "That voice can't start here.");
+    }
+    ms->select(e->isChord() ? static_cast<EngravingItem*>(toChord(e)->upNote()) : e);
+    return editResult(true);
+}
+
+std::string Session::editInsertBars(int count)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    ChordRest* cr = ms ? selectedChordRest(ms) : nullptr;
+    if (!cr && ms && ms->selection().isRange() && ms->selection().startSegment()) {
+        cr = toChordRest(ms->selection().startSegment()->element(staff2track(ms->selection().staffStart())));
+    }
+    if (!ms || !cr || count < 1 || count > 100) {
+        return editResult(false, "Select a note or rest in the bar to put new bars before.");
+    }
+    const SelectedPlace place = placeOf(ms);
+    MeasureBase* before = cr->measure();
+    Score::InsertMeasureOptions options;
+    options.createEmptyMeasures = false;
+    options.moveSignaturesClef = true;
+    options.needDeselectAll = false;
+    ms->startCmd(TranslatableString::untranslatable("Insert bars"));
+    for (int i = 0; i < count; ++i) {
+        ms->insertMeasure(before, options); // MasterScore's: in the parts too
+    }
+    ms->endCmd();
+    reselect(ms, place); // the same tick: now the first of the new bars
+    return afterBigEdit(this, ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+}
+
+std::string Session::editDeleteBars()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->selection().isNone()) {
+        return editResult(false, "Select a note, a rest or bars first.");
+    }
+    MeasureBase* first = nullptr;
+    MeasureBase* last = nullptr;
+    if (ms->selection().isRange() && ms->selection().startSegment()) {
+        first = ms->selection().startSegment()->measure();
+        Segment* end = ms->selection().endSegment();
+        last = end ? (end->prev1() ? end->prev1()->measure() : first) : ms->lastMeasure();
+    } else if (ChordRest* cr = selectedChordRest(ms)) {
+        first = last = cr->measure();
+    }
+    if (!first || !last) {
+        return editResult(false, "Select a note, a rest or bars first.");
+    }
+    if (first == ms->firstMeasure() && last == ms->lastMeasure()) {
+        return editResult(false, "A score needs at least one bar.");
+    }
+    const Fraction at = first->tick();
+    ms->deselectAll();
+    ms->startCmd(TranslatableString::untranslatable("Delete bars"));
+    ms->deleteMeasures(first, last);
+    ms->endCmd();
+    // the bar after the deleted ones (or the new last one), first line
+    Measure* m = ms->tick2measure(std::min(at, ms->lastMeasure()->tick()));
+    if (Segment* seg = m ? m->first(SegmentType::ChordRest) : nullptr) {
+        if (EngravingItem* e = seg->element(0)) {
+            ms->select(e->isChord() ? static_cast<EngravingItem*>(toChord(e)->upNote()) : e);
+        }
+    }
+    return afterBigEdit(this, ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+}
+
+std::string Session::editMark(int kind)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->selection().isNone()) {
+        return editResult(false, "Select a note first.");
+    }
+    static const SymId articulations[] = { SymId::articStaccatoAbove, SymId::articAccentAbove, SymId::articTenutoAbove, SymId::articMarcatoAbove };
+    if (kind >= 0 && kind < 4) {
+        // as the palette and desktop's shortcuts: on every selected note, a second time takes it off
+        ms->startCmd(TranslatableString::untranslatable("Toggle articulation"));
+        ms->toggleArticulation(articulations[kind]);
+        ms->endCmd();
+        afterEdit(ms, m_playbackModel.get(), []() {});
+        return editResult(true);
+    }
+    if (kind < 4 || kind > 6) {
+        return editResult(false, "No such mark.");
+    }
+    // fermata, breath mark and caesura are dropped on the note, as from the palette
+    std::vector<ChordRest*> targets;
+    if (ms->selection().isRange()) {
+        for (EngravingItem* e : ms->selection().elements()) {
+            ChordRest* cr = e->isNote() ? toNote(e)->chord() : (e->isChordRest() ? toChordRest(e) : nullptr);
+            if (cr && std::find(targets.begin(), targets.end(), cr) == targets.end()) {
+                targets.push_back(cr);
+            }
+        }
+        if (kind == 4 && !targets.empty()) {
+            targets = { targets.back() }; // a fermata over a passage goes on its last note
+        }
+    } else if (ChordRest* cr = selectedChordRest(ms)) {
+        targets.push_back(cr);
+    }
+    if (targets.empty()) {
+        return editResult(false, "Select a note first.");
+    }
+    const SelectedPlace place = placeOf(ms);
+    ms->startCmd(TranslatableString::untranslatable("Add mark"));
+    for (ChordRest* cr : targets) {
+        EditData ed(nullptr);
+        if (kind == 4) {
+            Fermata* f = Factory::createFermata(ms->dummy()->segment());
+            f->setSymIdAndTimeStretch(SymId::fermataAbove);
+            ed.dropElement = f;
+        } else {
+            Breath* b = Factory::createBreath(ms->dummy()->segment());
+            b->setSymId(kind == 5 ? SymId::breathMarkComma : SymId::caesura);
+            ed.dropElement = b;
+        }
+        if (cr->acceptDrop(ed)) {
+            cr->drop(ed);
+        } else {
+            delete ed.dropElement;
+        }
+    }
+    ms->endCmd();
+    reselect(ms, place);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    return editResult(true);
+}
+
+std::string Session::editSlur()
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->selection().isNone()) {
+        return editResult(false, "Select the notes to slur first.");
+    }
+    std::vector<std::pair<ChordRest*, ChordRest*> > spans;
+    const Selection& sel = ms->selection();
+    if (sel.isRange()) {
+        // one slur per line, from its first chord to its last (desktop's doAddSlur)
+        for (track_idx_t track = staff2track(sel.staffStart()); track < staff2track(sel.staffEnd()); ++track) {
+            ChordRest* a = nullptr;
+            ChordRest* b = nullptr;
+            for (EngravingItem* e : sel.uniqueElements()) {
+                if (e->track() != track) {
+                    continue;
+                }
+                EngravingItem* c = e->isNote() ? toNote(e)->chord() : e;
+                if (!c->isChord()) {
+                    continue;
+                }
+                ChordRest* cr = toChordRest(c);
+                if (!a || a->tick() > cr->tick()) {
+                    a = cr;
+                }
+                if (!b || b->tick() < cr->tick()) {
+                    b = cr;
+                }
+            }
+            if (a && b && a != b) {
+                spans.emplace_back(a, b);
+            }
+        }
+    } else if (ChordRest* cr = selectedChordRest(ms); cr && cr->isChord()) {
+        ChordRest* next = nextChordRest(cr);
+        while (next && !next->isChord()) {
+            next = nextChordRest(next);
+        }
+        if (next) {
+            spans.emplace_back(cr, next);
+        }
+    }
+    if (spans.empty()) {
+        return editResult(false, "A slur needs two notes: select a passage, or a note with one after it.");
+    }
+    const SelectedPlace place = placeOf(ms);
+    ms->startCmd(TranslatableString::untranslatable("Add slur"));
+    for (auto& [a, b] : spans) {
+        ms->addSlur(a, b, nullptr);
+    }
+    ms->endCmd();
+    if (place.valid) {
+        reselect(ms, place);
+    }
+    afterEdit(ms, m_playbackModel.get(), []() {});
+    return editResult(true);
+}
+
+std::string Session::editHairpin(int kind)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || ms->selection().isNone()) {
+        return editResult(false, "Select the notes first.");
+    }
+    const SelectedPlace place = placeOf(ms);
+    ms->startCmd(TranslatableString::untranslatable("Add hairpin"));
+    std::vector<Hairpin*> made = ms->addHairpins(kind == 1 ? HairpinType::DIM_HAIRPIN : HairpinType::CRESC_HAIRPIN);
+    ms->endCmd();
+    if (made.empty()) {
+        return editResult(false, "A hairpin needs notes to go under: select a passage or a note.");
+    }
+    if (place.valid) {
+        reselect(ms, place);
+    }
+    afterEdit(ms, m_playbackModel.get(), []() {});
     return editResult(true);
 }
 
@@ -1574,34 +2094,6 @@ std::string Session::editSelectStart()
     }
     ms->select(el->isChord() ? static_cast<EngravingItem*>(toChord(el)->upNote()) : el);
     return editSelectionJson();
-}
-
-// Editing that rebuilds bars or lines drops the selection: pick the same place again
-struct SelectedPlace {
-    Fraction tick;
-    track_idx_t track = muse::nidx;
-    bool valid = false;
-};
-static SelectedPlace placeOf(const MasterScore* ms)
-{
-    SelectedPlace p;
-    if (ChordRest* cr = selectedChordRest(ms)) {
-        p.tick = cr->tick();
-        p.track = cr->track();
-        p.valid = true;
-    }
-    return p;
-}
-static void reselect(MasterScore* ms, const SelectedPlace& p)
-{
-    if (!p.valid) {
-        return;
-    }
-    Segment* seg = ms->tick2segment(p.tick, false, SegmentType::ChordRest);
-    EngravingItem* e = seg ? seg->element(p.track) : nullptr;
-    if (e) {
-        ms->select(e->isChord() ? static_cast<EngravingItem*>(toChord(e)->upNote()) : e);
-    }
 }
 
 // ---- more of what a composer needs: bars, key, time, ties, accidentals, triplets, chords, words, lines

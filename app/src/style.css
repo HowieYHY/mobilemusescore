@@ -28,6 +28,10 @@ html, body {
   margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
+  /* iPadOS ignores user-scalable=no: a double tap on anything without touch-action zoomed the whole
+     app in ("the screen moves up") until another double tap. Children keep their stricter values
+     (none for drawing, pan-x pan-y on the score), since the browser takes the strictest in effect. */
+  touch-action: manipulation;
 }
 
 /* Behind the app, the colour of its bars, so no light strip ever shows at an edge */
@@ -1337,6 +1341,14 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .edit-more .btn { gap: 6px; }
 .editbar .btn.small.dyn { font-style: italic; font-weight: 700; padding: 4px 6px; }
 @media (max-width: 480px) { .em-h { flex-basis: 100%; } .em-words { flex-wrap: wrap; } }
+/* a range is selected: Copy and Cut take the place of ‹ ›, so the bar keeps its height */
+.edit-tools .range-only { display: none; }
+.edit-tools.on-range .range-only { display: inline-flex; }
+.edit-tools.on-range .single-only { display: none; }
+.editbar .len.paste { margin-left: auto; width: auto; padding: 0 10px; gap: 6px; font-size: 13px; border-color: rgba(255, 255, 255, 0.3); }
+.editbar .len.paste[hidden] { display: none; }
+/* holding a finger on the score makes a range: no callout or text selection on the way */
+.editing .pages { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* a rest is selected: the note letters take the place of the pitch buttons, so the bar keeps its height */
 .edit-letters { display: none; flex: 1 1 0; min-width: 0; gap: 4px; }
 .edit-tools.on-rest .edit-letters { display: flex; }
@@ -1353,6 +1365,8 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   outline: 2px solid var(--accent-bright);
   pointer-events: none;
 }
+/* a range: a lighter wash over the bars, as desktop's, so the notes inside stay readable */
+.edit-sel.range { background: rgba(30, 106, 208, 0.12); border-radius: 2px; }
 /* five buttons and the view menu share the phone's second row: Save keeps only its icon when narrow */
 @media (max-width: 400px) { #save .label { display: none; } }
 /* the narrowest phones (320 px): the view menu and the buttons give a little so Open is not cut */
@@ -1396,3 +1410,12 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .empty .new-row { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 20px 0; }
 .empty .new-row[hidden] { display: none; }
 .new-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* the other unsaved new scores: a small link, then one compact row each */
+.resume-more { appearance: none; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 2px; min-height: 32px; touch-action: manipulation; cursor: pointer; }
+.resume-more[hidden] { display: none; }
+.resume-more[aria-expanded="true"] { color: var(--ink-2); }
+.resume-list { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: min(100%, 420px); }
+.resume-list[hidden] { display: none; }
+.resume-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.resume-item .btn:first-child { justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resume-item .hint { white-space: nowrap; }

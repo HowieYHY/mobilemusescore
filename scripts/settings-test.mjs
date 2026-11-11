@@ -134,7 +134,7 @@ for (const [name, width, height, touch] of sizes) {
     check(box.left >= 0 && box.right <= width && !box.overflowX, `${name}: within the screen's width`);
     const defaults = await page.evaluate(() => [...document.querySelectorAll("[data-set]")].map((el) =>
         `${el.dataset.set}=${el.type === "checkbox" ? el.checked : el.value}`).join(" "));
-    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true keepAwake=false",
+    check(defaults === "keepPlaying=false metronomeOn=false tapToHear=true autoFocus=true focusPlayingSecs=4 focusStoppedSecs=10 focusFullscreen=true startView=page follow=true keepAwake=false pairSwipeTwo=false",
         `${name}: defaults are today's behaviour (${defaults})`);
     // every control is reachable: scroll to the last one and check it's on screen
     const last = page.locator('[data-set="keepAwake"]');

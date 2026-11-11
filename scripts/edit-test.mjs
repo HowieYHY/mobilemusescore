@@ -126,17 +126,22 @@ sel = await page.evaluate(() => app.edit.sel);
 check(sel === null || sel.kind === "rest", `Delete leaves a rest (${sel?.kind})`);
 
 // phase 2: a note goes onto the rest through the letter buttons; the bar keeps its height
-check(await page.evaluate(() => document.querySelectorAll("#edit-letters button").length === 7 && !document.getElementById("edit-letters").offsetParent === false), "a rest shows the seven note letters");
+check(await page.evaluate(() => document.querySelectorAll("#edit-letters button").length === 8 && !document.getElementById("edit-letters").offsetParent === false), "a rest shows the seven note letters and the rest key");
 check(await page.evaluate(() => document.getElementById("edit-up").offsetParent === null), "the pitch buttons make room for them");
 const barH = await page.evaluate(() => document.getElementById("editbar").getBoundingClientRect().height);
 const restSel = sel;
+const inputDen = await page.evaluate(() => app.edit.len.den); // note input: the chosen length, as desktop's
 await tapAndWait('#edit-letters button[aria-label="Put a E here"]');
+const moved = await page.evaluate(() => app.edit.sel);
+check(moved && (moved.x !== restSel.x || moved.bar !== restSel.bar), "the letter moved the selection on to the next place");
+await tap("#edit-prev"); // back to the E (moving is not an edit: wait for the selection itself)
+await page.waitForFunction((m) => app.edit.sel && app.edit.sel.x !== m.x, moved, { timeout: 5000 }).catch(() => {});
 sel = await page.evaluate(() => app.edit.sel);
-check(sel && sel.kind === "note" && /^E/.test(sel.name) && sel.den === restSel.den && sel.bar === restSel.bar, `E entered on the rest: ${sel?.name}, 1/${sel?.den}, bar ${sel?.bar}`);
+check(sel && sel.kind === "note" && /^E/.test(sel.name) && sel.den === inputDen && sel.bar === restSel.bar, `E entered on the rest: ${sel?.name}, 1/${sel?.den}, bar ${sel?.bar}`);
 check(Math.abs(sel.pitch - spot.pitch) <= 12, `in the octave near the music (pitch ${sel?.pitch}, neighbours ${spot.pitch})`);
 const barH2 = await page.evaluate(() => document.getElementById("editbar").getBoundingClientRect().height);
 check(Math.abs(barH - barH2) < 1, `the edit bar keeps its height (${barH} -> ${barH2})`);
-await tap("#edit-up"); await idle(); // the new note is selected, so it can be adjusted at once
+await tap("#edit-up"); await idle(); // back on the new note, it can be adjusted
 sel = await page.evaluate(() => app.edit.sel);
 check(sel && sel.kind === "note", `the new note can be moved (${sel?.name})`);
 await tap("#edit-undo"); await idle(); await tap("#edit-undo"); await idle(); // pitch, then the entry: the rest is back

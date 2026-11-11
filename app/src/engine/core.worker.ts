@@ -194,13 +194,27 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             result = JSON.parse(callStr("mss_edit_select", req.page, req.x, req.y, req.radius));
             core._mss_process();
             break;
+        case "editExtend":
+            result = JSON.parse(callStr("mss_edit_extend", req.page, req.x, req.y, req.radius));
+            core._mss_process();
+            break;
+        case "editCopy": result = JSON.parse(callStr("mss_edit_copy", req.cut ? 1 : 0)); core._mss_process(); break;
+        case "editPaste": result = JSON.parse(callStr("mss_edit_paste")); core._mss_process(); break;
+        case "editHasClip": result = core._mss_edit_has_clip() === 1; break;
+        case "editVoice": result = JSON.parse(callStr("mss_edit_voice", req.voice, req.input ? 1 : 0)); core._mss_process(); break;
+        case "editInsertBars": result = JSON.parse(callStr("mss_edit_insert_bars", req.count)); core._mss_process(); break;
+        case "editDeleteBars": result = JSON.parse(callStr("mss_edit_delete_bars")); core._mss_process(); break;
+        case "editMark": result = JSON.parse(callStr("mss_edit_mark", req.kind)); core._mss_process(); break;
+        case "editSlur": result = JSON.parse(callStr("mss_edit_slur")); core._mss_process(); break;
+        case "editHairpin": result = JSON.parse(callStr("mss_edit_hairpin", req.kind)); core._mss_process(); break;
         case "editSelectStart": result = JSON.parse(callStr("mss_edit_select_start")); break;
         case "editSelection": result = JSON.parse(callStr("mss_edit_selection")); break;
         case "editClearSelection": result = JSON.parse(callStr("mss_edit_clear_selection")); break;
         case "editMove": result = JSON.parse(callStr("mss_edit_move", req.to)); core._mss_process(); break;
         case "editPitch": result = JSON.parse(callStr("mss_edit_pitch", req.mode)); core._mss_process(); break;
         case "editDuration": result = JSON.parse(callStr("mss_edit_duration", req.den)); core._mss_process(); break;
-        case "editEnterNote": result = JSON.parse(callStr("mss_edit_enter_note", req.letter)); core._mss_process(); break;
+        case "editEnterNote": result = JSON.parse(callStr("mss_edit_enter_note", req.letter, req.den, req.dots)); core._mss_process(); break;
+        case "editEnterRest": result = JSON.parse(callStr("mss_edit_enter_rest", req.den, req.dots)); core._mss_process(); break;
         case "editAddBars": result = JSON.parse(callStr("mss_edit_add_bars", req.n)); core._mss_process(); break;
         case "editSetKey": result = JSON.parse(callStr("mss_edit_set_key", req.key)); core._mss_process(); break;
         case "editSetTime": result = JSON.parse(callStr("mss_edit_set_time", req.num, req.den)); core._mss_process(); break;

@@ -1,18 +1,18 @@
 {
   "settings-test": {
-    "streak": 15,
+    "streak": 16,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04",
     "note": "1.0.25, #29 fade"
   },
   "tour-test": {
-    "streak": 7,
+    "streak": 9,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   },
   "layout-shots": {
     "streak": 5,
@@ -30,27 +30,27 @@
     "date": "2026-10-19"
   },
   "mobile-test": {
-    "streak": 6,
+    "streak": 9,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
-    "date": "2026-11-03",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04",
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
-    "streak": 6,
+    "streak": 8,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04",
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
-    "streak": 7,
+    "streak": 10,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
-    "date": "2026-11-03",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04",
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
   },
   "goto-test": {
@@ -69,11 +69,11 @@
     "note": "needs a built copy: vite preview :4173; WebKit via PLAYWRIGHT_BROWSERS_PATH=D:/ms-playwright"
   },
   "pageturn-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "4f71342+changes",
-    "passCommit": "4f71342",
-    "date": "2026-10-15",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04",
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "scroller-test": {
@@ -140,11 +140,11 @@
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "pinch-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04",
     "note": "passed in sessions before 15 Oct (DEVELOPMENT.md, Tests); rerun when today's changes touch its area"
   },
   "cursor-test": {
@@ -200,32 +200,32 @@
     "date": "2026-11-03"
   },
   "edit-api-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "e1fd673+changes",
-    "passCommit": "e1fd673",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   },
   "edit-test": {
-    "streak": 4,
-    "last": "pass",
-    "commit": "77fc2b2+changes",
+    "streak": 0,
+    "last": "fail",
+    "commit": "d3f41aa+changes",
     "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "date": "2026-11-04"
   },
   "edit-layout-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "77fc2b2+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   },
   "edit-draft-test": {
-    "streak": 1,
+    "streak": 4,
     "last": "pass",
-    "commit": "77fc2b2+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   },
   "voice-test": {
     "streak": 1,
@@ -235,11 +235,11 @@
     "date": "2026-11-03"
   },
   "voice-edit-test": {
-    "streak": 2,
-    "last": "pass",
-    "commit": "77fc2b2+changes",
+    "streak": 0,
+    "last": "fail",
+    "commit": "d3f41aa+changes",
     "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "date": "2026-11-04"
   },
   "new-score-test": {
     "streak": 1,
@@ -249,24 +249,66 @@
     "date": "2026-11-03"
   },
   "new-score-flow-test": {
-    "streak": 2,
+    "streak": 5,
     "last": "pass",
-    "commit": "77fc2b2+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   },
   "edit-more-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "77fc2b2+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   },
   "edit-more-ui-test": {
+    "streak": 4,
+    "last": "pass",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
+  },
+  "new-score-inside-test": {
+    "streak": 4,
+    "last": "pass",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
+  },
+  "notes-edit-switch-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
+  },
+  "resume-list-test": {
+    "streak": 2,
+    "last": "pass",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
+  },
+  "step-entry-test": {
     "streak": 1,
     "last": "pass",
-    "commit": "77fc2b2+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
+  },
+  "range-copy-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
+  },
+  "composer-tools-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "d3f41aa+changes",
+    "passCommit": "d3f41aa",
+    "date": "2026-11-04"
   }
 }

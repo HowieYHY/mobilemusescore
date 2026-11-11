@@ -72,7 +72,18 @@ EMSCRIPTEN_KEEPALIVE const char* mss_edit_move(const char* cmd) { return ret(Ses
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_pitch(int mode) { return ret(Session::instance()->editPitch(mode)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_duration(int den) { return ret(Session::instance()->editDuration(den)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_dot() { return ret(Session::instance()->editDot()); }
-EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_note(int letter) { return ret(Session::instance()->editEnterNote(letter)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_note(int letter, int den, int dots) { return ret(Session::instance()->editEnterNote(letter, den, dots)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_rest(int den, int dots) { return ret(Session::instance()->editEnterRest(den, dots)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_extend(int page, double x, double y, double radius) { return ret(Session::instance()->editExtend(page, x, y, radius)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_copy(int cut) { return ret(Session::instance()->editCopy(cut != 0)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_paste() { return ret(Session::instance()->editPaste()); }
+EMSCRIPTEN_KEEPALIVE int mss_edit_has_clip() { return Session::instance()->editHasClip() ? 1 : 0; }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_voice(int v, int input) { return ret(Session::instance()->editVoice(v, input != 0)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_insert_bars(int n) { return ret(Session::instance()->editInsertBars(n)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_delete_bars() { return ret(Session::instance()->editDeleteBars()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_mark(int k) { return ret(Session::instance()->editMark(k)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_slur() { return ret(Session::instance()->editSlur()); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_hairpin(int k) { return ret(Session::instance()->editHairpin(k)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_insert_notes(const char* spec) { return ret(Session::instance()->editInsertNotes(spec)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_select_start() { return ret(Session::instance()->editSelectStart()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_add_bars(int n) { return ret(Session::instance()->editAddBars(n)); }

@@ -93,6 +93,13 @@ build, tests, status) before working here.
   passed for two phases because it only waited for the busy flag. Rule: every control gets a check of its
   effect (the selection moved, the pitch changed), and a new test is shown to fail on the broken behaviour.
 
+- **A close that waits for history can close the wrong thing.** Panels closed through `history.back()` and
+  closed only when its popstate came; in that gap a second close (the palette's tap-away, then Notes giving way
+  to Edit) went back twice, or a new mode's entry was pushed, and the late popstate closed the mode just opened:
+  tapping Edit in Notes left Notes on (4 Nov 2026). Rule: `closeLayer` closes at once and ignores its own
+  popstates (`ownBacks`); one mode replacing another takes its Back entry (`swapLayer`); test switches with a
+  panel open on top (`notes-edit-switch-test`).
+
 - **Touch is not mouse.** A double-tap text box worked with the mouse but vanished on a phone: after a
   finger lifts, the browser sends emulated mouse events that move focus away, and the empty box removed
   itself on blur. Cancel the pointerdown of the second tap. Rule: test touch features with real touch

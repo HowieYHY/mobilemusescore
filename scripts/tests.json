@@ -185,6 +185,8 @@
       "turnTo",
       "turnedTo",
       "page_turn",
+      "turnView",
+      "span",
       "slot",
       "settleTurn",
       "keepOnPage",
@@ -193,6 +195,28 @@
     ],
     "args": [
       "real test musescores/I am move it(howie version).mscz"
+    ]
+  },
+  "pagepair-test": {
+    "files": [],
+    "words": [
+      "pageTurn",
+      "turnView",
+      "perScreen",
+      "span",
+      "turnTo",
+      "turnedTo",
+      "lastTurn",
+      "turnLabel",
+      "page_pair",
+      "slot",
+      "settleTurn",
+      "keepSideways",
+      "followCursor",
+      "fitPageZoom"
+    ],
+    "args": [
+      "real test musescores/I am move it edited.mscz"
     ]
   },
   "scroller-test": {
@@ -504,6 +528,80 @@
       "edit-morebtn",
       "putLyric",
       "edit-dynamics"
+    ]
+  },
+  "new-score-inside-test": {
+    "files": [
+      "app/src/newscore.ts"
+    ],
+    "words": [
+      "beginFresh",
+      "openChosen",
+      "edit-newscore",
+      "ns-create",
+      "before closing it"
+    ]
+  },
+  "notes-edit-switch-test": {
+    "files": [],
+    "words": [
+      "openLayer",
+      "closeLayer",
+      "swapLayer",
+      "ownBacks",
+      "setNotesActive",
+      "setEditActive",
+      "notes-toggle",
+      "edit-toggle"
+    ]
+  },
+  "resume-list-test": {
+    "files": [
+      "app/src/editdraft.ts"
+    ],
+    "words": [
+      "showResume",
+      "continueDraft",
+      "dropDraft",
+      "resume-"
+    ]
+  },
+  "step-entry-test": {
+    "files": [],
+    "words": [
+      "editEnterNote",
+      "editEnterRest",
+      "enterStep",
+      "edit.len",
+      "edit.step",
+      "entering("
+    ]
+  },
+  "range-copy-test": {
+    "files": [],
+    "words": [
+      "editExtend",
+      "editCopy",
+      "editPaste",
+      "rangeJson",
+      "scoreTap",
+      "HOLD_MS",
+      "pasteButton",
+      "edit-copysel",
+      "edit-cut"
+    ]
+  },
+  "composer-tools-test": {
+    "files": [],
+    "words": [
+      "editVoice",
+      "editInsertBars",
+      "editDeleteBars",
+      "editMark",
+      "editSlur",
+      "editHairpin",
+      "Edit by keyboard",
+      "extend-"
     ]
   }
 }

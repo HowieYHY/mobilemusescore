@@ -1,4 +1,50 @@
-# Handoff (3 Nov 2026, branch `composer`)
+# Handoff (11 Nov 2026, branch `two-pages-view`, made from `composer`)
+
+## Latest session (11 Nov 2026): issue #34, the *Two pages* view. Built, tests paused part-way
+Branch `two-pages-view` = `composer` plus the composer work that was still uncommitted on this PC plus #34, in one
+commit (the two could not be split: both change `app/src/main.ts`). Not merged, not published, version not bumped.
+
+**What was built** (details in docs/DEVELOPMENT.md, row "Two pages (issue #34)"; user guide in the README):
+- View menu and Settings' *Open scores in* have **Two pages** (`page_pair`): two pages side by side, a swipe or
+  arrow key moves on **one** page (1-2, 2-3, 3-4; the right page goes to the left), as the issue asks.
+- The user then asked for both ways (mid-session): Settings > View > **Two pages: a swipe turns both**
+  (`pairSwipeTwo`, off by default) makes a swipe go 1-2, 3-4, 5-6.
+- "Forces landscape": `keepSideways` asks `screen.orientation.lock("landscape")` while the view shows and unlocks
+  after. Browsers allow that only in the installed app or in full screen (Focus button); iPhone/iPad can't be
+  asked at all, so upright a line says *Turn your device on its side to read two pages*.
+- It is Page by page's code with two slots per screen (`span`), not a second copy. Two fixes reach Page by page
+  too: quick repeated arrow keys no longer lose steps, and following the music waits for a turn to land.
+- Tour text (Views step), README, DEVELOPMENT.md, `scripts/tests.json` updated. New test `scripts/pagepair-test.mjs`.
+
+**Test state when the user paused the round:**
+- `pagepair-test` on "I am move it edited": all checks passed at phone-on-its-side (915x412) and iPad landscape
+  (1180x820), after the last code change.
+- "Cheap Thrills": iPad size passed; `pageturn-test` passed. Its phone-size run failed once at the very end
+  (see next point). The other three scores were not rerun after the last two code changes (before them they
+  passed at phone size and failed only the since-fixed "playing into page 3" check at iPad size).
+- **Unexplained, look at this first:** twice a run lost the score mid-test (the page was back on the start
+  screen: no pages, view menu disabled), once in the "swipe turns both" part and once in the upright part. The
+  same score and size passed when run again. Not known whether the dev server reloaded the page (files were
+  being edited / other runs going at the time) or the app did it. Rerun with nothing else touching `app/`;
+  if it comes back, log `beforeunload` and vite's reload messages in the test.
+- Not run yet after this change: `goto-test`, `scroller-test`, `tour-test`, `settings-test` (its defaults line
+  was updated for `pairSwipeTwo`), `pageturn-test` on the other four scores and at iPad size,
+  `layout-shots`. Nothing recorded in the ledger (`node scripts/tests.mjs record pagepair-test pass|fail`).
+- **Needs the user's devices:** whether Android really turns the screen (installed app; Chrome tab + Focus),
+  and the view on an iPhone/iPad. The orientation request is only checked with a stand-in on the PC.
+- On this PC pass scores from `real test musescore files/` (the tests' default folder name isn't here).
+
+**Open questions for the user:** is Settings the right place for "a swipe turns both" (they said "toggled"; a
+second menu entry or a button in the view would be the alternatives)? Should the issue be closed with `Fixes #34`
+once they have tried it on the phone (this commit says `Refs #34`)?
+
+**Other open issues:** #33 (Composer should look and work like the Flat app; the user will give access to their
+Android to explore it), #18, #3.
+
+**Left out of the commit on purpose:** `app/android/` (untracked leftover of the removed Capacitor project) and
+the changes inside the `third_party` submodules.
+
+# Earlier handoff (3 Nov 2026, branch `composer`)
 
 ## Done (all on branch `composer`, see docs/COMPOSER.md for the design)
 - Phase 1-2: Edit mode (select, move, pitch, length, delete, undo, Save a copy), note letters, silent edit drafts.
@@ -11,7 +57,7 @@
 - Real microphone singing; a phone, iPhone and iPad (nothing run there for the new features); hearing a newly added line (the engine lists its track, the sound itself was not listened to); the first-tap sound fix on a device; the More panel on a real 320 px phone.
 
 ## Remaining ideas
-- Hear the other lines while recording; New score from inside an open score; clef/sound of an existing line; multi-voice voice-to-notes; More panel is tall on a short phone (scrolls at 40% height).
+- Hear the other lines while recording; clef/sound of an existing line; multi-voice voice-to-notes; More panel is tall on a short phone (scrolls at 40% height).
 - Sounds picked in the mixer go back to the score's when a line is added or undone (`rebuildPlayback`).
 
 ## Next step
@@ -22,4 +68,8 @@ User tries it on localhost (`cd app && npx vite --port 5180 --host 127.0.0.1`), 
 - Branch `composer` is pushed but not merged to `main`; nothing is published (no deploy).
 
 ## Continuation prompt
-"Read HANDOFF.md and docs/COMPOSER.md. Rebuild the engine on this PC, run `node scripts/tests.mjs which`, then continue with the user's feedback on the Edit 'More' panel."
+"Read HANDOFF.md (top section first), docs/DEVELOPMENT.md's 'Two pages' row and docs/COMPOSER.md. Check out
+`two-pages-view`, rebuild the engine on this PC, start the dev server, finish the paused test round for issue #34
+(`pagepair-test` and `pageturn-test` on every score at phone and iPad sizes, then goto, scroller, tour, settings
+tests; look into the page that lost its score mid-test), record the results, and tell the user what to try on
+their phone. After that: the user's feedback on the Edit 'More' panel, and issue #33."

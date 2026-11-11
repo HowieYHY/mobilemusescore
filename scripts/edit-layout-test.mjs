@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "app/package.json"));
 const { chromium } = require("playwright");
-const scorePath = path.join(root, "real test musescores/Paper Hearts.mscz");
+const scorePath = path.resolve(process.env.SCORE || path.join(root, "real test musescores/Paper Hearts.mscz"));
 const url = process.env.APP_URL || "http://127.0.0.1:5180/";
 const shots = process.env.SHOTS || path.join(root, "build/edit-shots");
 fs.mkdirSync(shots, { recursive: true });
@@ -66,7 +66,7 @@ for (const [name, width, height] of sizes) {
         const bar = document.getElementById("editbar").getBoundingClientRect();
         return { n: L.length, minW: Math.min(...L.map((b) => b.width)), minH: Math.min(...L.map((b) => b.height)), out: L.some((b) => b.right > W + 0.5 || b.left < -0.5), h: Math.round(bar.height), oneRow: new Set(L.map((b) => Math.round(b.top))).size === 1 };
     });
-    const rok = rr.n === 7 && rr.minW >= 24 && rr.minH >= 34 && !rr.out && rr.oneRow && (width < 340 || rr.h === r.bar.b - r.bar.t);
+    const rok = rr.n === 8 && rr.minW >= 24 // C to B and the rest key && rr.minH >= 34 && !rr.out && rr.oneRow && (width < 340 || rr.h === r.bar.b - r.bar.t);
     failures += rok ? 0 : 1;
     console.log((rok ? "ok   " : "FAIL ") + `${name} rest: letters ${Math.round(rr.minW)}x${Math.round(rr.minH)} px, bar ${rr.h}px (note: ${r.bar.b - r.bar.t}px), one row ${rr.oneRow}`);
     await page.screenshot({ path: path.join(shots, `layout-${name}-rest.png`) });

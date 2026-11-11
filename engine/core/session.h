@@ -58,7 +58,23 @@ public:
     std::string editDuration(int denominator);
     std::string editDot();
     std::string editDelete();
-    std::string editEnterNote(int letter);
+    std::string editEnterNote(int letter, int den, int dots);
+    std::string editEnterRest(int den, int dots);
+    // a range, as desktop's Shift+click: from the selection to the note or rest nearest the point
+    std::string editExtend(int pageIndex, double x, double y, double radius);
+    std::string editCopy(bool cut);
+    std::string editPaste();
+    bool editHasClip() const { return !m_clip.empty(); }
+    // voice 1-4: input = carry on entering in that voice at the selected place, else move the selection there
+    std::string editVoice(int voice, bool input);
+    // bars before the selected one, and taking out the selected bars (all lines), as desktop's
+    std::string editInsertBars(int count);
+    std::string editDeleteBars();
+    // 0 staccato, 1 accent, 2 tenuto, 3 marcato, 4 fermata, 5 breath mark, 6 caesura
+    std::string editMark(int kind);
+    // a slur over the range (or from the note to the next), a crescendo (0) or diminuendo (1) hairpin
+    std::string editSlur();
+    std::string editHairpin(int kind);
     std::string editSelectStart();
     std::string editAddBars(int count);
     std::string editSetKey(int key);
@@ -204,6 +220,9 @@ private:
 
     std::shared_ptr<mu::engraving::EngravingProject> m_project;
     std::unique_ptr<mu::engraving::PlaybackModel> m_playbackModel;
+    // what Copy or Cut took, in desktop's clipboard format (kept across scores, as desktop's clipboard)
+    muse::ByteArray m_clip;
+    std::string m_clipType;
     AudioSettings m_audioSettings;
     bool m_hasAudioSettings = false;
 

@@ -15,7 +15,7 @@ reading the code only), and the fix proposed.
 - [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts`, `typing.ts`, `tour.ts` not read yet
 - [x] `app/src/voice/transcribe.ts` (nothing found)
 - [ ] `app/src/annotations.ts`
-- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView)
+- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview)
 - [ ] `engine/core/session.cpp` (only if usage allows)
 
 ## Findings
@@ -110,3 +110,41 @@ edits*, and the code treats anything but `"continue"` as *Start again*: `await e
 phone's Back button, Escape, or anything else that closes the dialog throws away the unsaved edits for good.
 **Fix proposed:** on `"cancel"` stop opening and keep the draft (possible once finding 9's reordering is done);
 only the *Start again* button deletes.
+
+### 12. A discarded edit draft can come back (`main.ts` `saveEditDraft` against `openChosen`'s "Don't keep") — read, low
+
+`saveEditDraft` waits for the engine to write the score, then stores it if `edit.dirty` is still true and the
+score key is unchanged. "Don't keep" removes the draft, but `edit.dirty` stays true and the key unchanged until
+the new score is loaded, so a draft save already under way (started by the 800 ms timer or by leaving the app)
+puts the draft back after it was removed. Next time that score is opened it asks "Continue your edits?".
+**Fix proposed:** set `edit.dirty = false` when the reader chooses "Don't keep" (before removing the draft).
+
+### 13. Restarting into an update does not wait for the edit draft (`main.ts` `restartForUpdate`) — read, low
+
+When the app goes to the background with an update ready, the same `visibilitychange` starts
+`saveEditDraft()` (not awaited) and `restartForUpdate()`, which reloads the page. If the last edit was made
+under a second before (Edit already closed with Done), the reload can come before the draft is stored, and
+that edit is lost. Mixer changes are handled (their draft is written first); edits are not.
+**Fix proposed:** `await saveEditDraft()` in `restartForUpdate` before reloading.
+
+### 14. An update reloads the start screen at once, whatever is open on it (`main.ts` `controllerchange`) — read, low
+
+With no score open the page reloads immediately when an update is installed, without `quietForUpdate()`: a
+New score dialog being filled in, the Settings panel or the tour closes under the reader's finger.
+**Fix proposed:** use the same quiet-moment rule there (no dialog, panel or tour open).
+
+### 15. *Continue* deletes a new score's draft even when it could not be opened (`main.ts` `continueDraft`) — read, medium-low
+
+`openChosen` returns `true` whenever the reader did not cancel, also when `openScore` then failed to load the
+file. `continueDraft` takes `true` as "opened" and runs `editDraft.remove(key)`: a draft that fails to load
+once is gone for good. The same wrong reading in New score (`ns-create`): after a failed load with another
+score open, `state.score` is still the old score, so `beginFresh()` marks that one as a new unsaved score.
+**Fix proposed:** `openScore` returns whether it loaded; `openChosen` passes that on; delete the draft and
+call `beginFresh` only then.
+
+### 16. Closing a panel that is not the top one leaves a spare Back entry (`main.ts` `closeLayer`) — read, low
+
+When the panel closed is under another (`i` is not the last), it is taken out of `layers` but no history entry
+is removed. History then holds one entry more than there are panels, so after everything is closed the
+phone's Back button does nothing once before it leaves the app. **Fix proposed:** go back one entry in that
+case too (counted in `ownBacks`), or re-number: to be tested with `notes-edit-switch-test`.

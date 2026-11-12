@@ -3094,9 +3094,18 @@ ui.fileInput.onchange = async () => {
 // A score the reader chose (Open score, or shared from another app): asks
 // about unsaved changes first. False when the reader cancelled.
 async function openChosen(name: string, data: ArrayBuffer): Promise<boolean> {
+    if (!isScoreName(name)) {
+        notAScore(name); // before any question: a wrong file must cost nothing (bug hunt, finding 10)
+        return false;
+    }
     if (state.playing) {
         await engine.stop();
     }
+    // What "Don't keep" and "Don't save" throw away goes only once the new score has opened: until
+    // then the open score and its drafts are as they were (a file that can't be read, a cancelled question)
+    const oldKey = state.scoreKey;
+    let dropEdits = false;
+    let dropChanges = false;
     if (edit.dirty) {
         // desktop's question on closing (ProjectActionsController::askAboutSavingScore), with this app's
         // Save a copy; asked for a new score even when untouched, as desktop counts it unsaved from the start
@@ -3106,10 +3115,7 @@ async function openChosen(name: string, data: ArrayBuffer): Promise<boolean> {
         if (choice === "cancel" || (choice === "copy" && !(await saveCopy()))) {
             return false;
         }
-        if (choice === "discard") {
-            clearTimeout(edit.draftTimer);
-            await editDraft.remove(state.scoreKey);
-        }
+        dropEdits = choice === "discard";
     }
     if (hasUnsaved()) {
         const choice = await ask("Save your changes?",
@@ -3118,35 +3124,75 @@ async function openChosen(name: string, data: ArrayBuffer): Promise<boolean> {
         if (choice === "cancel" || (choice === "save" && !saveAll())) {
             return false;
         }
-        if (choice === "discard") {
+        dropChanges = choice === "discard";
+    }
+    return openScore(name, data, async () => {
+        if (dropEdits) {
+            clearTimeout(edit.draftTimer);
+            edit.dirty = false; // a draft being written right now must not come back after the removal
+            await editDraft.remove(oldKey);
+        }
+        if (dropChanges) {
             discardAll();
         }
-    }
-    await openScore(name, data);
-    return true;
+    });
 }
 
-async function openScore(name: string, data: ArrayBuffer) {
-    if (!/\.(mscz|mscx)$/i.test(name)) {
-        setStatus(`"${name}" is not a MuseScore file. Choose a .mscz file.`, "error");
-        return;
+const isScoreName = (name: string) => /\.(mscz|mscx)$/i.test(name);
+function notAScore(name: string) {
+    setStatus(`"${name}" is not a MuseScore file. Choose a .mscz file.`, "error");
+}
+
+// The start screen again, saying why: the engine lets go of the open score before it tries a new
+// file (Session::load), so when that file can't be read there is no score any more. The pages of
+// the old one stayed on screen before, with Play, the mixer and editing dead (bug hunt, finding 9).
+// Unsaved notes, mixer changes and edits of the old score keep their drafts and come back with it.
+function backToStart(message: string) {
+    while (layers.length) {
+        closeLayer(layers[layers.length - 1]);
     }
-    setStatus(`Opening ${name}…`);
-    if (!ui.sounds.hidden) {
-        closeLayer(closeSounds); // it lists the previous score's parts
-    }
-    state.playbackReady = false;
-    stutterTold = false;
+    setNotesActive(false);
+    resetEdit();
     clearTimeout(draftTimer);
     Object.assign(mix, { store: null, score: null, saved: null, dirty: false, pendingSounds: {} });
-    // the sounds may report ready at any point from here on: they wait for the restore below
-    let mixRestoreDone: (restored: boolean) => void = () => {};
-    mixLoading = new Promise((resolve) => (mixRestoreDone = resolve));
+    Object.assign(state, { score: null, tracks: [], scoreKey: "", duration: 0, position: 0, playbackReady: false });
+    openedScore = null;
+    lastCursor = null;
+    lastPosition = null;
+    timeline = [];
+    barStarts = [];
+    renderGeneration++;
     state.pageOps.clear();
-    ui.mixerToggle.disabled = true;
+    clearPages();
+    cursorEl?.remove();
+    keepSideways(false);
+    notes.open("", "page");
+    ui.viewMode.value = "page";
+    shownView = "page";
+    for (const el of [ui.viewMode, ui.play, ui.speedOpen, ui.loopOpen, ui.rewind, ui.seek, ui.notesToggle, ui.editToggle, ui.mixerToggle]) {
+        el.disabled = true;
+    }
+    ui.goto.hidden = true;
+    ui.section.hidden = true;
+    ui.title.textContent = "PocketScore";
+    ui.time.textContent = "0:00";
+    ui.duration.textContent = fmt(0);
+    ui.seek.value = "0";
+    ui.empty.hidden = false;
+    $("open-label").classList.add("primary");
+    updateSaveState();
+    void showResume();
+    setStatus(message, "error");
+}
+
+/** Resolves true once the score is open; `onOpened` runs then, while the old score's stores are still in place. */
+async function openScore(name: string, data: ArrayBuffer, onOpened?: () => void | Promise<void>): Promise<boolean> {
+    if (!isScoreName(name)) {
+        notAScore(name);
+        return false;
+    }
+    // Nothing of the open score is touched until the new one has loaded (bug hunt, findings 9 and 11).
     const key = await scoreKey(name, data); // before the data goes to the engine
-    state.scoreKey = key;
-    openedScore = { name, data: data.slice(0) }; // a copy to reopen after restarting into an update
     // edits from last time that were never saved as a copy: continue them or start again
     let toLoad = data;
     let restoredEdits = false;
@@ -3155,6 +3201,9 @@ async function openScore(name: string, data: ArrayBuffer) {
         const choice = await ask("Continue your edits?",
             `You changed the notes of “${name}” and did not save a copy. Continue from there, or start again from the file as it is?`,
             [["start", "Start again"], ["continue", "Continue my edits"]]);
+        if (choice === "cancel") {
+            return false; // Back or Escape: the edits stay kept, and the score that is open stays open
+        }
         if (choice === "continue") {
             toLoad = draft.data;
             restoredEdits = true;
@@ -3162,12 +3211,32 @@ async function openScore(name: string, data: ArrayBuffer) {
             await editDraft.remove(key);
         }
     }
+    setStatus(`Opening ${name}…`);
+    if (!ui.sounds.hidden) {
+        closeLayer(closeSounds); // it lists the previous score's parts
+    }
+    // a Play or a tapped note that was waiting for the last score's sounds is not for this one
+    pendingPlay = false;
+    pendingPreview = null;
+    state.playbackReady = false;
+    stutterTold = false;
+    // the sounds may report ready at any point from here on: they wait for the restore below
+    let mixRestoreDone: (restored: boolean) => void = () => {};
+    mixLoading = new Promise((resolve) => (mixRestoreDone = resolve));
+    const copy = data.slice(0); // to reopen after restarting into an update (the engine takes `data`)
     const res = await engine.load(name, toLoad);
     if (!res.ok || !res.score) {
         mixRestoreDone(false);
-        setStatus(res.error || "Could not open this score.", "error");
-        return;
+        backToStart(res.error || "Could not open this score.");
+        return false;
     }
+    await onOpened?.();
+    clearTimeout(draftTimer);
+    Object.assign(mix, { store: null, score: null, saved: null, dirty: false, pendingSounds: {} });
+    state.pageOps.clear();
+    ui.mixerToggle.disabled = true;
+    state.scoreKey = key;
+    openedScore = { name, data: copy };
     state.score = res.score;
     scheduleAutoFocus();
     state.duration = res.score.duration;
@@ -3240,6 +3309,7 @@ async function openScore(name: string, data: ArrayBuffer) {
     updateSaveState();
     setStatus("Loading instrument sounds…");
     void engine.startAudio().catch(() => {}); // errors are shown by the engine
+    return true;
 }
 
 ui.viewMode.onchange = () => changeView();
@@ -3591,8 +3661,7 @@ async function reopenAfterUpdate() {
         return; // not from a restart just now
     }
     await engineReady;
-    await openScore(keep.name, keep.data);
-    if (!state.score) {
+    if (!(await openScore(keep.name, keep.data))) {
         return;
     }
     if (keep.view !== ui.viewMode.value && [...ui.viewMode.options].some((o) => o.value === keep.view)) {
@@ -5002,7 +5071,7 @@ $("ns-create").onclick = async () => {
     ns.dlg.close();
     const bytes = new TextEncoder().encode(text);
     // cancelled at "Save a copy … before closing it?": the open score must not become a new one
-    if (await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer) && state.score) {
+    if (await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer)) {
         await beginFresh();
     }
 };
@@ -5078,10 +5147,10 @@ async function continueDraft(key: string) {
         void showResume();
         return;
     }
-    await editDraft.remove(key); // its draft is kept again, under the new key, by the next change
-    if (state.score) {
-        await beginFresh();
-    }
+    // opened: its draft is kept again, under the new key, by beginFresh (a draft that could not be
+    // opened stays where it is: bug hunt, finding 15)
+    await editDraft.remove(key);
+    await beginFresh();
 }
 async function dropDraft(key: string) {
     await editDraft.remove(key);

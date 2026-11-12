@@ -85,6 +85,8 @@ When the page's drawing commands can't be fetched (`pageOps` rejects) or a draw 
 
 ### 9. Opening a file that can't be read leaves the previous score on screen but half disconnected (`main.ts` `openScore`) — read, **medium-high; the engine side is confirmed**: `Session::load` (`engine/core/session.cpp:454`) drops the open score (`m_project.reset()`) before it tries the new file, and refuses files from a newer MuseScore (`ignoreVersionError` false), so this is what happens when someone opens a score saved by a newer MuseScore while another is open
 
+> **Fixed** (12 Nov 2026): `openScore` changes nothing of the open score until the new one has loaded, and a failed load goes back to the start screen saying why (`backToStart`). **Proved:** `scripts/open-fail-test.mjs` fails 6 checks on the old code and passes now.
+
 Before the engine has accepted the new file, `openScore` already: sets `state.scoreKey` to the new file's key,
 replaces `openedScore` (used to reopen after an update), empties `mix` (`store: null`), sets
 `playbackReady = false`, disables the Mixer button and clears the cached page drawings. If `engine.load` then
@@ -98,6 +100,8 @@ failure, go back to the start screen with the message.
 
 ### 10. "Don't save" / "Don't keep" is carried out before the new file is known to be a score (`main.ts` `openChosen` → `openScore`) — read, medium-low
 
+> **Fixed** (12 Nov 2026): the name is checked before any question, and what "Don't save" / "Don't keep" throw away goes only once the new score has opened (`openChosen`'s `onOpened`).
+
 `openChosen` asks about unsaved notes, mixer changes and edits and discards them (`discardAll()`,
 `editDraft.remove`) before `openScore` checks the name (`"…" is not a MuseScore file`) or the engine tries the
 file. Picking a PDF by mistake, or a damaged file, after answering "Don't save" throws the unsaved notes away
@@ -106,6 +110,8 @@ has loaded.
 
 ### 11. Dismissing "Continue your edits?" with Back or Escape deletes the edits (`main.ts` `openScore`, with `ask`) — read, medium
 
+> **Fixed** (12 Nov 2026): dismissing the question stops the opening; the draft and the open score stay.
+
 `ask` resolves `"cancel"` when the dialog is dismissed. The question has only *Start again* and *Continue my
 edits*, and the code treats anything but `"continue"` as *Start again*: `await editDraft.remove(key)`. So the
 phone's Back button, Escape, or anything else that closes the dialog throws away the unsaved edits for good.
@@ -113,6 +119,8 @@ phone's Back button, Escape, or anything else that closes the dialog throws away
 only the *Start again* button deletes.
 
 ### 12. A discarded edit draft can come back (`main.ts` `saveEditDraft` against `openChosen`'s "Don't keep") — read, low
+
+> **Fixed** (12 Nov 2026): `edit.dirty` is cleared before the draft is removed (in `openChosen`'s `onOpened`).
 
 `saveEditDraft` waits for the engine to write the score, then stores it if `edit.dirty` is still true and the
 score key is unchanged. "Don't keep" removes the draft, but `edit.dirty` stays true and the key unchanged until
@@ -135,6 +143,8 @@ New score dialog being filled in, the Settings panel or the tour closes under th
 **Fix proposed:** use the same quiet-moment rule there (no dialog, panel or tour open).
 
 ### 15. *Continue* deletes a new score's draft even when it could not be opened (`main.ts` `continueDraft`) — read, medium-low
+
+> **Fixed** (12 Nov 2026): `openScore` and `openChosen` return whether the score opened; the draft is deleted and `beginFresh` called only then.
 
 `openChosen` returns `true` whenever the reader did not cancel, also when `openScore` then failed to load the
 file. `continueDraft` takes `true` as "opened" and runs `editDraft.remove(key)`: a draft that fails to load
@@ -172,6 +182,8 @@ right after it is left can lose the last change. **Fix proposed:** on `visibilit
 `pagehide`), write both drafts at once; `restartForUpdate` does the same for notes.
 
 ### 19. A Play tapped while the sounds were loading starts the *next* score by itself (`main.ts` `pendingPlay`, `openScore`) — read, medium-low
+
+> **Fixed** (12 Nov 2026): `openScore` clears `pendingPlay` and `pendingPreview`.
 
 Play before the sounds are ready sets `pendingPlay`, carried out when `playbackReady` comes. `openScore` does
 not clear it (nor `pendingPreview`, a tapped note waiting to sound). So: tap Play on a slow first load, give up

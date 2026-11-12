@@ -620,5 +620,15 @@
       "Edit by keyboard",
       "extend-"
     ]
+  },
+  "open-fail-test": {
+    "files": [],
+    "words": [
+      "openChosen",
+      "backToStart",
+      "isScoreName",
+      "onOpened",
+      "mixRestoreDone"
+    ]
   }
 }

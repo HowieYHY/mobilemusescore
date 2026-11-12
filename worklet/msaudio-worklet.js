@@ -15,6 +15,14 @@
 // longest to render (every note at the new place starts); two still ran dry on
 // a Pixel 9a. Only while playing (the playing queue is 16-48 blocks): stopped,
 // a tapped note sounds at once and a gap there is not heard as a stutter.
+//
+// That is the least. A device that takes its audio in big batches (an Android
+// tablet with 440 ms of output delay, a friend's playback report of 5 Nov 2026)
+// empties six blocks in one go, so the wait is for half of the playing queue,
+// which the worker sends with each block. The same wait comes when Play starts:
+// the short queue kept while stopped ran dry as the worker switched over, which
+// was counted as a stutter at every Play and told the reader the device fell
+// behind.
 const PRIME_FRAMES = 6 * 1024;
 
 class MsAudioPlayer extends AudioWorkletProcessor {
@@ -27,6 +35,9 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         this.underruns = 0;
         this.starved = false;
         this.priming = false;
+        this.primed = 0; // frames waited so far
+        this.heard = false; // the audio played last was sound, not silence
+        this.target = 0; // the worker's playing queue, in frames
         this.enginePlaying = false;
         this.sinceReport = 0;
         this.peak = 0;
@@ -40,7 +51,12 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             this.in = msg.inPort;
             this.in.onmessage = (e) => {
                 if (e.data.type === "audio" && e.data.gen === this.gen) {
+                    if (e.data.playing && !this.enginePlaying) { // Play: the playing queue fills first
+                        this.priming = true;
+                        this.primed = 0;
+                    }
                     this.enginePlaying = e.data.playing;
+                    this.target = e.data.target || this.target;
                     this.queue.push(e.data.data);
                     this.queuedFrames += e.data.data.length / 2;
                 }
@@ -52,6 +68,7 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             this.consumed = 0;
             this.gen++;
             this.priming = true;
+            this.primed = 0;
             if (this.in) {
                 this.in.postMessage({ type: "flush", gen: this.gen });
             }
@@ -67,8 +84,13 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         // After a flush (a jump while playing), wait for a little audio before
         // playing again: playing the first fresh chunk at once ran dry a moment
         // later (heard as a hiccup, and counted as the device falling behind)
-        if (this.priming && (this.queuedFrames >= PRIME_FRAMES || !this.enginePlaying)) {
-            this.priming = false;
+        // (and never for more than a second, whatever does or doesn't arrive)
+        if (this.priming) {
+            this.primed += frames;
+            const want = Math.max(PRIME_FRAMES, this.target / 2);
+            if (this.queuedFrames >= want || !this.enginePlaying || this.primed > sampleRate) {
+                this.priming = false;
+            }
         }
 
         let i = 0;
@@ -76,15 +98,16 @@ class MsAudioPlayer extends AudioWorkletProcessor {
             const chunk = this.queue[0];
             const chunkFrames = chunk.length / 2;
             const n = Math.min(frames - i, chunkFrames - this.readPos);
-            let peak = this.peak;
+            let loud = 0;
             for (let k = 0; k < n; k++) {
                 const l = chunk[(this.readPos + k) * 2];
                 const r = chunk[(this.readPos + k) * 2 + 1];
                 left[i + k] = l;
                 right[i + k] = r;
-                peak = Math.max(peak, Math.abs(l), Math.abs(r));
+                loud = Math.max(loud, Math.abs(l), Math.abs(r));
             }
-            this.peak = peak;
+            this.peak = Math.max(this.peak, loud);
+            this.heard = loud > 1e-4;
             i += n;
             this.readPos += n;
             if (this.readPos >= chunkFrames) {
@@ -102,11 +125,13 @@ class MsAudioPlayer extends AudioWorkletProcessor {
         this.consumed += played;
 
         if (this.in) {
-            // an empty queue while the engine is running means the device fell behind
+            // an empty queue while the engine is running means the device fell behind.
+            // `heard` says whether sound was cut: running dry in silence (the moment
+            // before the music starts, a rest) is no stutter, and nobody hears it
             const empty = this.queuedFrames === 0 && !this.priming;
             if (empty && !this.starved && this.consumed > 0) {
                 this.underruns++;
-                this.in.postMessage({ type: "underrun" });
+                this.in.postMessage({ type: "underrun", heard: this.heard });
             }
             this.starved = empty;
 

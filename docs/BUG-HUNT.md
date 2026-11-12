@@ -15,7 +15,7 @@ reading the code only), and the fix proposed.
 - [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts`, `typing.ts`, `tour.ts` not read yet
 - [x] `app/src/voice/transcribe.ts` (nothing found)
 - [ ] `app/src/annotations.ts`
-- [ ] `app/src/main.ts` (in parts; the lines read are noted here)
+- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView)
 - [ ] `engine/core/session.cpp` (only if usage allows)
 
 ## Findings
@@ -74,3 +74,39 @@ later. If the dialog is opened again (or a new recording started) before it come
 dialog open and processes the old recording, and its `voiceReleaseMic()` ends the new recording's microphone
 and metronome. **Fix proposed:** give each recording the `voice.token` it started with and ignore its `stop`
 when the token has moved on; also release the stream if `new MediaRecorder` throws.
+
+### 8. A page tile whose drawing failed stays blank while it is near the view (`main.ts` `renderTile`, `drawJobs`) — read, low
+
+When the page's drawing commands can't be fetched (`pageOps` rejects) or a draw throws, the tile's key stays in
+`state.rendered`, so nothing draws it again until it has been scrolled far away and back.
+**Fix proposed:** take the key out of `state.rendered` on both failures and try again after a moment (as the
+"no canvas memory" path already does).
+
+### 9. Opening a file that can't be read leaves the previous score on screen but half disconnected (`main.ts` `openScore`) — read, **medium-high; the engine side is confirmed**: `Session::load` (`engine/core/session.cpp:454`) drops the open score (`m_project.reset()`) before it tries the new file, and refuses files from a newer MuseScore (`ignoreVersionError` false), so this is what happens when someone opens a score saved by a newer MuseScore while another is open
+
+Before the engine has accepted the new file, `openScore` already: sets `state.scoreKey` to the new file's key,
+replaces `openedScore` (used to reopen after an update), empties `mix` (`store: null`), sets
+`playbackReady = false`, disables the Mixer button and clears the cached page drawings. If `engine.load` then
+fails ("Could not open this score": a damaged file, a draft that can't be read), it returns with the old score
+still showing: the Mixer button stays disabled, mixer changes are no longer kept, edit drafts would be written
+under the wrong score's key, an update restart reopens the bad file, and if the engine dropped the old score on
+the failed load, Play and page drawing fail too.
+**Fix proposed:** do nothing to the app's state until `engine.load` succeeded (work out the key, look for the
+draft and ask first, load, then switch everything over); if the engine no longer holds the old score after a
+failure, go back to the start screen with the message.
+
+### 10. "Don't save" / "Don't keep" is carried out before the new file is known to be a score (`main.ts` `openChosen` → `openScore`) — read, medium-low
+
+`openChosen` asks about unsaved notes, mixer changes and edits and discards them (`discardAll()`,
+`editDraft.remove`) before `openScore` checks the name (`"…" is not a MuseScore file`) or the engine tries the
+file. Picking a PDF by mistake, or a damaged file, after answering "Don't save" throws the unsaved notes away
+while the old score stays open. **Fix proposed:** check the name before asking; discard only once the new score
+has loaded.
+
+### 11. Dismissing "Continue your edits?" with Back or Escape deletes the edits (`main.ts` `openScore`, with `ask`) — read, medium
+
+`ask` resolves `"cancel"` when the dialog is dismissed. The question has only *Start again* and *Continue my
+edits*, and the code treats anything but `"continue"` as *Start again*: `await editDraft.remove(key)`. So the
+phone's Back button, Escape, or anything else that closes the dialog throws away the unsaved edits for good.
+**Fix proposed:** on `"cancel"` stop opening and keep the draft (possible once finding 9's reordering is done);
+only the *Start again* button deletes.

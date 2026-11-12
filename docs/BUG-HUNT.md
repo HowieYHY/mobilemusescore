@@ -15,7 +15,7 @@ reading the code only), and the fix proposed.
 - [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts`, `typing.ts`, `tour.ts` not read yet
 - [x] `app/src/voice/transcribe.ts` (nothing found)
 - [ ] `app/src/annotations.ts` (only the storage part, lines 254-478, read)
-- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found), 1774-2095 (seek, mixer, sound list), 3960-4170 (Edit's More tools). Checked across all of `app/src`: no text from a score (title, part and sound names) is put into the page as HTML; it all goes through `textContent`
+- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found), 1774-2095 (seek, mixer, sound list), 3960-4170 (Edit's More tools), 2420-2855 (speed, loop, go to bar, panels, Settings: nothing new), 3290-3420 (Two pages: turning, swipes). Checked across all of `app/src`: no text from a score (title, part and sound names) is put into the page as HTML; it all goes through `textContent`
 - [ ] `engine/core/session.cpp` (only if usage allows)
 
 ## Findings
@@ -148,6 +148,10 @@ When the panel closed is under another (`i` is not the last), it is taken out of
 is removed. History then holds one entry more than there are panels, so after everything is closed the
 phone's Back button does nothing once before it leaves the app. **Fix proposed:** go back one entry in that
 case too (counted in `ownBacks`), or re-number: to be tested with `notes-edit-switch-test`.
+Two ways to get there, both read in the code: (a) the Mixer with a part's sound list open, then the Mixer
+button, Speed, Loop or Settings: `openSheet` takes both panels out of `layers` and adds one, but history keeps
+both entries; (b) `closeMixer` under the sound list: the Mixer's entry is spliced out, only the sound list's
+goes back.
 
 ### 17. A new score's notes and mixer settings are lost each time it is continued (`main.ts` `scoreKey`, `continueDraft`) — read, medium-low (Composer only, hidden on the live site)
 
@@ -193,3 +197,10 @@ keys stop turning pages, and one Back press does nothing, until Back is pressed.
 
 `runEdit(...).then(() => { em.words.value = ""; })` clears the field whether the edit worked or not (the lyric
 button checks). **Fix proposed:** clear only when `runEdit` resolved `true`.
+
+### 23. Page by page: settling on a page after a trackpad scroll trusts a finger count that can be stale (`main.ts:3408`) — read, low
+
+The settle timer returns when `fingersDown > 0`. The app's own rule (issue #9) is that this count is not to be
+trusted after 3 s without touch activity (`fingersBusy()`), because a touch that ended on a removed element
+never reports. With a stale count the view can stay between two pages after a trackpad or wheel scroll.
+**Fix proposed:** use `fingersBusy()` there.

@@ -44,6 +44,10 @@ check(first.score && first.pages > 0 && first.play && first.mixer, `it shows, wi
 check(await open("holiday.pdf", b64) === false, "a file that is no score is refused");
 const same = await look();
 check(same.score && same.key === first.key && same.pages === first.pages && same.play && same.mixer, "and the open score is untouched: " + same.status);
+// the sounds may still be loading (a first visit): their progress must not write over the message
+await page.waitForTimeout(1500);
+const told = (await look()).status;
+check(/not a MuseScore file/.test(told), "and the message saying so stays up: " + told);
 
 // Play tapped while the sounds load must not start the next score (finding 19): open the mixer too, a panel
 await page.evaluate(() => document.getElementById("mixer-toggle").click());
@@ -54,6 +58,9 @@ const after = await look();
 check(!after.score && after.pages === 0 && after.start, "the start screen is back, the old pages gone");
 check(!after.play && !after.mixer && after.title === "PocketScore" && after.layers === 0, `Play and the Mixer are off, no panel is left open (title "${after.title}", ${after.layers} panels)`);
 check(/open|read|MuseScore/i.test(after.status), "and it says why: " + after.status);
+await page.waitForTimeout(1500);
+const why = (await look()).status;
+check(/open|read|MuseScore/i.test(why) && !/Loading/.test(why), "and goes on saying so while the sounds load: " + why);
 
 check(await open("Paper Hearts.mscz", b64) === true, "the score opens again afterwards");
 await page.waitForSelector("#pages .page canvas");

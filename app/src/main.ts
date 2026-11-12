@@ -160,7 +160,11 @@ const state = {
 // ---------------------------------------------------------------- status
 
 let statusTimer = 0;
+// A message about a file that could not be opened stays until the reader does something else: the
+// sounds still loading in the background (a first visit) wrote their progress over it within a moment
+let statusStays = false;
 function setStatus(text: string, kind: "info" | "error" = "info", autoHideMs = 0) {
+    statusStays = false;
     ui.status.hidden = !text;
     ui.status.textContent = text;
     ui.status.classList.toggle("error", kind === "error");
@@ -188,6 +192,9 @@ engine.on("engineReady", () => {
     }
 });
 engine.on("audioStatus", (s) => {
+    if (statusStays && !ui.status.hidden) {
+        return;
+    }
     if (s.text) {
         setStatus(s.text);
     } else if (!state.playbackReady && state.score) {
@@ -3011,7 +3018,9 @@ engine.on("playbackReady", async () => {
     state.playbackReady = true;
     const tracks = await engine.tracks();
     state.tracks = tracks;
-    setStatus("");
+    if (!statusStays) { // "Loading instrument sounds…" goes; a message about a file that was refused stays
+        setStatus("");
+    }
     // sounds chosen (or saved) before the sounds had loaded
     for (const t of tracks) {
         const id = mix.pendingSounds[slot(t)];
@@ -3119,6 +3128,7 @@ async function openChosen(name: string, data: ArrayBuffer, ownKey?: string): Pro
 const isScoreName = (name: string) => /\.(mscz|mscx)$/i.test(name);
 function notAScore(name: string) {
     setStatus(`"${name}" is not a MuseScore file. Choose a .mscz file.`, "error");
+    statusStays = true;
 }
 
 // The start screen again, saying why: the engine lets go of the open score before it tries a new
@@ -3161,6 +3171,7 @@ function backToStart(message: string) {
     updateSaveState();
     void showResume();
     setStatus(message, "error");
+    statusStays = true;
 }
 
 /** Resolves true once the score is open; `onOpened` runs then, while the old score's stores are still in place. */
@@ -3511,6 +3522,15 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
         if (isUpdate && e.data?.type === "sw-progress" && !state.playing) {
             setStatus(`Downloading an update to PocketScore… ${Math.round(e.data.done / e.data.total * 100)}%`);
         }
+        if (e.data?.type === "sw-update-failed") {
+            // the connection dropped: this version stays, whole, and the next visit tries again (bug hunt,
+            // finding 1). The "Downloading…" line must not stay up as if it were still going.
+            updateLogged = false;
+            playLog.add("update", `not installed: ${e.data.missing} file(s) could not be downloaded`);
+            if (ui.status.textContent?.startsWith("Downloading an update")) {
+                setStatus("The update couldn't finish downloading. PocketScore will try again later.", "info", 6000);
+            }
+        }
     });
     sw.addEventListener("controllerchange", () => {
         if (!isUpdate) {
@@ -3522,15 +3542,6 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
             // at once, unless something is open on the start screen (New score being filled in, Settings,
             // the tour): then at a quiet moment, like with a score open (bug hunt, finding 14)
             if (quietForUpdate()) {
-        if (e.data?.type === "sw-update-failed") {
-            // the connection dropped: this version stays, whole, and the next visit tries again (bug hunt,
-            // finding 1). The "Downloading…" line must not stay up as if it were still going.
-            updateLogged = false;
-            playLog.add("update", `not installed: ${e.data.missing} file(s) could not be downloaded`);
-            if (ui.status.textContent?.startsWith("Downloading an update")) {
-                setStatus("The update couldn't finish downloading. PocketScore will try again later.", "info", 6000);
-            }
-        }
                 location.reload();
             }
             return;
@@ -3609,6 +3620,7 @@ interface RestartState {
     from?: number;
     to?: number;
     focus: boolean;
+    ownKey?: string; // a score made with New score
 }
 
 async function restartForUpdate() {
@@ -3620,7 +3632,6 @@ async function restartForUpdate() {
         writeDraftsNow(); // unsaved notes and mixer changes: their drafts now, not when their timers come
         await saveEditDraft().catch(() => {}); // and the edits, before the page goes (bug hunt, finding 13)
         const keep: RestartState = {
-    ownKey?: string; // a score made with New score
             at: Date.now(),
             name: openedScore.name,
             data: openedScore.data,
@@ -3634,6 +3645,7 @@ async function restartForUpdate() {
             from: practice.from,
             to: practice.to,
             focus: state.focus,
+            ownKey: openedScore.ownKey,
         };
         await restartStore(true, (s) => s.put(keep, "score"));
     }
@@ -3645,7 +3657,6 @@ async function restartForUpdate() {
 
 // After the restart: the score, its layout, speed, loop, place and view, as they were
 async function reopenAfterUpdate() {
-            ownKey: openedScore.ownKey,
     if (embedded) {
         return;
     }
@@ -3785,6 +3796,14 @@ ui.install.onclick = async () => {
     }
 };
 
+// A score made with New score has no file whose contents could name it, and what it holds changes with
+// every edit: it gets a key of its own when it is made, kept in its draft, so the notes written on it and
+// its mixer settings are found again each time it is continued (bug hunt, finding 17).
+function newScoreKey(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(12));
+    return "new-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // A file's notes are found again by its contents, so a renamed copy keeps them
 async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
     try {
@@ -3796,14 +3815,6 @@ async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
 }
 
 // ---------------------------------------------------------------- notes
-// A score made with New score has no file whose contents could name it, and what it holds changes with
-// every edit: it gets a key of its own when it is made, kept in its draft, so the notes written on it and
-// its mixer settings are found again each time it is continued (bug hunt, finding 17).
-function newScoreKey(): string {
-    const bytes = crypto.getRandomValues(new Uint8Array(12));
-    return "new-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 
 const notes = new Annotations(ui.pages, ui.viewer, () => updateNotesBar(), (msg) => setStatus(msg, "error", 6000));
 

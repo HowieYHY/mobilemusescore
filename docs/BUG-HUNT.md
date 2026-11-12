@@ -14,8 +14,8 @@ reading the code only), and the fix proposed.
 - [x] `app/src/engine/core.worker.ts`, `engine.ts`
 - [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts`, `typing.ts`, `tour.ts` not read yet
 - [x] `app/src/voice/transcribe.ts` (nothing found)
-- [ ] `app/src/annotations.ts`
-- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview)
+- [ ] `app/src/annotations.ts` (only the storage part, lines 254-478, read)
+- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found)
 - [ ] `engine/core/session.cpp` (only if usage allows)
 
 ## Findings
@@ -148,3 +148,34 @@ When the panel closed is under another (`i` is not the last), it is taken out of
 is removed. History then holds one entry more than there are panels, so after everything is closed the
 phone's Back button does nothing once before it leaves the app. **Fix proposed:** go back one entry in that
 case too (counted in `ownBacks`), or re-number: to be tested with `notes-edit-switch-test`.
+
+### 17. A new score's notes and mixer settings are lost each time it is continued (`main.ts` `scoreKey`, `continueDraft`) — read, medium-low (Composer only, hidden on the live site)
+
+Notes, mixer settings and drafts are kept under the score's key, which is the hash of the file's bytes. A
+score made with New score has no file: after the app is closed, *Continue* loads the draft's bytes, which
+differ after every edit, so it gets a new key each time and the notes written on it and its mixer changes
+stay behind under the old key, unreachable. (An opened file is fine: "Continue my edits" keeps the original
+file's key.) The same applies to *Save a copy*: the copy is another file, so the notes don't follow it.
+**Fix proposed:** give a new score a key of its own when it is made (kept in its draft: `EditDraft.key`
+already exists) and reuse it on Continue instead of hashing the bytes.
+
+### 18. The last stroke or mixer change can miss its draft when the app is left at once (`annotations.ts` `save`, `main.ts` `draftTimer`) — read, low
+
+Note drafts are written 300 ms after a change and mixer drafts 400 ms after; nothing writes them at once when
+the page is hidden (edits do: `visibilitychange` → `saveEditDraft`). A phone that freezes or kills the app
+right after it is left can lose the last change. **Fix proposed:** on `visibilitychange` to hidden (and
+`pagehide`), write both drafts at once; `restartForUpdate` does the same for notes.
+
+### 19. A Play tapped while the sounds were loading starts the *next* score by itself (`main.ts` `pendingPlay`, `openScore`) — read, medium-low
+
+Play before the sounds are ready sets `pendingPlay`, carried out when `playbackReady` comes. `openScore` does
+not clear it (nor `pendingPreview`, a tapped note waiting to sound). So: tap Play on a slow first load, give up
+and open another score, and that one starts playing by itself as soon as its sounds are ready, against the
+standing rule that opening a score stops playback. **Fix proposed:** `pendingPlay = false; pendingPreview =
+null;` at the top of `openScore`.
+
+### 20. Cleanup, not a bug: *Keep playing*'s silent audio is behind an `ANDROID` check (`main.ts:1661`) — read
+
+The project's rule (17 Oct 2026) is one block of code for every platform, with no `ANDROID` check around a
+fix. `updateKeepAlive` runs only where the user agent says Android. Left as it is unless the user wants it
+changed: on iPhone the silent `<audio>` might help or might do harm (it can't be tested from this PC).

@@ -70,7 +70,7 @@ await page.waitForFunction(() => app.state.score && app.edit.on && app.edit.sel,
 check((await text("#score-title")).includes("A"), "Continue on A opens A");
 check(await page.evaluate(() => app.edit.fresh && app.edit.dirty), "as an unsaved new score");
 await page.waitForTimeout(1300);
-check(await count() === 3, "A is still kept (the draft moves to its new key)");
+check(await count() === 3, "A is still kept (its draft stays under its own key)");
 
 await boot();
 await page.tap("#resume-more");

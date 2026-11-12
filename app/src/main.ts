@@ -3070,7 +3070,8 @@ ui.fileInput.onchange = async () => {
 
 // A score the reader chose (Open score, or shared from another app): asks
 // about unsaved changes first. False when the reader cancelled.
-async function openChosen(name: string, data: ArrayBuffer): Promise<boolean> {
+/** `ownKey`: for a score made with New score, the key it keeps for good (see `newScoreKey`). */
+async function openChosen(name: string, data: ArrayBuffer, ownKey?: string): Promise<boolean> {
     if (!isScoreName(name)) {
         notAScore(name); // before any question: a wrong file must cost nothing (bug hunt, finding 10)
         return false;
@@ -3112,7 +3113,7 @@ async function openChosen(name: string, data: ArrayBuffer): Promise<boolean> {
         if (dropChanges) {
             discardAll();
         }
-    });
+    }, ownKey);
 }
 
 const isScoreName = (name: string) => /\.(mscz|mscx)$/i.test(name);
@@ -3163,17 +3164,18 @@ function backToStart(message: string) {
 }
 
 /** Resolves true once the score is open; `onOpened` runs then, while the old score's stores are still in place. */
-async function openScore(name: string, data: ArrayBuffer, onOpened?: () => void | Promise<void>): Promise<boolean> {
+async function openScore(name: string, data: ArrayBuffer, onOpened?: () => void | Promise<void>, ownKey?: string): Promise<boolean> {
     if (!isScoreName(name)) {
         notAScore(name);
         return false;
     }
     // Nothing of the open score is touched until the new one has loaded (bug hunt, findings 9 and 11).
-    const key = await scoreKey(name, data); // before the data goes to the engine
+    const key = ownKey ?? await scoreKey(name, data); // before the data goes to the engine
     // edits from last time that were never saved as a copy: continue them or start again
     let toLoad = data;
     let restoredEdits = false;
-    const draft = embedded || !composer ? null : await editDraft.get(key);
+    // (a new score's draft is the score itself: Continue on the start screen loads it, with no question)
+    const draft = embedded || !composer || ownKey ? null : await editDraft.get(key);
     if (draft) {
         const choice = await ask("Continue your edits?",
             `You changed the notes of “${name}” and did not save a copy. Continue from there, or start again from the file as it is?`,
@@ -3214,7 +3216,7 @@ async function openScore(name: string, data: ArrayBuffer, onOpened?: () => void 
     state.pageOps.clear();
     ui.mixerToggle.disabled = true;
     state.scoreKey = key;
-    openedScore = { name, data: copy };
+    openedScore = { name, data: copy, ownKey };
     state.score = res.score;
     scheduleAutoFocus();
     state.duration = res.score.duration;
@@ -3542,7 +3544,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 // and mixer changes come back from their silent drafts, as after closing the app.
 let updateReady = false;
 let restarting = false;
-let openedScore: { name: string; data: ArrayBuffer } | null = null;
+let openedScore: { name: string; data: ArrayBuffer; ownKey?: string } | null = null;
 const UPDATE_IDLE_MS = 20000;
 const RESTART_DB = "pocketscore-restart";
 
@@ -3618,6 +3620,7 @@ async function restartForUpdate() {
             scrollLeft: ui.viewer.scrollLeft,
             position: state.position,
             speed: practice.speed,
+    ownKey?: string; // a score made with New score
             loop: practice.loop,
             from: practice.from,
             to: practice.to,
@@ -3642,12 +3645,23 @@ async function reopenAfterUpdate() {
     }
     await restartStore(true, (s) => {
         s.delete("score");
+            ownKey: openedScore.ownKey,
     });
     if (Date.now() - keep.at > 10 * 60 * 1000 || !(keep.data instanceof ArrayBuffer)) {
         return; // not from a restart just now
     }
     await engineReady;
-    if (!(await openScore(keep.name, keep.data))) {
+    if (keep.ownKey) {
+        // a new score has no file: it comes back from its draft (written just before the restart),
+        // under its own key, and is still a new score, so the start screen keeps offering it
+        const d = await editDraft.get(keep.ownKey);
+        if (!(await openScore(d?.name ?? keep.name, d?.data ?? keep.data, undefined, keep.ownKey))) {
+            return;
+        }
+        edit.fresh = true;
+        edit.dirty = true;
+        updateEditBar();
+    } else if (!(await openScore(keep.name, keep.data))) {
         return;
     }
     if (keep.view !== ui.viewMode.value && [...ui.viewMode.options].some((o) => o.value === keep.view)) {
@@ -3782,6 +3796,14 @@ const COLOR_NAMES: Record<string, string> = {
 
 function swatch(c: string): HTMLButtonElement {
     const b = document.createElement("button");
+// A score made with New score has no file whose contents could name it, and what it holds changes with
+// every edit: it gets a key of its own when it is made, kept in its draft, so the notes written on it and
+// its mixer settings are found again each time it is continued (bug hunt, finding 17).
+function newScoreKey(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(12));
+    return "new-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
     b.className = "swatch";
     b.style.background = c;
     b.dataset.color = c;
@@ -5081,7 +5103,7 @@ $("ns-create").onclick = async () => {
     ns.dlg.close();
     const bytes = new TextEncoder().encode(text);
     // cancelled at "Save a copy … before closing it?": the open score must not become a new one
-    if (await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer)) {
+    if (await openChosen(`${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Untitled"}.mscx`, bytes.buffer as ArrayBuffer, newScoreKey())) {
         await beginFresh();
     }
 };
@@ -5153,13 +5175,12 @@ async function continueDraft(key: string) {
         return;
     }
     resume.row.hidden = true;
-    if (!(await openChosen(d.name, d.data))) {
+    // under the key it was made with, so its notes and mixer settings are there again (finding 17).
+    // Its draft stays where it is, opened or not (finding 15), and beginFresh writes it again.
+    if (!(await openChosen(d.name, d.data, key))) {
         void showResume();
         return;
     }
-    // opened: its draft is kept again, under the new key, by beginFresh (a draft that could not be
-    // opened stays where it is: bug hunt, finding 15)
-    await editDraft.remove(key);
     await beginFresh();
 }
 async function dropDraft(key: string) {

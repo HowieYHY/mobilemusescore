@@ -370,6 +370,8 @@ export class Engine {
     }
 
     timeline(): Promise<[number, number, number, number, number][]> { return this.request({ cmd: "timeline" }); }
+    /** Every bar ([id, ticks]) and staff (id) of the score, for notes to follow them through edits; null from an older engine. */
+    anchors(): Promise<{ bars: [number, number][]; staves: number[] } | null> { return this.request({ cmd: "anchors" }); }
     staves(): Promise<[number, number, [number, number, number][]][]> { return this.request({ cmd: "staves" }); }
 
     /** How long after Play the music reaches the speaker: the audio queued ahead while playing plus the device's own delay. */

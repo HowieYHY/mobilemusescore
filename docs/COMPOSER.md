@@ -127,7 +127,8 @@ no file to reopen, so its silent draft is flagged `fresh` and the start screen o
 saved. It also has no contents to be known by (they change with every edit), so it gets a key of its own when it is
 made (`newScoreKey`, kept in its draft and handed to `openScore` as `ownKey` by *Continue* and by the restart into an
 update): the notes written on it and its mixer settings are found again each time (`new-score-key-test.mjs`). A copy
-saved from it is another file, with another key: notes don't follow it. (every such draft: the newest first, the others behind a small *N more*, `resume-list-test.mjs`; desktop restores every unsaved score of a session) (`new-score-flow-test.mjs`: New score, Soprano, Alto, a Tenor letter, close the page, Continue, Save a copy;
+saved from it is another file, with another key: notes don't follow it. The reader's notes on the score follow
+the music through every edit, as desktop's staff texts do (DEVELOPMENT.md, *Notes on the score*; `notes-follow-test.mjs`). (every such draft: the newest first, the others behind a small *N more*, `resume-list-test.mjs`; desktop restores every unsaved score of a session) (`new-score-flow-test.mjs`: New score, Soprano, Alto, a Tenor letter, close the page, Continue, Save a copy;
 `VIDEO=dir` films it). With a score open, the same dialog is in Edit's More (*Score → New score*), not in the
 top bar, to keep the phone's bars as they are; `openChosen` returns false when the reader cancels at *Keep your
 edits?*, so the open score is never turned into a new one, and Edit's Back entry is reused

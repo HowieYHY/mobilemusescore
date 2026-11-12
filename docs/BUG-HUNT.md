@@ -250,7 +250,9 @@ trusted after 3 s without touch activity (`fingersBusy()`), because a touch that
 never reports. With a stale count the view can stay between two pages after a trackpad or wheel scroll.
 **Fix proposed:** use `fingersBusy()` there.
 
-### 24. Notes on the score don't follow the music after it is edited (`annotations.ts` pins, `main.ts` `afterEdit`) — read, medium-low (Composer only, hidden on the live site)
+### 24. Notes on the score don't follow the music after it is edited (`annotations.ts` pins, `main.ts` `afterEdit`) — **proved**, medium-low (Composer only, hidden on the live site)
+
+> **Fixed** (12 Nov 2026, branch `notes-follow-edits`, made from `bug-hunt`), by the owner's decision: as desktop MuseScore treats a staff text (read in `third_party/musescore-4.7`: a text belongs to a moment of its bar and to its staff). Notes are pinned to their bar and the place in it and follow it through inserted and deleted bars, undo, a rewritten time signature and added lines; a note goes with its deleted bar and comes back on undo. The owner's own rules where desktop has none: a stroke over several bars follows each bar (and splits when they end up on two lines), a scribble between staves follows the nearest, margin notes stay on the page, and clearing a range keeps the notes (desktop deletes its texts there). Needs the engine built from this branch (`mss_anchors`). **Proved:** `scripts/notes-follow-test.mjs` fails 4 checks with the new step off. Details in DEVELOPMENT.md, *Notes on the score*.
 
 Notes written in the current layout are kept at their place on the page, and shown in other layouts by the
 moment in the music under them (seconds) and the staff's number. An edit that moves the music (bars inserted
@@ -298,8 +300,7 @@ opening flow), 3, 21, 1, 5, 16, 18, then the Composer-only ones (12, 13, 17, 22,
 ## Where the fixing stands (12 Nov 2026)
 
 Fixed on branch `bug-hunt`: 1 to 19 (all), 21, 22, 23, 26, and the changes for 25. **Not fixed:**
-- **24** (Composer only, hidden on the live site): needs the owner's decision on what a note is pinned to once
-  the music can change (bar and beat, not seconds).
+- **24** is fixed on its own branch, `notes-follow-edits` (not merged into `bug-hunt`).
 - **20**: stays as it is, the owner's decision (12 Nov 2026): the `ANDROID` check around *Keep playing*'s silent audio is a known exception to the one-block rule.
 Not read at all: `annotations.ts` 608 to 1071, parts of `main.ts` (2362-2420, 3665-3884, 4170-4228, 4852-4958,
 the tour), `typing.ts`, `firsttime.ts`, most of `engine/core/session.cpp`, the test scripts.

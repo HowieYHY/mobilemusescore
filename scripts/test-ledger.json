@@ -23,11 +23,11 @@
     "note": "screenshots: look at them"
   },
   "no-change-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19"
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
+    "date": "2026-11-12"
   },
   "mobile-test": {
     "streak": 9,
@@ -46,12 +46,12 @@
     "note": "only its known failure"
   },
   "notes-test": {
-    "streak": 11,
+    "streak": 12,
     "last": "pass",
-    "commit": "4e683de+changes",
-    "passCommit": "4e683de",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
     "date": "2026-11-12",
-    "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
+    "note": "only its two known failures"
   },
   "goto-test": {
     "streak": 8,
@@ -116,11 +116,11 @@
     "note": "Pixel 9a, 17 Oct: all passed, incl. all 10 settings kept after a reload and an update"
   },
   "notes-views-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "ac86b61+changes",
-    "passCommit": "ac86b61",
-    "date": "2026-10-19",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
+    "date": "2026-11-12",
     "note": "needs 'I am move it edited.mscz' (its layout), not on this PC"
   },
   "continuous-test": {
@@ -221,10 +221,10 @@
     "date": "2026-11-04"
   },
   "edit-draft-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "56435f8+changes",
-    "passCommit": "56435f8",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
     "date": "2026-11-12"
   },
   "voice-test": {
@@ -249,10 +249,10 @@
     "date": "2026-11-03"
   },
   "new-score-flow-test": {
-    "streak": 6,
+    "streak": 7,
     "last": "pass",
-    "commit": "56435f8+changes",
-    "passCommit": "56435f8",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
     "date": "2026-11-12"
   },
   "edit-more-test": {
@@ -277,10 +277,10 @@
     "date": "2026-11-12"
   },
   "notes-edit-switch-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "56435f8+changes",
-    "passCommit": "56435f8",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
     "date": "2026-11-12"
   },
   "resume-list-test": {
@@ -354,10 +354,10 @@
     "date": "2026-11-12"
   },
   "new-score-key-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "56435f8+changes",
-    "passCommit": "56435f8",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
     "date": "2026-11-12"
   },
   "update-fail-test": {
@@ -365,6 +365,20 @@
     "last": "pass",
     "commit": "56435f8+changes",
     "passCommit": "56435f8",
+    "date": "2026-11-12"
+  },
+  "notepins-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
+    "date": "2026-11-12"
+  },
+  "notes-follow-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "3d26797+changes",
+    "passCommit": "3d26797",
     "date": "2026-11-12"
   }
 }

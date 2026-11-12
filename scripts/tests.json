@@ -692,5 +692,27 @@
       "sw-update-failed",
       "sw-progress"
     ]
+  },
+  "notepins-test": {
+    "files": [
+      "app/src/notepins.ts"
+    ],
+    "words": []
+  },
+  "notes-follow-test": {
+    "files": [
+      "app/src/notepins.ts",
+      "app/src/musicmap.ts",
+      "app/src/annotations.ts"
+    ],
+    "words": [
+      "musicChanged",
+      "placeFromPins",
+      "scoreAnchors",
+      "readAnchors",
+      "anchorsJson",
+      "mss_anchors",
+      "afterEdit"
+    ]
   }
 }

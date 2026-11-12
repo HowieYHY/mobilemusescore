@@ -209,6 +209,8 @@ On the start screen, **New score** makes a blank score to build up part by part 
 
 **Edit** (the music-note button at the top) lets you change the music itself. This is new and still being tried out.
 
+**Your own notes follow the music.** What you wrote or drew on the score with **Notes** stays with its bar when you edit: bars added before it carry it along, and a line added above moves it down with its staff. Deleting a bar takes the notes written on it too, and Undo brings them back with the bar. Clearing the music out of a bar (the bin, Cut) leaves your notes alone. A note in the margin or by the title stays where it is on the page. After editing, **Save** lights up when there are notes on the score, because they have moved with the music: save them together with a copy of the edited score, since the notes are kept for the score as it is now.
+
 1. Tap **Edit**. A bar appears under the top buttons.
 2. Tap a note or rest on the score. It gets a blue outline, and the bar says what it is, for example *C♯5 · quarter · bar 2*. A note sounds when you pick it.
 3. Change it:

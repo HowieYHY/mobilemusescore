@@ -133,6 +133,11 @@ EMSCRIPTEN_KEEPALIVE const char* mss_staves()
     return ret(Session::instance()->stavesJson());
 }
 
+EMSCRIPTEN_KEEPALIVE const char* mss_anchors()
+{
+    return ret(Session::instance()->anchorsJson());
+}
+
 EMSCRIPTEN_KEEPALIVE const char* mss_cursor(double secs)
 {
     return ret(Session::instance()->cursorJson(secs));

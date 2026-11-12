@@ -2,12 +2,18 @@
 // this device, per score, in page units of the layout they were written in, so
 // they stay put when zooming. Each is also pinned to the music (musicmap.ts),
 // so it shows in the other layouts too, on the same music; marks away from the
-// music (margins, the title) show only where they were written. A stylus always
+// music (margins, the title) show only where they were written. When the music is
+// edited, each pinned note follows its bar as a staff text does in desktop MuseScore
+// (musicChanged; the rules are in notepins.ts). A stylus always
 // draws; a finger draws when "Draw with finger" is on (by default until a
 // stylus is seen), and two fingers then scroll.
 
 import { MusicMap, type Anchor, type SystemStaves, type TimelinePoint } from "./musicmap";
 import { textField } from "./typing";
+import { barMover, staffMover, sameAnchors, type Bars } from "./notepins";
+
+/** What notes are pinned to, as the engine lists it: every bar and staff of the score with its id. */
+export interface ScoreAnchors { bars: Bars; staves: number[] }
 
 // Text boxes take plain text only, so pasted formatting or pictures never enter one (issue #27);
 // browsers without "plaintext-only" fall back to "true" (the text is still saved as plain text)
@@ -20,11 +26,18 @@ const editable = (() => {
 export type Tool = "pen" | "highlighter" | "text" | "eraser";
 
 // `a`: the music under each point (null where there is none), filled in by the layout it was written in
-interface Stroke { id: string; tool: "pen" | "highlighter"; color: string; width: number; pts: number[]; a?: (Anchor | null)[] } // x,y,x,y… page units
+// `part`: what is left of the stroke with this id after some of its bars were deleted (undo brings the whole back)
+interface Stroke { id: string; tool: "pen" | "highlighter"; color: string; width: number; pts: number[]; a?: (Anchor | null)[]; part?: string } // x,y,x,y… page units
 interface TextNote { id: string; x: number; y: number; size: number; color: string; text: string; a?: Anchor | null }
 interface PageNotes { strokes: Stroke[]; texts: TextNote[] }
 type ModeNotes = Record<string, PageNotes>; // by page index
-interface Stored { v: 1; modes: Record<string, ModeNotes> }
+// `stale`: layouts whose notes' places on the page are from before the music was edited; they are
+// worked out again from the pins the next time that layout is shown
+interface Stored { v: 1; modes: Record<string, ModeNotes>; stale?: string[] }
+
+// A note that went with its deleted bars, kept while the score is open so that undoing the deletion
+// brings it back: its pins' bars by the engine's ids (`ids`, one per point; null: not pinned to a bar)
+interface Gone { mode: string; page: number; kind: "stroke" | "text"; item: Stroke | TextNote; ids: (number | null)[] }
 
 // `mode`: the layout the item belongs to (a note from another layout can be erased here)
 type Undo =
@@ -84,7 +97,8 @@ function serialised(d: Stored): string {
             modes[m] = kept;
         }
     }
-    return JSON.stringify({ v: 1, modes });
+    const stale = (d.stale ?? []).filter((m) => modes[m]);
+    return JSON.stringify(stale.length ? { v: 1, modes, stale } : { v: 1, modes });
 }
 
 /** The same without the pins to the music, to tell whether the reader changed anything: older
@@ -132,6 +146,7 @@ export class Annotations {
     private shown = new Map<number, { strokes: ShownStroke[]; texts: ShownText[] }>();
     private views = new Map<number, PageView>();
     private undoStack: Undo[] = [];
+    private gone: Gone[] = [];
     private saveTimer = 0;
     /** Notes save by themselves: "" (nothing written yet), "saving", "saved" or "failed". */
     /** The saved notes (normalised JSON), to tell whether there are unsaved changes. */
@@ -265,6 +280,7 @@ export class Annotations {
         this.map = null; // the new score's layout comes with its timeline (setLayout)
         this.shown.clear();
         this.undoStack = [];
+        this.gone = [];
         const read = (k: string): Stored | null => {
             try {
                 const d = JSON.parse(localStorage.getItem(k) || "null");
@@ -331,8 +347,20 @@ export class Annotations {
      */
     setLayout(timeline: TimelinePoint[], speed: number, spatium: number, staves: SystemStaves[] = []) {
         this.map = new MusicMap(timeline, speed, spatium, staves);
-        // pin this layout's notes that have no pins yet, or pins from before staves were known
-        const old = (a: Anchor | null | undefined) => a === undefined || (!!a && this.map!.hasStaves && a.length < 5);
+        if (this.data.stale?.includes(this.mode)) {
+            // the music was edited since these were placed: where they are comes from their pins now
+            if (!this.map.empty) {
+                this.placeFromPins();
+                this.data.stale = this.data.stale.filter((m) => m !== this.mode);
+                this.save();
+            }
+            this.placeOthers();
+            this.renderAll();
+            return;
+        }
+        // pin this layout's notes that have no pins yet, or pins from before staves or bars were known
+        const old = (a: Anchor | null | undefined) => a === undefined
+            || (!!a && ((this.map!.hasStaves && a.length < 5) || (this.map!.hasBars && a[5] == null)));
         for (const [page, p] of Object.entries(this.modeNotes())) {
             for (const st of p.strokes) {
                 if (!st.a || st.a.some(old)) {
@@ -347,6 +375,191 @@ export class Annotations {
         }
         this.placeOthers();
         this.renderAll();
+    }
+
+    /**
+     * The music was edited (before the new layout's timeline comes with setLayout). Every pinned note
+     * follows its bar and its staff, as a staff text does in desktop MuseScore: `was` and `now` are the
+     * score's bars and staves before and after, by the engine's ids. Notes whose bars were deleted go
+     * with them and come back if the deletion is undone. Where the notes are on the page is worked out
+     * again from the pins, in this layout now and in the others when they are next shown: an edit that
+     * adds or removes no bar can still move the music to another line.
+     */
+    musicChanged(was: ScoreAnchors, now: ScoreAnchors) {
+        const map = this.map;
+        const each = (fn: (mode: string, page: number, p: PageNotes) => void) => {
+            for (const [mode, pages] of Object.entries(this.data.modes)) {
+                for (const [pg, p] of Object.entries(pages)) {
+                    fn(mode, Number(pg), p);
+                }
+            }
+        };
+        // pins from before bars were known get their bar from the layout as it was until now
+        if (map?.hasBars) {
+            each((_m, _pg, p) => {
+                for (const st of p.strokes) {
+                    st.a = st.a?.map((a) => (a && map.withBar(a)) || a);
+                }
+                for (const t of p.texts) {
+                    t.a = (t.a && map.withBar(t.a)) || t.a;
+                }
+            });
+        }
+        if (!sameAnchors(was, now)) {
+            const bar = barMover(was.bars, now.bars);
+            const staff = staffMover(was.staves, now.staves);
+            const nowAt = new Map<number, number>();
+            now.bars.ids.forEach((id, i) => nowAt.set(id, i));
+            // a pin after the edit: null when its bar was deleted; a pin with no bar is left as it is
+            const moved = (a: Anchor): Anchor | null => {
+                const out = a.slice() as Anchor;
+                if (a[3] != null) {
+                    const s = staff(a[3]);
+                    out[3] = s;
+                    out[4] = s === null ? null : a[4];
+                }
+                if (a[5] != null) {
+                    const at = bar({ bar: a[5], f: a[6] ?? 0 });
+                    if (!at) {
+                        return null;
+                    }
+                    out[5] = at.bar;
+                    out[6] = at.f;
+                }
+                return out;
+            };
+            const idsOf = (pins: (Anchor | null | undefined)[]) => pins.map((a) => (a && a[5] != null ? was.bars.ids[a[5]] ?? null : null));
+            const leaving: Gone[] = [];
+            each((mode, page, p) => {
+                p.strokes = p.strokes.flatMap((st) => {
+                    if (!st.a) {
+                        return [st];
+                    }
+                    const after = st.a.map((a) => (a ? moved(a) : null));
+                    const lost = st.a.map((a, i) => !!a && !after[i]);
+                    if (!lost.some(Boolean)) {
+                        st.a = after;
+                        return [st];
+                    }
+                    leaving.push({ mode, page, kind: "stroke", item: JSON.parse(JSON.stringify(st)), ids: idsOf(st.a) });
+                    if (st.a.every((a, i) => !a || lost[i])) {
+                        return []; // every bar it was on is gone
+                    }
+                    // what is left of it: the points on bars that stayed
+                    const keep = st.a.map((_a, i) => !lost[i]);
+                    return [{ ...st, part: st.part ?? st.id, pts: st.pts.filter((_v, i) => keep[i >> 1]), a: after.filter((_a, i) => keep[i]) }];
+                });
+                p.texts = p.texts.filter((t) => {
+                    if (!t.a) {
+                        return true;
+                    }
+                    const after = moved(t.a);
+                    if (!after) {
+                        leaving.push({ mode, page, kind: "text", item: JSON.parse(JSON.stringify(t)), ids: idsOf([t.a]) });
+                        return false;
+                    }
+                    t.a = after;
+                    return true;
+                });
+            });
+            // notes whose bars are back (the deletion was undone) come back whole, at the bars' new numbers
+            this.gone = this.gone.filter((g) => {
+                if (!g.ids.every((id) => id === null || nowAt.has(id))) {
+                    return true;
+                }
+                const pins = g.kind === "stroke" ? (g.item as Stroke).a ?? [] : [(g.item as TextNote).a];
+                pins.forEach((a, i) => {
+                    if (a && g.ids[i] !== null) {
+                        a[5] = nowAt.get(g.ids[i]!);
+                    }
+                });
+                const p = this.pageNotes(g.page, g.mode);
+                if (g.kind === "stroke") {
+                    p.strokes = p.strokes.filter((st) => st.part !== g.item.id && st.id !== g.item.id);
+                    for (const pages of Object.values(this.data.modes[g.mode] ?? {})) {
+                        pages.strokes = pages.strokes.filter((st) => st.part !== g.item.id); // its pieces, wherever they went
+                    }
+                    p.strokes.push(g.item as Stroke);
+                } else {
+                    p.texts.push(g.item as TextNote);
+                }
+                return false;
+            });
+            this.gone.push(...leaving);
+        }
+        // every layout's page positions are from before the edit now
+        const stale = Object.entries(this.data.modes)
+            .filter(([, pages]) => Object.values(pages).some((p) => p.strokes.length || p.texts.length)).map(([m]) => m);
+        if (!stale.length && !this.data.stale?.length) {
+            return; // no notes on this score
+        }
+        this.data.stale = stale;
+        this.undoStack = []; // its entries point at notes by where they were
+        this.save();
+    }
+
+    // This layout's notes put where their pins are now (after the music was edited). A stroke whose
+    // bars are now on two lines becomes a piece on each; a point with no pin of its own (off the end
+    // of the music) keeps its distance from the nearest pinned point; a note with no pin at all (a
+    // margin, the title) stays where it was written.
+    private placeFromPins() {
+        const map = this.map!;
+        const out: ModeNotes = {};
+        const on = (page: number) => (out[page] ||= { strokes: [], texts: [] });
+        for (const [pg, p] of Object.entries(this.modeNotes())) {
+            const page = Number(pg);
+            for (const st of p.strokes) {
+                const at = (st.a ?? []).map((a) => (a ? map.place(a) : null));
+                if (!at.some(Boolean)) {
+                    on(page).strokes.push(st);
+                    continue;
+                }
+                const n = st.pts.length >> 1;
+                interface Run { page: number; sys: string; pts: number[]; a: (Anchor | null)[] }
+                const runs: Run[] = [];
+                for (let i = 0; i < n; i++) {
+                    let j = i; // the nearest point that has a place
+                    for (let d = 0; !at[j] && d < n; d++) {
+                        j = at[i - d] ? i - d : at[i + d] ? i + d : j;
+                    }
+                    const ref = at[j]!;
+                    const x = ref.x + st.pts[2 * i] - st.pts[2 * j];
+                    const y = ref.y + st.pts[2 * i + 1] - st.pts[2 * j + 1];
+                    let run = runs[runs.length - 1];
+                    if (!run || run.sys !== ref.sys) {
+                        runs.push((run = { page: ref.page, sys: ref.sys, pts: [], a: [] }));
+                    }
+                    const a = at[i] ? st.a![i] : null;
+                    if (a && at[i]) {
+                        a[0] = at[i]!.t; // the moment it is at now, for versions that pin by time
+                    }
+                    run.pts.push(Math.round(x), Math.round(y));
+                    run.a.push(a);
+                }
+                // where it already is, to the unit: left untouched, so an edit that moved nothing
+                // changes nothing (pins round to a unit; Save must not light up for that)
+                if (runs.length === 1 && runs[0].page === page && runs[0].pts.every((v, i) => Math.abs(v - st.pts[i]) <= 1)) {
+                    st.a = runs[0].a;
+                    on(page).strokes.push(st);
+                    continue;
+                }
+                runs.forEach((r, k) => on(r.page).strokes.push(k === 0
+                    ? { ...st, pts: r.pts, a: r.a }
+                    : { ...st, id: newId(), pts: r.pts, a: r.a }));
+            }
+            for (const t of p.texts) {
+                const at = t.a ? map.place(t.a) : null;
+                if (at) {
+                    if (at.page !== page || Math.abs(at.x - t.x) > 1 || Math.abs(at.y - t.y) > 1) {
+                        t.x = at.x;
+                        t.y = at.y;
+                    }
+                    t.a![0] = at.t;
+                }
+                on(at ? at.page : page).texts.push(t);
+            }
+        }
+        this.data.modes[this.mode] = out;
     }
 
     // the music under each point of a stroke (undefined while the layout isn't known); the whole

@@ -146,6 +146,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             // older engine builds have no staff list: notes then pin to the system only
             result = core._mss_staves ? JSON.parse(callStr("mss_staves")) : [];
             break;
+        case "anchors":
+            // older engine builds don't say which bar is which: notes then stay where they are when the music is edited
+            result = core._mss_anchors ? JSON.parse(callStr("mss_anchors")) : null;
+            break;
         case "tracks":
             result = JSON.parse(callStr("mss_tracks"));
             break;

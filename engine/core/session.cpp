@@ -458,6 +458,7 @@ std::string Session::load(const std::string& path)
     m_project.reset();
     m_tracks.clear();
     m_auxOut.clear();
+    m_anchorIds.clear(); // addresses of the last score's bars mean nothing now
     m_hasAudioSettings = false;
     m_audioSettings = AudioSettings();
     ++m_loadKey;
@@ -2877,7 +2878,13 @@ std::string Session::timelineJson() const
         double x, y, h;
         bool barEnd;
         double secs100; // at 100% speed (see below)
+        int bar;        // the bar's place in the score (as anchorsJson lists them)
+        double inBar;   // how far through the bar, 0 to 1
     };
+    std::map<const Measure*, int> barIndex;
+    for (const Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        barIndex[m] = int(barIndex.size());
+    }
 
     // A moment's time at 100% speed, whatever the speed now. The speed divides the music's time
     // but not pauses (fermatas, breath and section-break pauses: TempoMap::normalize adds their
@@ -2907,7 +2914,7 @@ std::string Session::timelineJson() const
     };
     std::vector<Point> points;
 
-    auto point = [&](int utick, const System* system, double canvasX, bool barEnd = false) {
+    auto point = [&](int utick, const System* system, double canvasX, const Measure* m, int tick, bool barEnd = false) {
         const Page* page = system->page();
         if (!page) {
             return;
@@ -2928,7 +2935,9 @@ std::string Session::timelineJson() const
         const double secs = uticksToSecs(score, utick);
         points.push_back({ std::round(secs * 10000.0) / 10000.0, pageIdx,
                            std::round(x), std::round(y), std::round(h), barEnd,
-                           std::round(at100(utick, secs) * 10000.0) / 10000.0 });
+                           std::round(at100(utick, secs) * 10000.0) / 10000.0,
+                           barIndex.count(m) ? barIndex[m] : -1,
+                           m->ticks().ticks() > 0 ? std::round(double(tick - m->tick().ticks()) / m->ticks().ticks() * 100000.0) / 100000.0 : 0.0 });
     };
 
     for (const RepeatSegment* rs : playedRepeats(score)) {
@@ -2940,11 +2949,11 @@ std::string Session::timelineJson() const
             }
             for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
                 if (s->visible()) {
-                    point(s->tick().ticks() + offset, system, s->canvasPos().x());
+                    point(s->tick().ticks() + offset, system, s->canvasPos().x(), m, s->tick().ticks());
                 }
             }
             const Segment* endBar = m->findSegment(SegmentType::EndBarLine, m->endTick());
-            point(m->endTick().ticks() + offset, system, endBar ? endBar->canvasPos().x() : m->canvasPos().x() + m->width(), true);
+            point(m->endTick().ticks() + offset, system, endBar ? endBar->canvasPos().x() : m->canvasPos().x() + m->width(), m, m->endTick().ticks(), true);
         }
     }
 
@@ -2968,9 +2977,35 @@ std::string Session::timelineJson() const
             out += ",";
         }
         first = false;
-        out += "[" + num(p.secs) + "," + std::to_string(p.page) + "," + num(p.x) + "," + num(p.y) + "," + num(p.h) + "," + num(p.secs100) + "]";
+        out += "[" + num(p.secs) + "," + std::to_string(p.page) + "," + num(p.x) + "," + num(p.y) + "," + num(p.h) + "," + num(p.secs100) + "," + std::to_string(p.bar) + "," + num(p.inBar) + "]";
     }
     return out + "]";
+}
+
+int Session::anchorId(const void* item) const
+{
+    auto it = m_anchorIds.find(item);
+    if (it == m_anchorIds.end()) {
+        it = m_anchorIds.emplace(item, m_nextAnchorId++).first;
+    }
+    return it->second;
+}
+
+std::string Session::anchorsJson() const
+{
+    const Score* score = m_project ? m_project->masterScore() : nullptr;
+    if (!score) {
+        return "{\"bars\":[],\"staves\":[]}";
+    }
+    std::string bars;
+    for (const Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        bars += std::string(bars.empty() ? "" : ",") + "[" + std::to_string(anchorId(m)) + "," + std::to_string(m->ticks().ticks()) + "]";
+    }
+    std::string staves;
+    for (size_t i = 0; i < score->nstaves(); ++i) {
+        staves += std::string(staves.empty() ? "" : ",") + std::to_string(anchorId(score->staff(i)));
+    }
+    return "{\"bars\":[" + bars + "],\"staves\":[" + staves + "]}";
 }
 
 std::string Session::stavesJson() const

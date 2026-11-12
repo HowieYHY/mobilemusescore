@@ -6,7 +6,7 @@ import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer, forgetImages } from "./render/pagerenderer";
-import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
+import { Annotations, COLORS, MORE_COLORS, type ScoreAnchors, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 import { Tour, type TourStep } from "./tour";
 import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings";
@@ -1279,8 +1279,17 @@ type TimelinePoint = [number, number, number, number, number]; // secs, page, x,
 let timeline: TimelinePoint[] = [];
 const anchor = { secs: 0, clock: 0 };
 
+// The score's bars and staves by the engine's ids, as they were when the notes were last placed: what
+// the reader's notes follow when the music is edited (null: an engine that doesn't tell)
+let scoreAnchors: ScoreAnchors | null = null;
+async function readAnchors(): Promise<ScoreAnchors | null> {
+    const a = await engine.anchors().catch(() => null);
+    return a ? { bars: { ids: a.bars.map((b) => b[0]), ticks: a.bars.map((b) => b[1]) }, staves: a.staves } : null;
+}
+
 async function loadTimeline() {
     const [tl, staves] = await Promise.all([engine.timeline(), engine.staves()]);
+    scoreAnchors ??= await readAnchors();
     timeline = tl;
     // notes are pinned to the music through it and the staves (they show in every view); its times
     // follow the speed
@@ -3227,6 +3236,7 @@ async function openScore(name: string, data: ArrayBuffer, onOpened?: () => void 
     state.pageOps.clear();
     ui.mixerToggle.disabled = true;
     state.scoreKey = key;
+    scoreAnchors = null; // read again with this score's timeline
     openedScore = { name, data: copy, ownKey };
     state.score = res.score;
     scheduleAutoFocus();
@@ -4401,6 +4411,13 @@ async function afterEdit() {
     state.score = await engine.setViewMode(engineMode(shownView));
     state.duration = state.score.duration;
     ui.duration.textContent = fmt(state.duration);
+    // the reader's notes follow their bars and staves, as desktop's staff texts do (before the new
+    // timeline places them: loadTimeline)
+    const anchors = await readAnchors();
+    if (anchors && scoreAnchors) {
+        notes.musicChanged(scoreAnchors, anchors);
+    }
+    scoreAnchors = anchors;
     await Promise.all([loadTimeline(), loadBars(), loadTempos()]);
     rerenderAll(false);
     // a line was added or renamed: the mixer follows

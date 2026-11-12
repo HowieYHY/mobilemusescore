@@ -170,7 +170,20 @@ public:
     // system's top as in timelineJson's points.
     std::string stavesJson() const;
 
+    // What the reader's own notes are pinned to, so they follow the music when it is edited as
+    // desktop's staff texts do (they belong to their bar and their staff, whatever is inserted or
+    // deleted around them): {"bars":[[id, ticks], ...], "staves":[id, ...]}, every bar and staff
+    // in score order. An id stays with its bar or staff for as long as the score is open, through
+    // edits, undo and redo (the bar taken out by an undo is the same bar when it comes back); a
+    // bar written anew (a new time signature rewrites the bars after it) gets a new id.
+    std::string anchorsJson() const;
+
 private:
+    // ids for anchorsJson, by the bar's or staff's address (kept by the undo stack while it is out)
+    mutable std::map<const void*, int> m_anchorIds;
+    mutable int m_nextAnchorId = 1;
+    int anchorId(const void* item) const;
+
     // The note (if any) and played seconds under a tap; false if off the music
     bool locate(int pageIndex, double x, double y, double radius, double& secs, const mu::engraving::Note*& note) const;
 

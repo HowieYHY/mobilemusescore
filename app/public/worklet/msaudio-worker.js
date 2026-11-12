@@ -8,7 +8,8 @@
 // (src/web/appjs/distr/audioworker.js, GPL-3.0-only).
 //
 // Messages from the page:
-//   {type:"init", soundFont, soundFontPath, rpcPort, outPort, sampleRate}
+//   {type:"init", soundFont, soundFontPath, rpcPort, outPort, sampleRate, playTarget}
+//                            playTarget: the queue this device needed last time (frames)
 //   {type:"playing", on}     while stopped only a little audio is queued, so
 //                            a tapped note sounds at once
 // To the page: {type:"underrun", count} for each gap while playing, and
@@ -17,7 +18,7 @@
 // with loadUnder set when this device's timer is too coarse to measure it.
 // On outPort (from/to the worklet):
 //   -> {type:"audio", data: Float32Array (interleaved stereo), gen}
-//   <- {type:"consumed", frames} | {type:"underrun"} | {type:"flush", gen}
+//   <- {type:"consumed", frames} | {type:"underrun", heard} | {type:"flush", gen}
 
 import createMsAudio from "../engine/msaudio.mjs";
 
@@ -28,11 +29,14 @@ let mod = null;
 let out = null;
 let bufPtr = 0;
 let inFlight = 0; // frames sent to the worklet and not yet played
-// Audio queued ahead while playing. Deep enough to ride out a busy moment on
-// a phone (~340 ms; Android ~510 ms, whose audio timing is the least even);
-// seek, pause and stop flush it, so it adds no delay there.
-const ANDROID = /Android/i.test(self.navigator?.userAgent || "");
-let playTarget = (ANDROID ? 24 : 16) * BLOCK;
+// Audio queued ahead while playing (~510 ms). Deep enough to ride out a busy
+// moment on a phone; seek, pause and stop flush it, so it adds no delay there.
+// The same on every device: it was shorter (16 blocks) unless the browser said
+// "Android", and an Android tablet asking for desktop sites doesn't say so.
+// A device that needed more keeps what it learned (the page hands it back in
+// "init"), so the gaps that taught it are not heard again on every visit.
+const START_TARGET = 24 * BLOCK;
+let playTarget = START_TARGET;
 // While stopped (~85 ms); grows if the device takes audio in bigger bursts
 let idleTarget = 4 * BLOCK;
 const MAX_IDLE_TARGET = 12 * BLOCK;
@@ -100,7 +104,7 @@ function renderBlock() {
     }
     // copy out of wasm memory; the copy is transferred to the worklet
     const data = new Float32Array(mod.HEAPF32.buffer, bufPtr, BLOCK * 2).slice();
-    out.postMessage({ type: "audio", data, gen, playing }, [data.buffer]);
+    out.postMessage({ type: "audio", data, gen, playing, target: playTarget }, [data.buffer]);
     inFlight += BLOCK;
 }
 
@@ -165,6 +169,9 @@ self.onmessage = async (e) => {
         return;
     }
     sampleRate = msg.sampleRate || sampleRate;
+    if (msg.playTarget > 0) {
+        playTarget = Math.min(MAX_TARGET, Math.max(START_TARGET, Math.round(msg.playTarget / BLOCK) * BLOCK));
+    }
     try {
         mod = await createMsAudio({
             print: (s) => self.postMessage({ type: "log", text: s }),
@@ -188,11 +195,13 @@ self.onmessage = async (e) => {
                 inFlight = Math.max(0, inFlight - m.frames);
             } else if (m.type === "underrun") {
                 // the device fell behind: keep more audio queued from now on
-                if (playing) {
+                if (playing && m.heard === false) {
+                    // silence ran out (before the first note, in a rest): not a stutter
+                } else if (playing) {
                     underruns++;
                     // self-correcting: each gap keeps ~170 ms more ready, up to ~1 s
                     playTarget = Math.min(MAX_TARGET, playTarget + 8 * BLOCK);
-                    self.postMessage({ type: "underrun", count: underruns });
+                    self.postMessage({ type: "underrun", count: underruns, target: playTarget });
                     self.postMessage({ type: "log", text: `audio underrun; queue now ${playTarget} frames` });
                 } else {
                     idleTarget = Math.min(MAX_IDLE_TARGET, idleTarget + BLOCK);

@@ -631,6 +631,16 @@
       "mixRestoreDone"
     ]
   },
+  "worklet-burst-test": {
+    "files": [
+      "app/public/worklet/msaudio-worker.js",
+      "app/public/worklet/msaudio-worklet.js"
+    ],
+    "words": [
+      "priming",
+      "playTarget"
+    ]
+  },
   "sounds-retry-test": {
     "files": [],
     "words": [

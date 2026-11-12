@@ -126,6 +126,14 @@ const settings: Settings = loadSettings(!embedded);
 $("version").textContent = "PocketScore " + __APP_VERSION__;
 
 const engine = new Engine();
+// The sound queue this device turned out to need is kept, so a device that stuttered once doesn't
+// stutter again at the start of every visit (nothing is kept in the website's preview).
+const QUEUE_KEY = "pocketscore.queue";
+try {
+    engine.startQueue = embedded ? 0 : Number(localStorage.getItem(QUEUE_KEY)) || 0;
+} catch (err) {
+    // storage blocked: the usual queue
+}
 
 const ICON_PLAY = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>`;
 const ICON_PAUSE = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>`;
@@ -1420,7 +1428,14 @@ document.addEventListener("visibilitychange", () => {
 // A gap in the sound: the audio engine already keeps more ready from now on;
 // say so once per score, so a stutter isn't a mystery
 let stutterTold = false;
-engine.on("stutter", () => {
+engine.on("stutter", (e) => {
+    if (!embedded && e.target > 0) {
+        try {
+            localStorage.setItem(QUEUE_KEY, String(e.target));
+        } catch (err) {
+            // not kept: learned again next time
+        }
+    }
     if (!stutterTold && state.playing) {
         stutterTold = true;
         setStatus("The sound stuttered, so PocketScore now prepares more of it ahead to keep it smooth.", "info", 10000);

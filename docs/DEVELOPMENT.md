@@ -326,9 +326,16 @@ exported audio file.
 inside the worklet and was called for every 128-frame slice. A slow phone could
 not always finish that within the slice's ~2.7 ms deadline, so the sound
 stuttered. Now `msaudio-worker.js` renders 1024-frame blocks about 170 ms ahead.
-While playing it keeps about 340 ms queued (16 blocks), growing by four blocks
-on each underrun up to about 1 s. While stopped it keeps only ~85 ms queued, so
-a tapped note sounds quickly. Blocks carry a flush generation, so audio rendered
+While playing it keeps about 510 ms queued (24 blocks, the same on every device:
+the browser's name is not asked, since an Android tablet set to desktop sites
+says "Linux"), growing by eight blocks on each underrun up to about 1 s. What a
+device grew to is kept (`pocketscore.queue` in localStorage, handed to the worker
+as `playTarget`), so it starts there on the next visit. After Play and after a
+jump the worklet waits for half the queue before sounding, and a queue that runs
+dry in silence (before the first note, in a rest) is not counted as a stutter.
+`scripts/worklet-burst-test.mjs` runs the worklet on a clock of its own with a
+device that takes its audio in big batches. While stopped it keeps only ~85 ms
+queued, so a tapped note sounds quickly. Blocks carry a flush generation, so audio rendered
 before a seek is never played after it. The worklet
 (`msaudio-worklet.js`) only copies from its queue.
 - **Keeping the cursor in time.** The worklet reports how much audio is

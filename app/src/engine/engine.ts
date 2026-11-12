@@ -58,6 +58,9 @@ export class Engine {
 
     private lastStatus = "";
 
+    /** The playing queue this device needed before, in frames (0 = the usual one). Set before the audio starts. */
+    startQueue = 0;
+
     constructor(base = import.meta.env.BASE_URL) {
         this.base = new URL(base, location.href).href;
         this.worker = new Worker(new URL("./core.worker.ts", import.meta.url), { type: "module" });
@@ -191,8 +194,9 @@ export class Engine {
                         this.stats.targetSecs = m.target / ctx.sampleRate;
                     } else if (m.type === "underrun") {
                         this.underruns = m.count;
+                        this.stats.targetSecs = m.target / ctx.sampleRate; // as it is now, not as last reported
                         this.note("gap", `sound gap ${m.count}; queue now ${(this.stats.targetSecs * 1000).toFixed(0)} ms, engine load ${this.stats.load === null ? "?" : (this.stats.load * 100).toFixed(0) + "%"}`);
-                        this.emit("stutter", { count: m.count });
+                        this.emit("stutter", { count: m.count, target: m.target });
                     } else if (m.type === "error") {
                         reject(new Error(m.text));
                     } else if (m.type === "log" && /ERROR|WARN|underrun/.test(m.text)) {
@@ -207,7 +211,7 @@ export class Engine {
 
             // The score engine must be listening before the audio engine announces itself
             await this.request({ cmd: "startAudio", sampleRate: ctx.sampleRate, blockSize: 1024, soundFontUri: "file://" + SOUND_FONT_PATH });
-            worker.postMessage({ type: "init", rpcPort: this.rpcForAudio, outPort: audioPath.port1, soundFont: sf, soundFontPath: SOUND_FONT_PATH, sampleRate: ctx.sampleRate },
+            worker.postMessage({ type: "init", rpcPort: this.rpcForAudio, outPort: audioPath.port1, soundFont: sf, soundFontPath: SOUND_FONT_PATH, sampleRate: ctx.sampleRate, playTarget: this.startQueue },
                 [this.rpcForAudio, audioPath.port1, sf]);
             await ready;
             this.emit("audioStatus", { text: "" });
@@ -374,7 +378,7 @@ export class Engine {
         if (!ctx) {
             return 0;
         }
-        const queued = this.stats.targetSecs || (16 * 1024) / ctx.sampleRate; // the worker's playing queue
+        const queued = this.stats.targetSecs || (24 * 1024) / ctx.sampleRate; // the worker's playing queue
         return queued + (ctx.baseLatency || 0) + ((ctx as any).outputLatency || 0);
     }
 

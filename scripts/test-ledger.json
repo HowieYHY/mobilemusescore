@@ -156,11 +156,11 @@
     "note": "1.0.25, #29 fade"
   },
   "selfcheck-test": {
-    "streak": 11,
+    "streak": 12,
     "last": "pass",
-    "commit": "a50b74a+changes",
-    "passCommit": "a50b74a",
-    "date": "2026-11-03",
+    "commit": "e455896+changes",
+    "passCommit": "e455896",
+    "date": "2026-11-12",
     "note": "1.0.25, #29 fade"
   },
   "install-hint-test": {
@@ -330,6 +330,13 @@
     "last": "pass",
     "commit": "9f10744+changes",
     "passCommit": "9f10744",
+    "date": "2026-11-12"
+  },
+  "worklet-burst-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "e455896+changes",
+    "passCommit": "e455896",
     "date": "2026-11-12"
   }
 }

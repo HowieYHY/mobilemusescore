@@ -252,6 +252,28 @@ line above renumbers the staves. Nothing warns the reader. **Fix proposed:** nee
 pin notes by bar and beat rather than seconds, and re-place the current layout's notes from their pins after
 an edit. Until then, say in the README that notes written before editing may no longer sit on their music.
 
+### 25. A friend's playback report (5 Nov 2026, 1.0.29): a "sound gap" at every Play, on an Android tablet (`msaudio-worker.js`, `msaudio-worklet.js`) — medium
+
+> **Changed** (12 Nov 2026), not proven on that device: see below. Needs the friend to try it and send a new report.
+
+What the report says: the browser calls itself "Linux x86_64" (Chrome on an Android tablet asks for desktop
+sites) with 440 ms of output delay; the queue starts at 341 ms; in both visits a gap is logged within a few ms
+of Play and another 0.7 to 1.8 s later, at 6 to 10% engine load and 7 ms for the slowest block; a third gap came
+with 683 ms queued, two seconds before a jump. So the engine is not slow: something stops the audio worker for
+longer than the queue at the start of playing, or the queue is counted as dry when nothing was sounding.
+What was wrong in the code, whatever the cause on that tablet:
+- The longer queue was given only to browsers saying "Android" (a device check, against the project's own
+  rule), so this tablet started with the short one. Now 24 blocks everywhere.
+- The queue learned from gaps was forgotten on every visit (341 again), so the same gaps came back each time.
+  Now kept on the device and used from the start.
+- `play()` doesn't empty the queue as a jump does, so the worklet went from the short stopped queue straight
+  into playing; and a queue running dry before the first note (silence) was counted as a stutter, grew the
+  queue and told the reader the device fell behind. Now Play waits for half the queue like a jump, the wait
+  after a jump is half the queue and not a fixed six blocks, and running dry in silence is not counted.
+`worklet-burst-test` (new) shows the silence case failing on the old worklet. Not known: what stops the worker
+on that tablet (the play command itself, Bluetooth, the tablet's own audio). If gaps remain after this, the
+next step is to time the audio worker's message handling (`rpc.onmessage`) and put it in the report.
+
 ## Reading stopped here (12 Nov 2026)
 
 24 findings from about two thirds of the app's own code. The parts listed above as not read may hold more.

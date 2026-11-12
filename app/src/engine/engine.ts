@@ -143,10 +143,27 @@ export class Engine {
 
         this.audioStarting = (async () => {
             this.emit("audioStatus", { text: "Loading MS Basic sound font…" });
-            const [sf] = await Promise.all([
-                this.fetchSoundFont(),
-                ctx.audioWorklet.addModule(this.base + "worklet/msaudio-worklet.js"),
-            ]);
+            let sf: ArrayBuffer;
+            try {
+                [sf] = await Promise.all([
+                    this.fetchSoundFont(),
+                    ctx.audioWorklet.addModule(this.base + "worklet/msaudio-worklet.js"),
+                ]);
+            } catch (err: any) {
+                // The download dropped (49 MB on mobile data) or the worklet didn't load. Nothing has
+                // been handed to the workers yet, so start clean: the next Play, or the next score
+                // opened, tries again. Kept before, the failed start made Play dead for the whole visit
+                // (bug hunt, finding 3).
+                console.warn("sounds could not be loaded:", err);
+                if (this.ctx === ctx) {
+                    this.ctx = null;
+                }
+                this.audioStarting = null;
+                ctx.onstatechange = null;
+                void ctx.close().catch(() => {});
+                this.emit("audioStatus", { text: "" });
+                throw Object.assign(new Error("Couldn't load the sounds. Check the connection and tap Play again."), { retry: true });
+            }
 
             // MuseScore's audio engine renders ahead in its own worker; the
             // AudioWorklet only plays from the queue it is sent.
@@ -196,7 +213,7 @@ export class Engine {
             this.emit("audioStatus", { text: "" });
         })();
 
-        this.audioStarting.catch((err) => this.emit("error", { message: "Audio failed to start: " + err.message }));
+        this.audioStarting.catch((err) => this.emit("error", { message: err.retry ? err.message : "Audio failed to start: " + err.message }));
         return this.audioStarting;
     }
 

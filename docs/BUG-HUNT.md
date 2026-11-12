@@ -42,6 +42,8 @@ stored under that odd key and is then served for every later `/?…` visit of th
 
 ### 3. If the sounds fail to load once, they never load again until the app is restarted (`app/src/engine/engine.ts` `startAudio`) — read, medium
 
+> **Fixed** (12 Nov 2026): a failed download or worklet load closes the context and clears the start, so the next Play (or score opened) loads the sounds again; the message says to tap Play again. `sounds-retry-test` (new; 3 FAILs on the old code).
+
 `audioStarting` is set once and kept even when it rejects (the 49 MB sound font download drops on mobile data,
 or the worklet module fails to load). Every later `startAudio()` (each Play, each score opened) returns the
 same rejected promise, so the reader sees "Audio failed to start" and Play can never work again in this

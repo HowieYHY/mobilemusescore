@@ -1719,6 +1719,11 @@ function audioFailed(err: any) {
         setStatus("This browser can't play sound here. Use a recent Safari, Chrome or Edge, with PocketScore's usual address (https://howieyhy.github.io/mobilemusescore/).", "error");
         return;
     }
+    if (err?.retry) {
+        pendingPlay = false; // nothing is loading now: the next tap starts it again
+        setStatus(err.message, "error");
+        return;
+    }
     setStatus("Audio could not start: " + (err && err.message || err), "error");
 }
 

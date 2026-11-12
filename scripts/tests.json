@@ -630,5 +630,13 @@
       "onOpened",
       "mixRestoreDone"
     ]
+  },
+  "sounds-retry-test": {
+    "files": [],
+    "words": [
+      "fetchSoundFont",
+      "audioStarting",
+      "audioFailed"
+    ]
   }
 }

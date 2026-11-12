@@ -12,11 +12,12 @@ reading the code only), and the fix proposed.
 - [x] `app/public/sw.js`
 - [x] `app/src/editdraft.ts`, `mixerstore.ts`, `settings.ts`, `playlog.ts` (nothing found); `firsttime.ts` not read
 - [x] `app/src/engine/core.worker.ts`, `engine.ts`
-- [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts`, `typing.ts`, `tour.ts` not read yet
+- [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts` (nothing found); `typing.ts`, `tour.ts` not read
 - [x] `app/src/voice/transcribe.ts` (nothing found)
 - [ ] `app/src/annotations.ts` (only the storage part, lines 254-478, read)
 - [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found), 1774-2095 (seek, mixer, sound list), 3960-4170 (Edit's More tools), 2420-2855 (speed, loop, go to bar, panels, Settings: nothing new), 3290-3420 (Two pages: turning, swipes). Checked across all of `app/src`: no text from a score (title, part and sound names) is put into the page as HTML; it all goes through `textContent`
-- [ ] `engine/core/session.cpp` (only if usage allows)
+- [ ] `engine/core/session.cpp`: only `Session::load` read. The rest (3,100 lines of C++, the edit functions above all) is **not read**; a bug there needs an engine build to confirm
+- [ ] **Not read:** `annotations.ts` drawing and text boxes (478-1071), `main.ts` 2362-2420, 3665-3884 (install, notes bar), 4170-4228, 4852-4958, the tour, `typing.ts`, `firsttime.ts`, the audio worker and worklet in `app/public/worklet`, `scripts/`
 
 ## Findings
 
@@ -204,3 +205,20 @@ The settle timer returns when `fingersDown > 0`. The app's own rule (issue #9) i
 trusted after 3 s without touch activity (`fingersBusy()`), because a touch that ended on a removed element
 never reports. With a stale count the view can stay between two pages after a trackpad or wheel scroll.
 **Fix proposed:** use `fingersBusy()` there.
+
+### 24. Notes on the score don't follow the music after it is edited (`annotations.ts` pins, `main.ts` `afterEdit`) — read, medium-low (Composer only, hidden on the live site)
+
+Notes written in the current layout are kept at their place on the page, and shown in other layouts by the
+moment in the music under them (seconds) and the staff's number. An edit that moves the music (bars inserted
+or deleted, a line added, lengths changed so the systems break elsewhere) changes neither: a circle drawn
+round bar 12 stays where bar 12 was on the paper, and in the other views lands a bar early or late; adding a
+line above renumbers the staves. Nothing warns the reader. **Fix proposed:** needs a decision, not a patch:
+pin notes by bar and beat rather than seconds, and re-place the current layout's notes from their pins after
+an edit. Until then, say in the README that notes written before editing may no longer sit on their music.
+
+## Reading stopped here (12 Nov 2026)
+
+24 findings from about two thirds of the app's own code. The parts listed above as not read may hold more.
+Order proposed for fixing, by what a reader of the live site can hit today: 9 (with 10, 11, 15, 19: the
+opening flow), 3, 21, 1, 5, 16, 18, then the Composer-only ones (12, 13, 17, 22, 7, 24) and the small ones
+(2, 4, 6, 8, 14, 23).

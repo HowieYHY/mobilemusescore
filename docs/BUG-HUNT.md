@@ -15,7 +15,7 @@ reading the code only), and the fix proposed.
 - [x] `app/src/render/pagerenderer.ts`, `newscore.ts` (nothing found there); `musicmap.ts`, `typing.ts`, `tour.ts` not read yet
 - [x] `app/src/voice/transcribe.ts` (nothing found)
 - [ ] `app/src/annotations.ts` (only the storage part, lines 254-478, read)
-- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found)
+- [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found), 1774-2095 (seek, mixer, sound list), 3960-4170 (Edit's More tools). Checked across all of `app/src`: no text from a score (title, part and sound names) is put into the page as HTML; it all goes through `textContent`
 - [ ] `engine/core/session.cpp` (only if usage allows)
 
 ## Findings
@@ -179,3 +179,17 @@ null;` at the top of `openScore`.
 The project's rule (17 Oct 2026) is one block of code for every platform, with no `ANDROID` check around a
 fix. `updateKeepAlive` runs only where the user agent says Android. Left as it is unless the user wants it
 changed: on iPhone the silent `<audio>` might help or might do harm (it can't be tested from this PC).
+
+### 21. Two quick taps on a part's sound button open the sound list twice (`main.ts` `openSounds`) — read, medium-low
+
+The first time, `openSounds` waits for the engine's sound list before it shows the panel, and nothing stops a
+second tap meanwhile; each call ends with `openLayer(closeSounds)`. The panel then has two entries in
+`layers` and in history. Closing it once leaves one behind: `layers.length` stays above zero with nothing
+open, so Focus no longer starts by itself, an installed update is never applied (`quietForUpdate`), the arrow
+keys stop turning pages, and one Back press does nothing, until Back is pressed.
+**Fix proposed:** ignore the call while the list is loading or the panel is open.
+
+### 22. Words typed for a staff text are cleared even when they could not be put in (`main.ts` `edit-text`) — read, low
+
+`runEdit(...).then(() => { em.words.value = ""; })` clears the field whether the edit worked or not (the lyric
+button checks). **Fix proposed:** clear only when `runEdit` resolved `true`.

@@ -1,9 +1,8 @@
 # Handoff (11 Nov 2026, late: 1.0.30 published from branch `two-pages-view`)
 
 ## Newest: 1.0.30 is live, Two pages without the Composer
-- **Published from `two-pages-view`, not from `main`** (the user: "push this branch to live"). `main` is still
-  1.0.29, so publishing from `main` on any PC would take Two pages off the site again. Open question for the
-  user: merge `two-pages-view` into `main`?
+- **`main` is what is live.** 1.0.30 was published from `two-pages-view`, which the user then had merged into
+  `main` (fast-forward, pushed 12 Nov 2026). Work and publish from `main`; on the other PC, pull first.
 - **The Composer is hidden in the published app** (the user's choice: it was never tried on devices): `composer`
   in `app/src/main.ts` is true only on the dev server or with `?composer` in the address; CSS `.no-composer`
   hides Edit, New score and Continue, edit drafts aren't offered, the tour skips its step. README sections

@@ -280,3 +280,73 @@ next step is to time the audio worker's message handling (`rpc.onmessage`) and p
 Order proposed for fixing, by what a reader of the live site can hit today: 9 (with 10, 11, 15, 19: the
 opening flow), 3, 21, 1, 5, 16, 18, then the Composer-only ones (12, 13, 17, 22, 7, 24) and the small ones
 (2, 4, 6, 8, 14, 23).
+
+## Could be done better (the whole codebase, 12 Nov 2026)
+
+Not bugs. Ordered by what they would save; none is started. Each says what it costs and what could go wrong.
+
+### B1. `main.ts` is 5,300 lines with 62 module-level variables: the per-score state is reset by hand in several places
+Most findings above (9, 10, 11, 15, 19, 21) are one kind: something of the last score was still there, or was
+cleared too early. `openScore`, `backToStart`, `discardAll` and `resetEdit` each reset their own list of
+variables, and a new feature has to remember to join every list. **Better:** one `ScoreSession` object holding
+everything that belongs to the open score (key, tracks, timeline, bar starts, mix, edit, pending Play, render
+generation), made new when a score opens and dropped whole when it closes; module state is then only what
+outlives a score. Then split the file by feature along seams that already exist (opening and drafts, paging and
+drawing, transport, mixer, notes, Composer and voice, tour, updates). **Cost:** a few sessions, mechanical but
+wide; it is the foundational kind of change, so the full test round once. **Risk:** behaviour drift in the
+paging code, which is the most timing-dependent. Do the session object first; it removes the bug class without
+moving code between files.
+
+### B2. `tests.mjs which` asks for 46 of 64 tests after almost any change
+Its words are too common ("tour", "zoom", "restart", "goto" match any line that mentions them, even a comment
+or an unrelated `ui.goto.hidden`), so the settled-tests rule can't work as meant and the choice is made by
+hand each time. **Better:** match on files plus function names only, and let a test name the functions it
+covers; print the reason only when it is a function or a file. **Cost:** an hour on `tests.json`. **Risk:**
+a test missed after a change; keep "foundational files run everything" for the engine, worklet and storage.
+
+### B3. Logic that could be tested in milliseconds is only tested through a browser
+`worklet-burst-test` (new) runs the real worklet under Node on its own clock: no browser, the same result every
+time, and it can imitate a device nobody here owns. The same works for the Back-entry accounting (`layers`,
+finding 16), the cursor clock (already done in `cursor-test`), the note pins, `transcribe.ts` and the draft
+stores. **Better:** move those pieces out of `main.ts` as plain functions and test them that way; keep
+Playwright for what needs a page. **Cost:** comes almost free with B1. This is also the only way to cover
+iPad and odd Android behaviour from this PC: write down the timing pattern a device shows, then replay it.
+
+### B4. The engine is built by hand on each PC and is not in git
+Already cost a week of releases without a feature (the lesson of 16 Oct). `check-engine.mjs` catches a missing
+function, not an old build of an existing one. **Better:** build the engine in GitHub Actions on a tag (or on a
+change under `engine/`), attach it to a release, and have `copy-engine.mjs` download that; a hash of the engine
+goes into the app and the start screen's version line. **Cost:** a day; the Emscripten build is slow (cache
+it). **Risk:** CI minutes on a private repo (2,000 a month free); the build must be shown identical to the
+local one once (`compare-engines.mjs`).
+
+### B5. The 49 MB sound font is fetched in one go, with no resume
+Finding 3 now lets Play try again, but a dropped download starts from zero, on mobile data. **Better:** fetch
+it in ranges (GitHub Pages answers `Range`), keep finished parts in the Cache API, resume from the last part,
+retry each part with backoff. Check first, cheaply, that Pages serves ranges for this file with compression
+off, and compare the assembled bytes with the whole file. **Cost:** half a day. **Risk:** the service worker
+also caches this file; one of the two must own it.
+
+### B6. Notes and mixer drafts live in localStorage, edits in IndexedDB
+localStorage is about 5 MB for the whole site and is written synchronously on the main thread (a long ink
+drawing is serialised whole on every stroke, 300 ms later). A full store shows "could not be kept".
+**Better:** one IndexedDB store for all three, written per score, with the existing localStorage data moved
+across on first run and kept until the move is confirmed. **Cost:** a day with the migration test. **Risk:**
+losing someone's notes in the move, so the old copy stays readable for some versions.
+
+### B7. The update path (finding 1) can't be tested here, and it is the one path every reader goes through
+`update-restart-test` covers the restart, not a service worker install on a bad connection. **Better:** a
+test that serves two builds from a local server with a route that fails some files, then checks the old
+version still opens offline. Then finding 1's fix can go in with proof.
+
+### B8. A dev-server vulnerability is open on GitHub (Vite, moderate: `server.fs.deny` bypass; fixed in 6.4.5)
+It only matters while the dev server runs with `--host` (which the iPhone testing notes tell you to do: any
+device on the same Wi-Fi could read files outside the project). **Better:** `npm i -D vite@^6.4.5` in `app/`,
+then a build and one test. Not done here because a build-tool upgrade wants the wider test round.
+
+### B9. Small ones
+- `ANDROID` is still asked in `main.ts` for *Keep playing*'s silent audio (finding 20); the same code can run
+  everywhere the setting is on.
+- The playback report could carry what finding 25 lacked: how long the audio worker's longest message took,
+  and the size of the device's audio batches. Then a report like the friend's names its own cause.
+- `HANDOFF.md` has grown into a log (four handoffs deep); the project's rule is one current picture.

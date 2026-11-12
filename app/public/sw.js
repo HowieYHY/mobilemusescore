@@ -39,29 +39,50 @@ self.addEventListener("install", (event) => {
         const total = files.reduce((a, f) => a + f.size, 0);
         let done = 0;
         let lastTold = 0;
+        // files that could not be downloaded (the connection dropped, the server said no)
+        let missing = 0;
         // one by one (addAll fails as a whole). An update keeps the files that
         // haven't changed (same content hash) instead of downloading the whole
         // app again, so it finishes quickly, before the app is closed.
         for (const f of files) {
             const url = new URL(f.url, self.registration.scope).href;
             try {
-                const prev = f.h ? await previous(url) : null;
-                if (prev && await sha1(prev.clone()) === f.h) {
-                    await cache.put(url, prev);
-                } else {
-                    const r = await fetch(f.url, { cache: "no-store" });
-                    if (r.ok) {
-                        await cache.put(url, r);
+                // stored already by an earlier try of this same install that did not finish
+                const mine = f.h ? await cache.match(url) : null;
+                if (!mine || await sha1(mine) !== f.h) {
+                    const prev = f.h ? await previous(url) : null;
+                    if (prev && await sha1(prev.clone()) === f.h) {
+                        await cache.put(url, prev);
+                    } else {
+                        const r = await fetch(f.url, { cache: "no-store" });
+                        if (r.ok) {
+                            await cache.put(url, r);
+                        } else {
+                            missing++;
+                        }
                     }
                 }
             } catch (err) {
-                // offline during install: the fetch handler fills gaps later
+                // a device with no room left keeps what fits, as before: the room comes back when
+                // the older version's copy goes, and the fetch handler fills the gaps then
+                if (!err || err.name !== "QuotaExceededError") {
+                    missing++;
+                }
             }
             done += f.size;
             if (done - lastTold > total / 50) {
                 lastTold = done;
                 await tellPages({ type: "sw-progress", done, total });
             }
+        }
+        // An update with files missing must not take over: activating deletes the older version's
+        // complete copy, and the app would then need the network for what is missing (no sound, or no
+        // engine, offline, where it worked before). Failing here keeps the older version as it is;
+        // the browser tries again at the next visit, and what was downloaded this time is kept.
+        // (A first install has nothing to lose: it goes on, and the fetch handler fills the gaps.)
+        if (missing && self.registration.active) {
+            await tellPages({ type: "sw-update-failed", missing });
+            throw new Error(`update not installed: ${missing} file(s) could not be downloaded`);
         }
         await self.skipWaiting();
     })());

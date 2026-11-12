@@ -3522,6 +3522,15 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
             // at once, unless something is open on the start screen (New score being filled in, Settings,
             // the tour): then at a quiet moment, like with a score open (bug hunt, finding 14)
             if (quietForUpdate()) {
+        if (e.data?.type === "sw-update-failed") {
+            // the connection dropped: this version stays, whole, and the next visit tries again (bug hunt,
+            // finding 1). The "Downloading…" line must not stay up as if it were still going.
+            updateLogged = false;
+            playLog.add("update", `not installed: ${e.data.missing} file(s) could not be downloaded`);
+            if (ui.status.textContent?.startsWith("Downloading an update")) {
+                setStatus("The update couldn't finish downloading. PocketScore will try again later.", "info", 6000);
+            }
+        }
                 location.reload();
             }
             return;
@@ -3611,6 +3620,7 @@ async function restartForUpdate() {
         writeDraftsNow(); // unsaved notes and mixer changes: their drafts now, not when their timers come
         await saveEditDraft().catch(() => {}); // and the edits, before the page goes (bug hunt, finding 13)
         const keep: RestartState = {
+    ownKey?: string; // a score made with New score
             at: Date.now(),
             name: openedScore.name,
             data: openedScore.data,
@@ -3620,7 +3630,6 @@ async function restartForUpdate() {
             scrollLeft: ui.viewer.scrollLeft,
             position: state.position,
             speed: practice.speed,
-    ownKey?: string; // a score made with New score
             loop: practice.loop,
             from: practice.from,
             to: practice.to,
@@ -3636,6 +3645,7 @@ async function restartForUpdate() {
 
 // After the restart: the score, its layout, speed, loop, place and view, as they were
 async function reopenAfterUpdate() {
+            ownKey: openedScore.ownKey,
     if (embedded) {
         return;
     }
@@ -3645,7 +3655,6 @@ async function reopenAfterUpdate() {
     }
     await restartStore(true, (s) => {
         s.delete("score");
-            ownKey: openedScore.ownKey,
     });
     if (Date.now() - keep.at > 10 * 60 * 1000 || !(keep.data instanceof ArrayBuffer)) {
         return; // not from a restart just now
@@ -3787,6 +3796,14 @@ async function scoreKey(name: string, data: ArrayBuffer): Promise<string> {
 }
 
 // ---------------------------------------------------------------- notes
+// A score made with New score has no file whose contents could name it, and what it holds changes with
+// every edit: it gets a key of its own when it is made, kept in its draft, so the notes written on it and
+// its mixer settings are found again each time it is continued (bug hunt, finding 17).
+function newScoreKey(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(12));
+    return "new-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 
 const notes = new Annotations(ui.pages, ui.viewer, () => updateNotesBar(), (msg) => setStatus(msg, "error", 6000));
 
@@ -3796,14 +3813,6 @@ const COLOR_NAMES: Record<string, string> = {
 
 function swatch(c: string): HTMLButtonElement {
     const b = document.createElement("button");
-// A score made with New score has no file whose contents could name it, and what it holds changes with
-// every edit: it gets a key of its own when it is made, kept in its draft, so the notes written on it and
-// its mixer settings are found again each time it is continued (bug hunt, finding 17).
-function newScoreKey(): string {
-    const bytes = crypto.getRandomValues(new Uint8Array(12));
-    return "new-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
     b.className = "swatch";
     b.style.background = c;
     b.dataset.color = c;

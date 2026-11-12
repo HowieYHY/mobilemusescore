@@ -25,15 +25,17 @@ worker), `notes-follow-test`, `notes-oldpins-test`; and again `open-fail-test`, 
 `notes-test` (its two known failures), `notes-views-test`, `notes-align-test`, `no-change-test`. Each new test was
 seen failing on the old code. Many of the bug hunt's small fixes are typechecked only; the record says which.
 
-## Needs the user or their friend
-- The friend's tablet: play as before and send a new playback report. The queue should start at 512 ms, no gap
-  should be logged at Play, and a second visit should start with the queue the first ended on.
-- The phone's own Back button on a real phone (finding 16: the Mixer with a part's sound list open, then the
-  Mixer button, then Back should leave the app at the first press), and an update arriving on a poor connection
-  (finding 1): both were tested in desktop Chromium only.
-- #35 with a real voice; Two pages on iPhone and iPad; nothing in 1.0.31 was run on a phone or in Safari.
-- Notes following edits with a finger or a stylus (tested with a mouse), a line added above a note, and a stroke
-  over several bars that end up on two lines or lose some of their bars (written, not tested in a browser).
+## Checked by the owner, and what waits
+- **The Back button is fine** on the owner's phone in 1.0.31 (finding 16; 12 Nov 2026).
+- **Playback (the friend's tablet, finding 25) counts as fixed** until another report comes in (the owner, 12 Nov
+  2026): don't ask for a new report. If one comes: the queue should start at 512 ms, no gap should be logged at
+  Play, and a second visit should start with the queue the first ended on.
+- **Waiting until the Composer is finished** (the owner will test them then, or report if something shows up
+  earlier): #35 with a real voice; notes following edits with a finger or a stylus, with a line added above a
+  note, and with a stroke over several bars that end up on two lines or lose some of their bars (written, not
+  tested in a browser).
+- Not run on any device: an update arriving on a poor connection (finding 1, desktop Chromium only); Two pages on
+  iPhone and iPad; nothing in 1.0.31 was run in Safari.
 - Decisions: which of B1 to B9 to take up (B1 and B2 first).
 
 ## Next step

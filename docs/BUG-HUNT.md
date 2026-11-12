@@ -175,7 +175,7 @@ call `beginFresh` only then.
 
 ### 16. Closing a panel that is not the top one leaves a spare Back entry (`main.ts` `closeLayer`) — **proved**, low
 
-> **Fixed** (12 Nov 2026): the bookkeeping moved to `app/src/layers.ts` with one rule, one history entry per open panel: a panel that closes gives one back wherever it sat, and the browser is asked once, at the end of the app's own turn, for the net change. **Proved:** `scripts/layers-test.mjs` (Node, written first: 4 failures on the old logic, both ways below and a random run) and `scripts/back-entries-test.mjs` (a browser, by touch: 6 failures on the old `main.ts`); `notes-edit-switch-test`, `focus-test`, `tour-test`, `settings-test` pass as before.
+> **Fixed** (12 Nov 2026): the bookkeeping moved to `app/src/layers.ts` with one rule, one history entry per open panel: a panel that closes gives one back wherever it sat, and the browser is asked once, at the end of the app's own turn, for the net change. **Proved:** `scripts/layers-test.mjs` (Node, written first: 4 failures on the old logic, both ways below and a random run) and `scripts/back-entries-test.mjs` (a browser, by touch: 6 failures on the old `main.ts`); `notes-edit-switch-test`, `focus-test`, `tour-test`, `settings-test` pass as before. The owner found the Back button fine on their phone in 1.0.31.
 
 When the panel closed is under another (`i` is not the last), it is taken out of `layers` but no history entry
 is removed. History then holds one entry more than there are panels, so after everything is closed the
@@ -264,7 +264,7 @@ an edit. Until then, say in the README that notes written before editing may no 
 
 ### 25. A friend's playback report (5 Nov 2026, 1.0.29): a "sound gap" at every Play, on an Android tablet (`msaudio-worker.js`, `msaudio-worklet.js`) — medium
 
-> **Changed** (12 Nov 2026), not proven on that device: see below. Needs the friend to try it and send a new report.
+> **Changed** (12 Nov 2026, live in 1.0.31), not proven on that device: see below. The owner counts it as fixed until another report comes in.
 
 What the report says: the browser calls itself "Linux x86_64" (Chrome on an Android tablet asks for desktop
 sites) with 440 ms of output delay; the queue starts at 341 ms; in both visits a gap is logged within a few ms

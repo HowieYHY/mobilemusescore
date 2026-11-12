@@ -34,6 +34,8 @@ the page still works from the network.)
 
 ### 2. The cache key for an address with `?…` is built wrongly (`app/public/sw.js` fetch handler) — read, low
 
+> **Fixed** (12 Nov 2026): the key is the address without its query. Read only, not run: the service worker isn't active on the dev server.
+
 `key = url.href + "index.html"` when the path ends in `/`, but `href` includes the query, so `./?shared=1`
 gives `…/?shared=1index.html`. It works only by accident: `ignoreSearch` makes the lookup a miss, the network
 answers, and offline the `navigate` fallback serves the shell. A side effect: the network's copy of the page is
@@ -280,6 +282,18 @@ next step is to time the audio worker's message handling (`rpc.onmessage`) and p
 Order proposed for fixing, by what a reader of the live site can hit today: 9 (with 10, 11, 15, 19: the
 opening flow), 3, 21, 1, 5, 16, 18, then the Composer-only ones (12, 13, 17, 22, 7, 24) and the small ones
 (2, 4, 6, 8, 14, 23).
+
+## Where the fixing stands (12 Nov 2026)
+
+Fixed on branch `bug-hunt`: 2 to 15 (all), 18, 19, 21, 22, 23, and the changes for 25. **Not fixed:**
+- **1** (an update on a bad connection): changes how every reader gets updates and can't be proven here; see B7.
+- **16** (spare Back entry): the Back accounting has broken before (CLAUDE.md, 4 Nov); wants a Node test of
+  `layers` first (B3), then the fix.
+- **17** and **24** (Composer only, hidden on the live site): 24 needs the owner's decision; 17 goes with it,
+  since both are about what a note or setting is tied to once the music can change.
+- **20**: cleanup, the owner's call.
+Not read at all: `annotations.ts` 608 to 1071, parts of `main.ts` (2362-2420, 3665-3884, 4170-4228, 4852-4958,
+the tour), `typing.ts`, `firsttime.ts`, most of `engine/core/session.cpp`, the test scripts.
 
 ## Could be done better (the whole codebase, 12 Nov 2026)
 

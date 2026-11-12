@@ -112,7 +112,9 @@ self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         const url = new URL(req.url);
-        const key = url.pathname.endsWith("/") ? url.href + "index.html" : url.href;
+        // a folder's page is kept as its index.html, whatever follows the "?" (href would put the
+        // query in the middle: "/?shared=1index.html")
+        const key = url.pathname.endsWith("/") ? url.origin + url.pathname + "index.html" : url.href;
         const hit = await cache.match(key, { ignoreSearch: true }) || await cache.match(req, { ignoreSearch: true });
         if (hit) {
             return hit;

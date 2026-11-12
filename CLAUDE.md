@@ -322,6 +322,14 @@ build, tests, status) before working here.
   origin/gh-pages`; the script replaces every file anyway. A Pages build can also sit queued for 20+
   minutes: check `gh run list`, and the live script's hash, before saying it is live.
 
+- **The browser's name is not the device.** The longer sound queue went only to browsers saying "Android"; a
+  friend's Android tablet (Chrome asks for desktop sites there, so it says "Linux x86_64") got the short one
+  and stuttered at the start of every visit, because what the queue learned was also forgotten each time, and a
+  queue running dry before the first note was counted as a stutter (playback report of 5 Nov, read 12 Nov
+  2026). Rule: no choice from the user agent; decide from what is measured, keep what a device has taught the
+  app, and count as a stutter only sound that was cut. A device nobody here owns is imitated from its report
+  (`worklet-burst-test.mjs`), and the fix is called unproven until its owner sends a new report.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

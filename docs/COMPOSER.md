@@ -102,8 +102,20 @@ that fits the target staff (`mid`, the pitch of the staff's middle line, from th
 (`Session::editInsertNotes`) enters the events with `Score::setNoteRest` (rhythmic), one undo step, ties and
 rests across bar lines done by the engine. Tests: `voice-test.mjs` (tracker on a synthetic tune: 10/10 notes,
 36x real time) and `voice-edit-test.mjs` (the whole flow, tune in a Bass bar; `VIDEO=dir` films it to MP4).
-**Only tested on a synthetic voice and a synthetic recording; a real voice, a real microphone and a phone
-are not tested.** Several voices stay unbuilt.
+**A metronome while recording (issue #35):** `voiceMetronome` beeps the beat on its own AudioContext (made in the
+Record tap, before the microphone question), a switch in the dialog, on by default; its speed is the picked
+bar's (`tempoAtBar`: the engine's bar starts and tempos, 120 where the score has none, halved or doubled into
+50-200), shown in the Speed field, which is set before recording and locked during it. The beeps reach the
+microphone from the device's own speaker and the tracker took them for notes (measured: up to 8 notes never
+sung, some before the tune), so the beep is high and short (`CLICK_HZ` 2400, 40 ms) and a recording made with
+beeps goes through `removeClicks` (8th-order low-pass at 1200 Hz, above every pitch the tracker looks for)
+first: 8/8 cases right in `voice-test`, beeps up to three times the voice. The first sung note still starts
+the tune (the beeps set the speed, not the place: the delay between speaker and microphone differs per
+device). The dialog names the line and bar the tune goes into. `voice-edit-test` records on Chrome's stand-in
+microphone and counts the beeps.
+**Only tested on a synthetic voice and a synthetic recording; a real voice, a real microphone, a real
+speaker's beeps and a phone are not tested** (on iPhone the system may play sound quietly through the earpiece
+while the microphone is on). Several voices stay unbuilt.
 
 Found on the way: Previous/Next (`mss_edit_move`) never moved the selection in phase 1: the engine wants
 `select-next-chord`, not `next-chord`, and the test only waited for it to finish. Fixed, and tested for movement.

@@ -228,18 +228,18 @@
     "date": "2026-11-04"
   },
   "voice-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "77fc2b2+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-03"
+    "commit": "08e6e97+changes",
+    "passCommit": "08e6e97",
+    "date": "2026-11-12"
   },
   "voice-edit-test": {
-    "streak": 0,
-    "last": "fail",
-    "commit": "d3f41aa+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-04"
+    "streak": 1,
+    "last": "pass",
+    "commit": "08e6e97+changes",
+    "passCommit": "08e6e97",
+    "date": "2026-11-12"
   },
   "new-score-test": {
     "streak": 1,

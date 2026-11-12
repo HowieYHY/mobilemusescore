@@ -18,6 +18,37 @@ export interface SungNote { midi: number; start: number; dur: number }
 /** A note on the grid: sixteenths from where the tune starts (midi -1 is a rest). */
 export interface GridNote { midi: number; units: number }
 
+/** The metronome's beep while recording: high and short, so `removeClicks` can take it out of the recording. */
+export const CLICK_HZ = 2400;
+export const CLICK_SECS = 0.04;
+const CLICK_CUT = 1200; // above every pitch the tracker looks for (MAX_F), an octave under the beep
+
+/**
+ * The recording without the metronome's beeps, which the microphone hears from the device's own speaker and
+ * the tracker would take for notes (measured: up to 8 notes that were never sung, some before the tune).
+ * An 8th-order Butterworth low-pass: everything sung stays, the beep is 48 dB down.
+ */
+export function removeClicks(x: Float32Array): Float32Array {
+    const y = Float32Array.from(x);
+    const w = 2 * Math.PI * CLICK_CUT / SAMPLE_RATE;
+    const c = Math.cos(w);
+    for (const q of [0.5098, 0.6013, 0.9, 2.5629]) {
+        const a = Math.sin(w) / (2 * q);
+        const b0 = (1 - c) / 2 / (1 + a);
+        const b1 = (1 - c) / (1 + a);
+        const a1 = -2 * c / (1 + a);
+        const a2 = (1 - a) / (1 + a);
+        let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        for (let i = 0; i < y.length; i++) {
+            const v = y[i];
+            const o = b0 * v + b1 * x1 + b0 * x2 - a1 * y1 - a2 * y2;
+            x2 = x1; x1 = v; y2 = y1; y1 = o;
+            y[i] = o;
+        }
+    }
+    return y;
+}
+
 const nsdf = new Float32Array(MAX_LAG + 1);
 
 function trackFrame(x: Float32Array, s: number): PitchFrame {

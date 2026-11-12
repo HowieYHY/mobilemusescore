@@ -1,6 +1,14 @@
 # Handoff (11 Nov 2026, late: 1.0.30 published from branch `two-pages-view`)
 
-## Newest: 1.0.30 is live, Two pages without the Composer
+## Newest (12 Nov 2026): issue #35 built, not published
+- **Sing it in has a metronome** (switch in the dialog, on by default, at the picked bar's speed) and names the
+  line and bar the tune goes into; details in `docs/COMPOSER.md`. Committed with `Refs #35`: a real voice, a
+  real microphone and a phone are the user's to try (dev server, or the live site with `?composer` once
+  published). Not published: the live site is still 1.0.30. #34 is closed.
+- **Open issues left:** #33 (Flat app's design for the Composer: needs the user to show the Flat app on their
+  Android), #18 (app stores: the user's decision on cost and accounts), #3 (design, for contributors).
+
+## 1.0.30 is live, Two pages without the Composer
 - **`main` is what is live.** 1.0.30 was published from `two-pages-view`, which the user then had merged into
   `main` (fast-forward, pushed 12 Nov 2026). Work and publish from `main`; on the other PC, pull first.
 - **The Composer is hidden in the published app** (the user's choice: it was never tried on devices): `composer`
@@ -21,7 +29,6 @@
   happy; iPhone and iPad are untried.
 - **This PC (HOWIE):** scores are in `real test musescores/`; adb is `D:/Android/sdk/platform-tools/adb.exe`
   (pass `ADB=`); Playwright's browsers are in `D:\ms-playwright` (the C: folder is a junction to it).
-- Open: is #34 done (commit says `Refs #34`)? #33, #18, #3.
 
 ## Earlier the same day (branch `two-pages-view`, made from `composer`)
 

@@ -21,7 +21,8 @@ let failures = 0;
 const check = (ok, msg) => { console.log((ok ? "ok   " : "FAIL ") + msg); failures += ok ? 0 : 1; };
 const pause = (ms) => (video ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
-const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
+// a microphone that needs no question and no room: Chrome's own stand-in (it beeps once a second)
+const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] });
 const context = await browser.newContext({
     viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
     userAgent: "Mozilla/5.0 (Linux; Android 16; Pixel 9a) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
@@ -98,6 +99,37 @@ if (await page.evaluate(() => document.getElementById("edit-more").hidden)) awai
 await tap("#edit-voice");
 check(await page.evaluate(() => document.getElementById("voice").open), "the Sing it in dialog opens");
 await pause(1200);
+
+// issue #35: the dialog says where the tune goes, and starts at the speed of the picked bar with the metronome on
+const opened = await page.evaluate(async () => {
+    let bpm = (await app.engine.tempos())[0]?.[1] || 120;
+    while (bpm < 50) bpm *= 2;
+    while (bpm > 200) bpm /= 2;
+    return { where: document.getElementById("voice-where").textContent, part: app.edit.sel.part, tempo: document.getElementById("voice-tempo").value, want: String(Math.round(bpm)), on: document.getElementById("voice-click").checked };
+});
+check(opened.where.includes(`${opened.part}, bar 1`) && /carries on into the next bars/.test(opened.where), "it says which line and bar the tune goes into: " + opened.where);
+check(opened.tempo === opened.want, `the speed starts as the picked bar's own (${opened.tempo}, the score says ${opened.want})`);
+check(opened.on, "the metronome is on to start with");
+// Record: the metronome beeps at that speed while the microphone is on
+await page.fill("#voice-tempo", "120");
+await page.dispatchEvent("#voice-tempo", "change");
+await tap("#voice-record");
+await page.waitForFunction(() => !document.getElementById("voice-rec").hidden, null, { timeout: 10000 });
+await page.waitForTimeout(3000);
+const beat = await page.evaluate(() => ({ clicks: app.voice.clicks, state: app.voice.metro?.ctx.state, locked: document.getElementById("voice-tempo").disabled }));
+check(beat.state === "running" && beat.clicks >= 5 && beat.clicks <= 8, `after 3 s at 120 it has beeped about 6 times, its sound running (${beat.clicks}, ${beat.state})`);
+check(beat.locked, "the speed can't be changed under the singer");
+await tap("#voice-click");
+await page.waitForTimeout(500); // beeps already on their way still count
+const quiet0 = await page.evaluate(() => app.voice.clicks);
+await page.waitForTimeout(2000);
+check(await page.evaluate((n) => app.voice.clicks === n && !document.getElementById("voice-click").checked, quiet0), "switched off, the beeps stop while the recording goes on");
+await tap("#voice-click");
+await tap("#voice-stop");
+await page.waitForFunction(() => document.getElementById("voice-rec").hidden && !app.voice.metro && !app.voice.stream && !/Listening/.test(document.getElementById("voice-status").textContent), null, { timeout: 30000 });
+check(await page.evaluate(() => !document.getElementById("voice-tempo").disabled && !document.getElementById("voice-source").hidden), "Stop ends the beeps and the microphone, and Record is back: " + await page.evaluate(() => document.getElementById("voice-status").textContent));
+if (process.env.SHOT_DIALOG) await page.screenshot({ path: process.env.SHOT_DIALOG });
+
 await page.setInputFiles("#voice-file", wav);
 await page.waitForFunction(() => !document.getElementById("voice-result").hidden, null, { timeout: 60000 });
 await pause(2500);

@@ -1,7 +1,7 @@
 // first: decides whether this is someone's first visit before anything else saves data
 import { editDraft, type EditDraft } from "./editdraft";
 import { CLEFS, KEYS, TIMES, buildScore, type LineChoice } from "./newscore";
-import { SAMPLE_RATE, decodeTo16k, findNotes, toGrid, trackPitch, type GridNote, type SungNote } from "./voice/transcribe";
+import { CLICK_HZ, CLICK_SECS, SAMPLE_RATE, decodeTo16k, findNotes, removeClicks, toGrid, trackPitch, type GridNote, type SungNote } from "./voice/transcribe";
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
@@ -4581,6 +4581,10 @@ const voice = {
     started: 0,
     listen: null as { ctx: AudioContext; stop: () => void } | null,
     token: 0, // a newer recording or a closed dialog makes older work stop
+    // the metronome while recording (issue #35): on unless switched off, and it stays as the reader left it
+    click: true,
+    metro: null as { ctx: AudioContext; stop: () => void } | null,
+    clicks: 0, // beeps played in this recording: any at all, and the recording is filtered (removeClicks)
 };
 const vEl = {
     dlg: $<HTMLDialogElement>("voice"),
@@ -4590,6 +4594,8 @@ const vEl = {
     result: $("voice-result"),
     roll: $<HTMLCanvasElement>("voice-roll"),
     tempo: $<HTMLInputElement>("voice-tempo"),
+    click: $<HTMLInputElement>("voice-click"),
+    where: $("voice-where"),
     grid: $<HTMLSelectElement>("voice-grid"),
     status: $("voice-status"),
     listen: $<HTMLButtonElement>("voice-listen"),
@@ -4608,7 +4614,40 @@ function voiceStopListening() {
     vEl.listen.textContent = "Listen";
 }
 
+// The beat while recording, on a small synth of its own (the score isn't playing): short high beeps, scheduled
+// a little ahead on the audio clock so they stay even when the page is busy.
+function voiceMetronome(ctx: AudioContext) {
+    const beat = 60 / voice.bpm;
+    let next = ctx.currentTime + 0.15;
+    const ahead = () => {
+        while (next < ctx.currentTime + 0.3) {
+            if (voice.click) {
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.frequency.value = CLICK_HZ;
+                g.gain.setValueAtTime(0.5, next);
+                g.gain.exponentialRampToValueAtTime(0.001, next + CLICK_SECS);
+                o.connect(g).connect(ctx.destination);
+                o.start(next);
+                o.stop(next + CLICK_SECS + 0.01);
+                voice.clicks++;
+            }
+            next += beat;
+        }
+    };
+    ahead();
+    const timer = window.setInterval(ahead, 100);
+    voice.metro = { ctx, stop: () => { clearInterval(timer); void ctx.close(); } };
+}
+
+function voiceStopMetronome() {
+    voice.metro?.stop();
+    voice.metro = null;
+}
+
 function voiceReleaseMic() {
+    voiceStopMetronome();
+    vEl.tempo.disabled = false;
     clearInterval(voice.timer);
     voice.stream?.getTracks().forEach((t) => t.stop());
     voice.stream = null;
@@ -4684,7 +4723,7 @@ function voiceRefresh() {
     voiceSay(notes ? `${notes} note${notes === 1 ? "" : "s"}, about ${Math.round(secs)} s at this speed. Check them with Listen; change the speed if they look too crowded or too stretched.` : "No notes at this setting.");
 }
 
-async function voiceProcess(data: ArrayBuffer) {
+async function voiceProcess(data: ArrayBuffer, beeped = false) {
     const mine = ++voice.token;
     vEl.source.hidden = true;
     vEl.rec.hidden = true;
@@ -4697,7 +4736,8 @@ async function voiceProcess(data: ArrayBuffer) {
         if (samples.length / SAMPLE_RATE > MAX_VOICE_SECS + 5) {
             throw new Error(`That is longer than ${MAX_VOICE_SECS} seconds. Choose or record a shorter tune.`);
         }
-        const frames = await trackPitch(samples, (d) => voice.token === mine && voiceSay(`Listening to it… ${Math.round(d * 100)}%`));
+        // the microphone heard the metronome too: out it goes, or its beeps come back as notes
+        const frames = await trackPitch(beeped ? removeClicks(samples) : samples, (d) => voice.token === mine && voiceSay(`Listening to it… ${Math.round(d * 100)}%`));
         if (voice.token !== mine) {
             return;
         }
@@ -4715,15 +4755,10 @@ async function voiceProcess(data: ArrayBuffer) {
         voiceSay("No tune found. Sing a little louder and closer, one note at a time, and try again.", true);
         return;
     }
-    let bpm = baseTempoAt(0) || 100;
-    while (bpm < 50) bpm *= 2;
-    while (bpm > 200) bpm /= 2;
-    voice.bpm = Math.round(bpm);
     // the octave that puts the tune in the middle of the staff it goes into (a bass line sung at C4 goes down)
     const sorted = voice.notes.map((n) => n.midi).sort((a, b) => a - b);
     const mid = edit.sel?.mid;
     voice.shift = mid === undefined ? 0 : Math.max(-3, Math.min(3, Math.round((mid - sorted[sorted.length >> 1]) / 12)));
-    vEl.tempo.value = String(voice.bpm);
     vEl.grid.value = String(voice.smallest);
     vEl.result.hidden = false;
     vEl.source.hidden = false;
@@ -4735,9 +4770,14 @@ async function voiceRecord() {
         voiceSay("This browser can't record here. Choose a recording instead.", true);
         return;
     }
+    // made in the tap itself, before the microphone question: Safari starts sound only from a tap
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const beat: AudioContext = new Ctx();
+    void beat.resume();
     try {
         voice.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
     } catch (err) {
+        void beat.close();
         voiceSay("PocketScore can't use the microphone. Allow it in the browser's settings for this site, or choose a recording instead.", true);
         return;
     }
@@ -4750,18 +4790,22 @@ async function voiceRecord() {
     rec.ondataavailable = (e) => e.data.size && voice.chunks.push(e.data);
     rec.onstop = async () => {
         const blob = new Blob(voice.chunks, { type: rec.mimeType });
+        const beeped = voice.clicks > 0;
         voiceReleaseMic();
         voice.chunks = [];
         if (vEl.dlg.open && blob.size) {
-            await voiceProcess(await blob.arrayBuffer());
+            await voiceProcess(await blob.arrayBuffer(), beeped);
         }
     };
     rec.start();
     voice.started = performance.now();
+    voice.clicks = 0;
+    voiceMetronome(beat); // silent while the switch is off, so it can be turned on part-way
+    vEl.tempo.disabled = true; // the beat can't change under the singer
     vEl.source.hidden = true;
     vEl.result.hidden = true;
     vEl.rec.hidden = false;
-    voiceSay("Sing now. Tap Stop when you are done.");
+    voiceSay("Sing now: your first note starts the tune. Tap Stop when you are done.");
     const tick = () => {
         const secs = (performance.now() - voice.started) / 1000;
         vEl.time.textContent = `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
@@ -4805,11 +4849,30 @@ function voiceListen() {
     vEl.listen.textContent = "Stop listening";
 }
 
+// The speed in force at a bar: the metronome's, and the grid's (issue #35). A score with no speed written
+// has the engine's own 120. Kept between 50 and 200 by counting in halves or doubles.
+function tempoAtBar(bar: number) {
+    const start = barStarts.find(([no]) => no === bar)?.[1] ?? 0;
+    let bpm = baseTempoAt(start + 0.001) || 120;
+    while (bpm < 50) bpm *= 2;
+    while (bpm > 200) bpm /= 2;
+    return Math.round(bpm);
+}
+
 function openVoice() {
-    if (!edit.sel || edit.busy) {
+    const s = edit.sel;
+    if (!s || edit.busy) {
         return;
     }
     voiceReset();
+    voice.bpm = tempoAtBar(s.bar);
+    vEl.tempo.value = String(voice.bpm);
+    vEl.click.checked = voice.click;
+    // where the tune goes: the line and the bar that were picked
+    const lines = state.tracks.filter((t) => !t.metronome).length;
+    const b = document.createElement("b");
+    b.textContent = `${lines > 1 && s.part ? s.part + ", " : ""}bar ${s.bar}`;
+    vEl.where.replaceChildren("The notes go into ", b, ", from the note or rest you picked, and replace what is there. A tune longer than the bar carries on into the next bars.");
     vEl.dlg.showModal();
 }
 
@@ -4827,7 +4890,12 @@ $<HTMLInputElement>("voice-file").onchange = async (e) => {
 vEl.tempo.onchange = () => {
     voice.bpm = Math.max(30, Math.min(240, Math.round(Number(vEl.tempo.value)) || voice.bpm));
     vEl.tempo.value = String(voice.bpm);
-    voiceRefresh();
+    if (voice.notes.length) {
+        voiceRefresh();
+    }
+};
+vEl.click.onchange = () => {
+    voice.click = vEl.click.checked;
 };
 vEl.grid.onchange = () => {
     voice.smallest = vEl.grid.value === "8" ? 8 : 16;
@@ -5030,7 +5098,7 @@ void showResume();
 // Let tests and the console drive the app
 // pages: what page drawing is waiting for (tests and USB debugging)
 const pagesInfo = () => ({ fingersDown, sinceTouchMs: Math.round(performance.now() - lastTouch), waiting: [...jobs.keys()], drawing });
-(window as any).app = { engine, state, settings, edit, layers, updateEditBar, showEditSel, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
+(window as any).app = { engine, state, settings, edit, voice, layers, updateEditBar, showEditSel, playLog, sendReport, openScore, notes, mix, currentMix, pagesInfo, firstTime, cursorAt: (secs: number) => cursorFromTimeline(secs),
     // update-restart-test.mjs: an update can't be produced on demand there
     markUpdateReady: () => (updateReady = true), restartForUpdate };
 
@@ -5084,7 +5152,7 @@ function tourSteps(): TourStep[] {
         { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
         { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        ...(!composer ? [] : [{ target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes, and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." }]),
+        ...(!composer ? [] : [{ target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes (a metronome beeps the beat while you record), and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." }]),
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Two pages shows two side by side with the device on its side, and hides the controls (tap off the music to bring them back); each swipe slides along one page, so the right page becomes the left (Settings can make a swipe turn both). Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },

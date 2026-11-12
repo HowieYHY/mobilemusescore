@@ -470,7 +470,9 @@
     "words": [
       "trackPitch",
       "findNotes",
-      "toGrid"
+      "toGrid",
+      "removeClicks",
+      "CLICK_"
     ]
   },
   "voice-edit-test": {
@@ -481,6 +483,8 @@
       "editInsertNotes",
       "voice-",
       "voiceProcess",
+      "voiceMetronome",
+      "tempoAtBar",
       "openVoice",
       "edit_insert_notes"
     ]

@@ -11,7 +11,7 @@ const require = createRequire(path.join(root, "app/package.json"));
 const esbuild = require("esbuild");
 const out = path.join(root, "build/spike/transcribe.mjs");
 await esbuild.build({ entryPoints: [path.join(root, "app/src/voice/transcribe.ts")], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
-const { trackPitch, findNotes, toGrid, SAMPLE_RATE: SR } = await import(pathToFileURL(out).href);
+const { trackPitch, findNotes, toGrid, removeClicks, CLICK_HZ, CLICK_SECS, SAMPLE_RATE: SR } = await import(pathToFileURL(out).href);
 
 let failures = 0;
 const check = (ok, msg) => { console.log((ok ? "ok   " : "FAIL ") + msg); failures += ok ? 0 : 1; };
@@ -72,5 +72,33 @@ const want = [[60, 4], [62, 4], [64, 2], [64, 2], [65, 4], [-1, 2], [67, 8], [65
 check(JSON.stringify(grid.map((g) => [g.midi, g.units])) === JSON.stringify(want), "on the grid it is the tune that was sung: " + grid.map((g) => `${g.midi}:${g.units}`).join(" "));
 check(toGrid(notes, 100, 8).every((g) => g.units % 2 === 0), "an eighth grid has no shorter notes");
 check(toGrid(notes, 100, 16, -1)[0].midi === 48, "an octave down moves every note");
+
+// The metronome while recording (issue #35): its beeps reach the microphone from the device's own speaker.
+// Two seconds of beeps before the singer starts, then the same tune with a beep on every beat: as loud as the
+// voice and three times as loud, on the notes' starts and off them (nobody sings exactly on the beat).
+const lead = Math.round(2.4 * SR);
+const withBeeps = (level, offset) => {
+    const x = new Float32Array(lead + sig.length);
+    let r = 777; const noise = () => ((r = (r * 1664525 + 1013904223) >>> 0) / 4294967296 - 0.5) * 0.01;
+    for (let i = 0; i < lead; i++) x[i] = noise();
+    x.set(sig, lead);
+    const n = Math.round(CLICK_SECS * SR);
+    for (let t = offset; t * SR + n < x.length; t += Q) {
+        const s0 = Math.round(t * SR);
+        for (let i = 0; i < n; i++) x[s0 + i] += level * Math.sin(2 * Math.PI * CLICK_HZ * i / SR) * Math.exp(-i * 6.9 / n);
+    }
+    return x;
+};
+const gridOf = async (x) => JSON.stringify(toGrid(findNotes(await trackPitch(x)), 100, 16).map((g) => [g.midi, g.units]));
+check(await gridOf(withBeeps(0.3, 0)) !== JSON.stringify(want), "left in, the metronome's beeps are taken for notes (so the check below can fail)");
+let clean = 0, cases = 0;
+for (const level of [0.3, 1]) {
+    for (const offset of [0, 0.07, 0.2, 0.33]) {
+        cases++;
+        clean += (await gridOf(removeClicks(withBeeps(level, offset)))) === JSON.stringify(want) ? 1 : 0;
+    }
+}
+check(clean === cases, `with the beeps filtered out it is the tune that was sung, whatever their loudness and place (${clean}/${cases})`);
+check(await gridOf(removeClicks(sig)) === JSON.stringify(want), "the filter leaves a recording without beeps as it was");
 console.log(failures ? `${failures} failed` : "voice test passed");
 process.exit(failures ? 1 : 0);

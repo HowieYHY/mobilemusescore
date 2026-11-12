@@ -1191,7 +1191,7 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .set-foot { margin: 12px 14px 8px; font-size: 13px; color: var(--ink-2); }
 
 /* the switch, as in the notes bar but on the light panel */
-.set-row input[type=checkbox] {
+.set-row input[type=checkbox], .voice-click input[type=checkbox] {
   appearance: none;
   -webkit-appearance: none;
   flex: none;
@@ -1204,7 +1204,7 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   cursor: pointer;
   transition: background 0.15s ease-out;
 }
-.set-row input[type=checkbox]::after {
+.set-row input[type=checkbox]::after, .voice-click input[type=checkbox]::after {
   content: "";
   position: absolute;
   top: 3px;
@@ -1216,8 +1216,8 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   box-shadow: 0 1px 2px rgba(16, 24, 36, 0.3);
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.set-row input[type=checkbox]:checked { background: var(--accent); }
-.set-row input[type=checkbox]:checked::after { transform: translateX(16px); }
+.set-row input[type=checkbox]:checked, .voice-click input[type=checkbox]:checked { background: var(--accent); }
+.set-row input[type=checkbox]:checked::after, .voice-click input[type=checkbox]:checked::after { transform: translateX(16px); }
 .set-row input:disabled, .set-row select:disabled { opacity: 0.45; cursor: default; }
 .set-row input:focus-visible, .set-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .set-row select {
@@ -1387,6 +1387,12 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 @media (prefers-reduced-motion: reduce) { .voice-dot { animation: none; } }
 #voice-time { font-variant-numeric: tabular-nums; min-width: 3ch; }
 .voice-result { margin-bottom: 8px; }
+/* the metronome and the speed: set before recording, and the speed again afterwards to fit the notes */
+.voice-setup { margin-bottom: 14px; }
+.voice-click { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; touch-action: manipulation; }
+.voice-click input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.voice-setup input:disabled { opacity: 0.45; cursor: default; }
+#voice-where b { font-weight: 600; color: var(--ink); }
 #voice-roll { display: block; width: 100%; height: 132px; border-radius: 8px; background: #eef1f4; margin-bottom: 10px; }
 .voice-opts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 14px; color: var(--ink-2); }
 .voice-opts input[type="number"] { width: 4.5em; font: inherit; padding: 6px; border: 1px solid #c4c9cf; border-radius: 8px; }

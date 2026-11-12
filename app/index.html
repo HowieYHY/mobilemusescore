@@ -375,7 +375,11 @@
 
   <dialog class="ask voice" id="voice" aria-labelledby="voice-title">
     <h2 id="voice-title">Sing it in</h2>
-    <p id="voice-hint">Sing or hum one tune, one note at a time. The notes go in from the note or rest you picked, and replace what is there.</p>
+    <p id="voice-hint">Sing or hum one tune, one note at a time. <span id="voice-where">The notes go in from the note or rest you picked, and replace what is there.</span></p>
+    <div class="voice-opts voice-setup">
+      <label class="voice-click" title="Beeps the beat while you record, at this speed"><input type="checkbox" role="switch" id="voice-click" checked> Metronome</label>
+      <label>Speed <input type="number" id="voice-tempo" min="30" max="240" step="1" inputmode="numeric"> beats a minute</label>
+    </div>
     <div class="voice-source" id="voice-source">
       <button class="btn primary" id="voice-record">Record</button>
       <span class="btn voice-file">Choose a recording<input type="file" id="voice-file" accept="audio/*" aria-label="Choose a recording"></span>
@@ -387,7 +391,6 @@
     <div class="voice-result" id="voice-result" hidden>
       <canvas id="voice-roll" role="img" aria-label="The notes that were found"></canvas>
       <div class="voice-opts">
-        <label>Speed <input type="number" id="voice-tempo" min="30" max="240" step="1" inputmode="numeric"> beats a minute</label>
         <label>Shortest note <select id="voice-grid"><option value="16">Sixteenth</option><option value="8">Eighth</option></select></label>
         <span class="voice-oct" role="group" aria-label="Octave">
           <button class="btn small" id="voice-oct-down" aria-label="An octave lower">Octave ⌄</button>

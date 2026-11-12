@@ -46,11 +46,11 @@
     "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
   },
   "notes-test": {
-    "streak": 10,
+    "streak": 11,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04",
+    "commit": "4e683de+changes",
+    "passCommit": "4e683de",
+    "date": "2026-11-12",
     "note": "known failures (also before Settings): choosing a colour closes the palette; Done hides the toolbar; in WebKit also: a message says the unsaved changes are back (no Web Audio on Windows WebKit; same before 1.0.26)"
   },
   "goto-test": {
@@ -85,11 +85,11 @@
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "update-restart-test": {
-    "streak": 3,
+    "streak": 4,
     "last": "pass",
-    "commit": "d58d7fb+changes",
-    "passCommit": "d58d7fb",
-    "date": "2026-10-15"
+    "commit": "4e683de+changes",
+    "passCommit": "4e683de",
+    "date": "2026-11-12"
   },
   "compare-engines": {
     "streak": 2,
@@ -221,11 +221,11 @@
     "date": "2026-11-04"
   },
   "edit-draft-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "4e683de+changes",
+    "passCommit": "4e683de",
+    "date": "2026-11-12"
   },
   "voice-test": {
     "streak": 2,
@@ -284,11 +284,11 @@
     "date": "2026-11-04"
   },
   "resume-list-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "4e683de+changes",
+    "passCommit": "4e683de",
+    "date": "2026-11-12"
   },
   "step-entry-test": {
     "streak": 1,
@@ -319,10 +319,10 @@
     "date": "2026-11-11"
   },
   "open-fail-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "fab5451+changes",
-    "passCommit": "fab5451",
+    "commit": "4e683de+changes",
+    "passCommit": "4e683de",
     "date": "2026-11-12"
   }
 }

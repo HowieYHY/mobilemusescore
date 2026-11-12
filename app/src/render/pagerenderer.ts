@@ -10,6 +10,7 @@ type Op = any[];
 
 const fontFamilies = new Map<string, string>(); // resource path -> CSS family
 const fontLoads = new Map<string, Promise<void>>();
+const fontTries = new Map<string, number>();
 
 function familyFor(resPath: string): string {
     let fam = fontFamilies.get(resPath);
@@ -39,6 +40,14 @@ export async function ensureFonts(ops: Op[], base: string): Promise<void> {
                 (document.fonts as any).add(f);
             }, (err) => {
                 console.warn(`font ${resPath} could not be loaded:`, err);
+                // A blip on the first visit must not leave every later page without its noteheads:
+                // asked for again by the next pages drawn, three times in all (a font the browser
+                // refuses for good would otherwise be fetched with every tile)
+                const tries = (fontTries.get(resPath) ?? 0) + 1;
+                fontTries.set(resPath, tries);
+                if (tries < 3) {
+                    fontLoads.delete(resPath);
+                }
             });
             fontLoads.set(resPath, p);
         }
@@ -51,6 +60,10 @@ const images = new Map<string, HTMLImageElement>(); // data URL -> decoded image
 // Decodes the pictures a page needs before drawing it. Only pictures inside the score (data URLs):
 // an address elsewhere in a doctored score would tell that server the score was opened (issue #27).
 const embedded = (src: unknown) => typeof src === "string" && /^data:image\//i.test(src);
+/** Another score is open: the last one's pictures are not needed any more. */
+export function forgetImages() {
+    images.clear();
+}
 export async function ensureImages(ops: Op[]): Promise<void> {
     await Promise.all(ops.filter((op) => op[0] === "img" && embedded(op[5]) && !images.has(op[5])).map(async (op) => {
         const img = new Image();

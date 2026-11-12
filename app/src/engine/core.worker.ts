@@ -33,8 +33,12 @@ function callStr(name: string, ...args: (string | number)[]): string {
         }
         return a;
     });
-    const r = core["_" + name](...conv);
-    ptrs.forEach((p) => core._free(p));
+    let r: unknown;
+    try {
+        r = core["_" + name](...conv);
+    } finally {
+        ptrs.forEach((p) => core._free(p)); // also when the engine throws
+    }
     return typeof r === "number" && name !== "mss_process" ? core.UTF8ToString(r) : "";
 }
 
@@ -48,8 +52,11 @@ function callVoid(name: string, ...args: (string | number)[]) {
         }
         return a;
     });
-    core["_" + name](...conv);
-    ptrs.forEach((p) => core._free(p));
+    try {
+        core["_" + name](...conv);
+    } finally {
+        ptrs.forEach((p) => core._free(p));
+    }
     core._mss_process();
 }
 
@@ -111,11 +118,14 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "load": {
             const path = "/scores/" + req.name.replace(/[\\/]/g, "_");
             writeFile(core.FS, path, new Uint8Array(req.data));
-            result = JSON.parse(callStr("mss_load", path));
             try {
-                core.FS.unlink(path); // the score is in memory now
-            } catch (err) {
-                // ignore
+                result = JSON.parse(callStr("mss_load", path));
+            } finally {
+                try {
+                    core.FS.unlink(path); // the score is in memory now (or could not be read)
+                } catch (err) {
+                    // ignore
+                }
             }
             core._mss_process();
             break;

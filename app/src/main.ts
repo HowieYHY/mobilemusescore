@@ -5,7 +5,7 @@ import { CLICK_HZ, CLICK_SECS, SAMPLE_RATE, decodeTo16k, findNotes, removeClicks
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
 import type { CursorInfo, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
-import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer } from "./render/pagerenderer";
+import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer, forgetImages } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
 import { Tour, type TourStep } from "./tour";
@@ -566,8 +566,20 @@ async function renderTile(key: string) {
         state.rendered.delete(key);
         return;
     }
+    // not drawn this time (no drawing commands, no canvas memory): again in a while, if still near
+    const later = () => {
+        state.rendered.delete(key);
+        setTimeout(() => {
+            if (gen === renderGeneration && tiles.get(key) === tile && distanceFromView(tile.el) < NEAR) {
+                void renderTile(key);
+            }
+        }, 1500);
+    };
     const ops = await pageOps(tile.page, gen).catch(() => null);
     if (!ops || !still()) {
+        if (!ops && still()) {
+            later(); // the engine didn't answer: the tile stayed blank for good (bug hunt, finding 8)
+        }
         return;
     }
     await Promise.all([ensureFonts(ops, engine.base), ensureImages(ops)]);
@@ -603,12 +615,7 @@ async function renderTile(key: string) {
         void drawJobs();
         return;
     }
-    state.rendered.delete(key);
-    setTimeout(() => {
-        if (gen === renderGeneration && tiles.get(key) === tile && distanceFromView(tile.el) < NEAR) {
-            void renderTile(key);
-        }
-    }, 1500);
+    later();
 }
 
 // Tiles waiting to be drawn. Drawn in pieces (about 6 ms a frame while playing,
@@ -663,6 +670,7 @@ async function drawJobs() {
                 console.warn("page tile", key, "could not be drawn:", err);
                 jobs.delete(key);
                 freeCanvas(job.canvas);
+                state.rendered.delete(key); // drawn again when it next comes into view
                 continue;
             }
             performance.measure("page-draw", { start: t1 });
@@ -1946,8 +1954,19 @@ function soundsContain(node: SoundNode, id: string): boolean {
 // The sound list is for the part it was opened from. "Several parts" (a small
 // button by the title, so the list stays uncluttered) shows a row of parts to
 // add; a sound picked then goes to all of them.
+let soundsOpening = false;
 async function openSounds(t: TrackInfo) {
-    soundList ||= await engine.sounds();
+    // a second tap while the list loads opened it twice: two Back entries for one panel, and the one
+    // left behind kept Focus, updates and the page-turn keys waiting (bug hunt, finding 21)
+    if (soundsOpening || !ui.sounds.hidden) {
+        return;
+    }
+    soundsOpening = true;
+    try {
+        soundList ||= await engine.sounds();
+    } finally {
+        soundsOpening = false;
+    }
     const list = soundList;
     const parts = state.tracks.filter((p) => !p.metronome);
     const chosen = new Set<number>([t.key]);
@@ -3231,6 +3250,7 @@ async function openScore(name: string, data: ArrayBuffer, onOpened?: () => void 
         return false;
     }
     await onOpened?.();
+    forgetImages(); // the last score's pictures
     clearTimeout(draftTimer);
     Object.assign(mix, { store: null, score: null, saved: null, dirty: false, pendingSounds: {} });
     state.pageOps.clear();
@@ -3475,7 +3495,7 @@ let turnFitted = true; // page by page at the whole-page zoom (kept that way whe
         }
         clearTimeout(idle);
         idle = window.setTimeout(() => {
-            if (!pageTurn() || swipe || fingersDown > 0 || scrollerDragging) {
+            if (!pageTurn() || swipe || fingersBusy() || scrollerDragging) {
                 return;
             }
             const [lo, hi] = slotRange(turnedTo());
@@ -3539,7 +3559,11 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
         updateReady = true;
         playLog.add("update", "installed");
         if (!state.score) {
-            location.reload();
+            // at once, unless something is open on the start screen (New score being filled in, Settings,
+            // the tour): then at a quiet moment, like with a score open (bug hunt, finding 14)
+            if (quietForUpdate()) {
+                location.reload();
+            }
             return;
         }
         // a fallback the reader can use at once; otherwise it restarts by itself at a quiet moment
@@ -3565,13 +3589,17 @@ const UPDATE_IDLE_MS = 20000;
 const RESTART_DB = "pocketscore-restart";
 
 function quietForUpdate(): boolean {
-    return !state.playing && !restarting && !focusStarting && !notes.active && !tour.open && !ui.ask.open
-        && !layers.some((close) => close !== leaveFocus);
+    return !state.playing && !restarting && !focusStarting && !notes.active && !tour.open
+        && !document.querySelector("dialog[open]") && !layers.some((close) => close !== leaveFocus);
 }
 async function maybeRestartForUpdate() {
-    if (updateReady && state.score && quietForUpdate()
+    if (updateReady && quietForUpdate()
         && (document.hidden || performance.now() - lastInputAt >= UPDATE_IDLE_MS)) {
-        await restartForUpdate();
+        if (state.score) {
+            await restartForUpdate();
+        } else {
+            location.reload(); // the start screen, with nothing open on it
+        }
     }
 }
 setInterval(() => void maybeRestartForUpdate(), 2000);
@@ -3620,8 +3648,8 @@ async function restartForUpdate() {
     }
     restarting = true;
     if (openedScore && state.score) {
-        clearTimeout(draftTimer); // unsaved mixer changes: their draft now, not in 400 ms
-        mix.store?.setDraft(mix.dirty ? currentMix() : null);
+        writeDraftsNow(); // unsaved notes and mixer changes: their drafts now, not when their timers come
+        await saveEditDraft().catch(() => {}); // and the edits, before the page goes (bug hunt, finding 13)
         const keep: RestartState = {
             at: Date.now(),
             name: openedScore.name,
@@ -4180,7 +4208,7 @@ $("edit-tie").onclick = () => void runEdit(() => engine.editTie());
 $("edit-triplet").onclick = () => void runEdit(() => engine.editTriplet());
 $("edit-text").onclick = () => {
     const t = em.words.value.trim();
-    if (t) void runEdit(() => engine.editStaffText(t)).then(() => { em.words.value = ""; });
+    if (t) void runEdit(() => engine.editStaffText(t)).then((ok) => { if (ok) em.words.value = ""; });
 };
 // A syllable goes under the note, and the next note is picked so the words can be typed straight on
 const putLyric = async () => {
@@ -4443,11 +4471,24 @@ function scheduleEditDraft() {
     clearTimeout(edit.draftTimer);
     edit.draftTimer = window.setTimeout(() => void saveEditDraft(), 800);
 }
+// Leaving the app: every draft is written now, not when its timer comes (a phone may freeze or close
+// the app from here; bug hunt, finding 18)
+function writeDraftsNow() {
+    notes.flush();
+    if (mix.store) {
+        clearTimeout(draftTimer);
+        mix.store.setDraft(mix.dirty ? currentMix() : null);
+    }
+}
 document.addEventListener("visibilitychange", () => {
-    if (document.hidden && edit.dirty) {
-        void saveEditDraft();
+    if (document.hidden) {
+        writeDraftsNow();
+        if (edit.dirty) {
+            void saveEditDraft();
+        }
     }
 });
+window.addEventListener("pagehide", writeDraftsNow);
 
 // Edit by keyboard, with desktop's keys (computers, iPads with a keyboard): A-G and 0 note input, 1-7 the
 // lengths (64th to whole), "." dot, arrows move (Shift: a range), Up/Down pitch (Ctrl: octave), Delete,
@@ -4854,10 +4895,21 @@ async function voiceRecord() {
         await engine.pause();
     }
     voice.chunks = [];
-    const rec = new MediaRecorder(voice.stream);
+    let rec: MediaRecorder;
+    try {
+        rec = new MediaRecorder(voice.stream);
+    } catch (err) {
+        void beat.close();
+        voiceReleaseMic();
+        voiceSay("This browser can't record here. Choose a recording instead.", true);
+        return;
+    }
     voice.recorder = rec;
-    rec.ondataavailable = (e) => e.data.size && voice.chunks.push(e.data);
+    rec.ondataavailable = (e) => voice.recorder === rec && e.data.size && voice.chunks.push(e.data);
     rec.onstop = async () => {
+        if (voice.recorder !== rec) {
+            return; // the dialog was closed, or another recording started: this one is nobody's now
+        }
         const blob = new Blob(voice.chunks, { type: rec.mimeType });
         const beeped = voice.clicks > 0;
         voiceReleaseMic();

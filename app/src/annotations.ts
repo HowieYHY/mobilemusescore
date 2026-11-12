@@ -448,21 +448,28 @@ export class Annotations {
     // kept so closing the app doesn't lose them.
     private save() {
         clearTimeout(this.saveTimer);
-        this.saveTimer = window.setTimeout(() => {
-            if (!this.key) {
-                return;
-            }
-            try {
-                if (this.dirty) {
-                    localStorage.setItem(DRAFT_PREFIX + this.key, serialised(this.data));
-                } else {
-                    localStorage.removeItem(DRAFT_PREFIX + this.key);
-                }
-            } catch (err) {
-                this.onError("Your notes could not be kept on this device (storage is full or blocked). Tap Save to try again.");
-            }
-        }, 300);
+        this.draftDue = true;
+        this.saveTimer = window.setTimeout(() => this.flush(), 300);
         this.onChange();
+    }
+
+    private draftDue = false;
+    /** Write the draft now if a change is waiting for it (the app is being left). */
+    flush() {
+        clearTimeout(this.saveTimer);
+        if (!this.draftDue || !this.key) {
+            return;
+        }
+        this.draftDue = false;
+        try {
+            if (this.dirty) {
+                localStorage.setItem(DRAFT_PREFIX + this.key, serialised(this.data));
+            } else {
+                localStorage.removeItem(DRAFT_PREFIX + this.key);
+            }
+        } catch (err) {
+            this.onError("Your notes could not be kept on this device (storage is full or blocked). Tap Save to try again.");
+        }
     }
 
     // ------------------------------------------------------------ tools

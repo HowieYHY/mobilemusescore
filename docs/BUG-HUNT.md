@@ -52,11 +52,15 @@ visit; only closing and reopening the app helps, and nothing says so.
 
 ### 4. A worker call that throws leaks the strings passed to it (`core.worker.ts` `callStr`/`callVoid`, and `load`'s temp file) — read, low
 
+> **Fixed** (12 Nov 2026): `callStr`, `callVoid` and `load` free their strings and remove the temporary file in `finally`. Typechecked only.
+
 `_free` runs after the call, not in `finally`; `load` unlinks the score file only when `mss_load` returns.
 Each throw leaks a few bytes (or the whole score file in the engine's memory file system, until a file of the
 same name is opened). Only matters after engine errors. **Fix proposed:** `try/finally`.
 
 ### 5. A font that fails to load once is never tried again (`app/src/render/pagerenderer.ts` `ensureFonts`) — read, medium-low
+
+> **Fixed** (12 Nov 2026): a font that failed is asked for again by the next pages drawn, three times in all. Typechecked only (no test cuts the connection).
 
 `fontLoads` keeps the promise of a failed load, so the same font is not asked for again in this visit. If the
 music font (Bravura/Leland) fails once (a blip on the first visit, before the offline copy exists), every page
@@ -65,10 +69,14 @@ drawn afterwards has no noteheads or clefs until the app is reloaded, and nothin
 
 ### 6. Decoded pictures are kept for the whole visit (`pagerenderer.ts` `images`) — read, low
 
+> **Fixed** (12 Nov 2026): `forgetImages()` empties the map when another score has opened. Typechecked only.
+
 The map is keyed by the picture's whole data URL and never emptied, so opening several scores with pictures
 keeps every picture (and its text copy) in memory. **Fix proposed:** clear it when a score is opened.
 
 ### 7. Sing it in: a recording that ends late can land in the next session of the dialog (`main.ts` `voiceRecord` `rec.onstop`) — read, low
+
+> **Fixed** (12 Nov 2026): `onstop` and `ondataavailable` do nothing unless their recorder is still `voice.recorder`; a `MediaRecorder` that can't be made releases the microphone and says so. Typechecked only: needs a real microphone.
 
 Closing the dialog while recording stops the microphone tracks, and the recorder's `stop` event comes a moment
 later. If the dialog is opened again (or a new recording started) before it comes, the old handler sees the
@@ -77,6 +85,8 @@ and metronome. **Fix proposed:** give each recording the `voice.token` it starte
 when the token has moved on; also release the stream if `new MediaRecorder` throws.
 
 ### 8. A page tile whose drawing failed stays blank while it is near the view (`main.ts` `renderTile`, `drawJobs`) — read, low
+
+> **Fixed** (12 Nov 2026): a tile the engine gave no drawing commands for, or whose drawing threw, leaves `state.rendered` and is tried again. Typechecked only.
 
 When the page's drawing commands can't be fetched (`pageOps` rejects) or a draw throws, the tile's key stays in
 `state.rendered`, so nothing draws it again until it has been scrolled far away and back.
@@ -130,6 +140,8 @@ puts the draft back after it was removed. Next time that score is opened it asks
 
 ### 13. Restarting into an update does not wait for the edit draft (`main.ts` `restartForUpdate`) — read, low
 
+> **Fixed** (12 Nov 2026): `restartForUpdate` writes the note and mixer drafts and waits for the edit draft before the page goes (`update-restart-test` passes; the edit draft part is not covered by it).
+
 When the app goes to the background with an update ready, the same `visibilitychange` starts
 `saveEditDraft()` (not awaited) and `restartForUpdate()`, which reloads the page. If the last edit was made
 under a second before (Edit already closed with Done), the reload can come before the draft is stored, and
@@ -137,6 +149,8 @@ that edit is lost. Mixer changes are handled (their draft is written first); edi
 **Fix proposed:** `await saveEditDraft()` in `restartForUpdate` before reloading.
 
 ### 14. An update reloads the start screen at once, whatever is open on it (`main.ts` `controllerchange`) — read, low
+
+> **Fixed** (12 Nov 2026): with no score open, the reload waits while a dialog, panel or the tour is open, and comes at the next quiet moment. Typechecked only.
 
 With no score open the page reloads immediately when an update is installed, without `quietForUpdate()`: a
 New score dialog being filled in, the Settings panel or the tour closes under the reader's finger.
@@ -176,6 +190,8 @@ already exists) and reuse it on Continue instead of hashing the bytes.
 
 ### 18. The last stroke or mixer change can miss its draft when the app is left at once (`annotations.ts` `save`, `main.ts` `draftTimer`) — read, low
 
+> **Fixed** (12 Nov 2026): `writeDraftsNow` (notes `flush()`, mixer draft) runs when the page is hidden and on `pagehide` (`notes-test` passes with its two known failures; leaving the app within 300 ms is not covered by a test).
+
 Note drafts are written 300 ms after a change and mixer drafts 400 ms after; nothing writes them at once when
 the page is hidden (edits do: `visibilitychange` → `saveEditDraft`). A phone that freezes or kills the app
 right after it is left can lose the last change. **Fix proposed:** on `visibilitychange` to hidden (and
@@ -199,6 +215,8 @@ changed: on iPhone the silent `<audio>` might help or might do harm (it can't be
 
 ### 21. Two quick taps on a part's sound button open the sound list twice (`main.ts` `openSounds`) — read, medium-low
 
+> **Fixed** (12 Nov 2026): `openSounds` does nothing while the list is loading or already open. Typechecked only.
+
 The first time, `openSounds` waits for the engine's sound list before it shows the panel, and nothing stops a
 second tap meanwhile; each call ends with `openLayer(closeSounds)`. The panel then has two entries in
 `layers` and in history. Closing it once leaves one behind: `layers.length` stays above zero with nothing
@@ -208,10 +226,14 @@ keys stop turning pages, and one Back press does nothing, until Back is pressed.
 
 ### 22. Words typed for a staff text are cleared even when they could not be put in (`main.ts` `edit-text`) — read, low
 
+> **Fixed** (12 Nov 2026): the words are cleared only when `runEdit` says the edit went in. Typechecked only.
+
 `runEdit(...).then(() => { em.words.value = ""; })` clears the field whether the edit worked or not (the lyric
 button checks). **Fix proposed:** clear only when `runEdit` resolved `true`.
 
 ### 23. Page by page: settling on a page after a trackpad scroll trusts a finger count that can be stale (`main.ts:3408`) — read, low
+
+> **Fixed** (12 Nov 2026): the settle timer asks `fingersBusy()`. Typechecked only.
 
 The settle timer returns when `fingersDown > 0`. The app's own rule (issue #9) is that this count is not to be
 trusted after 3 s without touch activity (`fingersBusy()`), because a touch that ended on a removed element

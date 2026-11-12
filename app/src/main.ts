@@ -12,6 +12,7 @@ import { Tour, type TourStep } from "./tour";
 import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings";
 import { numberField } from "./typing";
 import { PlayLog, stamp } from "./playlog";
+import { makeLayers } from "./layers";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -2142,58 +2143,8 @@ ui.soundsBack.onclick = () => closeLayer(closeSounds);
 // ---------------------------------------------------------------- back button
 
 // Panels close with the phone's Back button or gesture instead of leaving the
-// app: each open panel adds a history entry, and going back closes the top one.
-const layers: (() => void)[] = [];
-
-// popstates of our own history.back(), which close nothing: their panel closed already
-let ownBacks = 0;
-// entries for panels opened while such a back was on its way, added once it has landed
-let laterPushes = 0;
-
-function openLayer(close: () => void) {
-    layers.push(close);
-    if (ownBacks > 0) {
-        laterPushes++;
-    } else {
-        history.pushState({ pocketscoreLayer: layers.length }, "");
-    }
-}
-
-/** Close a panel from the app's own controls: at once, with history following. Leaving the closing to
- *  the late popstate let a second close in the meantime (the palette's tap-away, then Notes giving way to
- *  Edit) go back twice, and the second popstate closed the panel just opened. */
-function closeLayer(close: () => void) {
-    const i = layers.lastIndexOf(close);
-    if (i === layers.length - 1 && i >= 0) {
-        layers.pop();
-        ownBacks++;
-        history.back();
-    } else if (i >= 0) {
-        layers.splice(i, 1);
-    }
-    close();
-}
-
-/** One mode in place of another (Notes and Edit): the new one takes the old one's Back entry. */
-function swapLayer(from: () => void, to: () => void) {
-    const i = layers.lastIndexOf(from);
-    if (i < 0) {
-        openLayer(to);
-    } else {
-        layers[i] = to;
-    }
-}
-
-window.addEventListener("popstate", () => {
-    if (ownBacks > 0) {
-        ownBacks--;
-        for (; ownBacks === 0 && laterPushes > 0; laterPushes--) {
-            history.pushState({ pocketscoreLayer: layers.length - laterPushes + 1 }, "");
-        }
-        return;
-    }
-    layers.pop()?.();
-});
+// app: each open panel adds a history entry, and going back closes the top one (layers.ts).
+const { layers, openLayer, closeLayer, swapLayer, openSheet: openOneOf } = makeLayers(history, (h) => window.addEventListener("popstate", h));
 
 // ---------------------------------------------------------------- focus mode
 
@@ -2229,7 +2180,7 @@ async function enterFocus(fullscreen = true) {
         // finish writing first (the notes bar would be hidden anyway). Closing the top layer goes
         // back in history, whose popstate comes later: wait for it before focus adds its own entry.
         focusStarting = true;
-        const closed = layers[layers.length - 1] === closeNotes
+        const closed = layers.includes(closeNotes)
             ? new Promise<void>((done) => window.addEventListener("popstate", () => done(), { once: true }))
             : null;
         closeLayer(closeNotes);
@@ -2721,20 +2672,7 @@ function closeLoop() {
 // Opening one while another is open takes over its Back entry: closing the
 // other through history first happened later and closed the new one instead
 function openSheet(close: () => void) {
-    const others = [closeSounds, closeMixer, closeSpeed, closeLoop, closeSettings].filter((c) => c !== close);
-    let reuse = false;
-    for (let i = layers.length - 1; i >= 0; i--) {
-        if (others.includes(layers[i])) {
-            const c = layers.splice(i, 1)[0];
-            c();
-            reuse = true;
-        }
-    }
-    if (reuse) {
-        layers.push(close);
-    } else {
-        openLayer(close);
-    }
+    openOneOf(close, [closeSounds, closeMixer, closeSpeed, closeLoop, closeSettings].filter((c) => c !== close));
 }
 for (const s of sheets) {
     s.open.onclick = () => {

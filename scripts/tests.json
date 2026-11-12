@@ -560,12 +560,13 @@
     ]
   },
   "notes-edit-switch-test": {
-    "files": [],
+    "files": [
+      "app/src/layers.ts"
+    ],
     "words": [
       "openLayer",
       "closeLayer",
       "swapLayer",
-      "ownBacks",
       "setNotesActive",
       "setEditActive",
       "notes-toggle",
@@ -628,7 +629,8 @@
       "backToStart",
       "isScoreName",
       "onOpened",
-      "mixRestoreDone"
+      "mixRestoreDone",
+      "statusStays"
     ]
   },
   "worklet-burst-test": {
@@ -647,6 +649,48 @@
       "fetchSoundFont",
       "audioStarting",
       "audioFailed"
+    ]
+  },
+  "layers-test": {
+    "files": [
+      "app/src/layers.ts"
+    ],
+    "words": []
+  },
+  "back-entries-test": {
+    "files": [
+      "app/src/layers.ts"
+    ],
+    "words": [
+      "openLayer",
+      "closeLayer",
+      "openSheet",
+      "closeMixer",
+      "closeSounds",
+      "openSounds"
+    ]
+  },
+  "new-score-key-test": {
+    "files": [
+      "app/src/editdraft.ts"
+    ],
+    "words": [
+      "newScoreKey",
+      "ownKey",
+      "scoreKey",
+      "continueDraft",
+      "beginFresh",
+      "reopenAfterUpdate"
+    ]
+  },
+  "update-fail-test": {
+    "files": [
+      "app/public/sw.js",
+      "scripts/gen-precache.mjs"
+    ],
+    "words": [
+      "sw-update-failed",
+      "sw-progress"
     ]
   }
 }

@@ -1,18 +1,18 @@
 {
   "settings-test": {
-    "streak": 17,
+    "streak": 18,
     "last": "pass",
-    "commit": "cfd870c+changes",
-    "passCommit": "cfd870c",
-    "date": "2026-11-11",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12",
     "note": "1.0.25, #29 fade"
   },
   "tour-test": {
-    "streak": 10,
+    "streak": 11,
     "last": "pass",
-    "commit": "cfd870c+changes",
-    "passCommit": "cfd870c",
-    "date": "2026-11-11"
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
   },
   "layout-shots": {
     "streak": 5,
@@ -38,12 +38,12 @@
     "note": "known failures (also before Settings): Back closes the palette / leaves notes mode / closes the mixer"
   },
   "focus-test": {
-    "streak": 8,
+    "streak": 9,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04",
-    "note": "known failures (also before Settings): the mixer still shows in focus, 3 sizes"
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12",
+    "note": "only its known failure"
   },
   "notes-test": {
     "streak": 11,
@@ -85,10 +85,10 @@
     "note": "pass a score: the default 'I am move it edited' isn't on this PC"
   },
   "update-restart-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "4e683de+changes",
-    "passCommit": "4e683de",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12"
   },
   "compare-engines": {
@@ -156,10 +156,10 @@
     "note": "1.0.25, #29 fade"
   },
   "selfcheck-test": {
-    "streak": 12,
+    "streak": 13,
     "last": "pass",
-    "commit": "e455896+changes",
-    "passCommit": "e455896",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12",
     "note": "1.0.25, #29 fade"
   },
@@ -221,10 +221,10 @@
     "date": "2026-11-04"
   },
   "edit-draft-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "4e683de+changes",
-    "passCommit": "4e683de",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12"
   },
   "voice-test": {
@@ -249,11 +249,11 @@
     "date": "2026-11-03"
   },
   "new-score-flow-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
   },
   "edit-more-test": {
     "streak": 2,
@@ -270,24 +270,24 @@
     "date": "2026-11-04"
   },
   "new-score-inside-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
   },
   "notes-edit-switch-test": {
-    "streak": 2,
-    "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
-  },
-  "resume-list-test": {
     "streak": 3,
     "last": "pass",
-    "commit": "4e683de+changes",
-    "passCommit": "4e683de",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
+  },
+  "resume-list-test": {
+    "streak": 4,
+    "last": "pass",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12"
   },
   "step-entry-test": {
@@ -319,17 +319,17 @@
     "date": "2026-11-11"
   },
   "open-fail-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "4e683de+changes",
-    "passCommit": "4e683de",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12"
   },
   "sounds-retry-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "9f10744+changes",
-    "passCommit": "9f10744",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12"
   },
   "worklet-burst-test": {
@@ -337,6 +337,34 @@
     "last": "pass",
     "commit": "e455896+changes",
     "passCommit": "e455896",
+    "date": "2026-11-12"
+  },
+  "layers-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
+  },
+  "back-entries-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
+  },
+  "new-score-key-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
+    "date": "2026-11-12"
+  },
+  "update-fail-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "56435f8+changes",
+    "passCommit": "56435f8",
     "date": "2026-11-12"
   }
 }

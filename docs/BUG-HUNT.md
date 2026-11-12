@@ -21,7 +21,9 @@ reading the code only), and the fix proposed.
 
 ## Findings
 
-### 1. An update on a bad connection can leave the app unable to open offline (`app/public/sw.js`, install + activate) — read, medium
+### 1. An update on a bad connection can leave the app unable to open offline (`app/public/sw.js`, install + activate) — **proved**, medium
+
+> **Fixed** (12 Nov 2026): an update with a file that could not be downloaded fails its `install`, so the version in use and its complete copy stay; the files it did get are kept and used by the next try. Not quite as proposed: a first install still goes on with gaps (there is nothing to lose, and without a service worker Android's Share to PocketScore doesn't work), and a full device (`QuotaExceededError`) is treated as before, since the room only comes back when the old copy goes. The page takes the "Downloading an update…" line away and says it will try again. **Proved:** `scripts/update-fail-test.mjs` (B7: two builds from a local server, the line cut in the middle of the app's script) fails 4 checks with the old `sw.js` (the old copy deleted, the app dead offline) and passes now; the retry downloaded 0.2 MB.
 
 `install` swallows every failed file ("the fetch handler fills gaps later") and still finishes; `activate`
 then deletes every older cache. If a file fails during an **update** (connection drops while the 49 MB sound
@@ -171,7 +173,9 @@ score open, `state.score` is still the old score, so `beginFresh()` marks that o
 **Fix proposed:** `openScore` returns whether it loaded; `openChosen` passes that on; delete the draft and
 call `beginFresh` only then.
 
-### 16. Closing a panel that is not the top one leaves a spare Back entry (`main.ts` `closeLayer`) — read, low
+### 16. Closing a panel that is not the top one leaves a spare Back entry (`main.ts` `closeLayer`) — **proved**, low
+
+> **Fixed** (12 Nov 2026): the bookkeeping moved to `app/src/layers.ts` with one rule, one history entry per open panel: a panel that closes gives one back wherever it sat, and the browser is asked once, at the end of the app's own turn, for the net change. **Proved:** `scripts/layers-test.mjs` (Node, written first: 4 failures on the old logic, both ways below and a random run) and `scripts/back-entries-test.mjs` (a browser, by touch: 6 failures on the old `main.ts`); `notes-edit-switch-test`, `focus-test`, `tour-test`, `settings-test` pass as before.
 
 When the panel closed is under another (`i` is not the last), it is taken out of `layers` but no history entry
 is removed. History then holds one entry more than there are panels, so after everything is closed the
@@ -182,7 +186,9 @@ button, Speed, Loop or Settings: `openSheet` takes both panels out of `layers` a
 both entries; (b) `closeMixer` under the sound list: the Mixer's entry is spliced out, only the sound list's
 goes back.
 
-### 17. A new score's notes and mixer settings are lost each time it is continued (`main.ts` `scoreKey`, `continueDraft`) — read, medium-low (Composer only, hidden on the live site)
+### 17. A new score's notes and mixer settings are lost each time it is continued (`main.ts` `scoreKey`, `continueDraft`) — **proved**, medium-low (Composer only, hidden on the live site)
+
+> **Fixed** (12 Nov 2026), as proposed: `newScoreKey()` when the score is made, reused by *Continue* (`openScore`'s `ownKey`). Found on the way: restarting into an update with a new score open asked "Continue your edits?" and brought it back as an ordinary edited score, which the start screen then no longer offered; it now comes back from its draft as the new score it is. **Proved:** `scripts/new-score-key-test.mjs` fails 4 checks on the old code (another key and the saved volume gone, at each Continue). Drafts made before this keep the key they have. Not changed: a copy saved from the score is another file, so notes don't follow it.
 
 Notes, mixer settings and drafts are kept under the score's key, which is the hash of the file's bytes. A
 score made with New score has no file: after the app is closed, *Continue* loads the draft's bytes, which
@@ -276,6 +282,12 @@ What was wrong in the code, whatever the cause on that tablet:
 on that tablet (the play command itself, Bluetooth, the tablet's own audio). If gaps remain after this, the
 next step is to time the audio worker's message handling (`rpc.onmessage`) and put it in the report.
 
+### 26. A message about a file that could not be opened is wiped by the sounds loading (`main.ts` `audioStatus`, the sounds-ready step) — **proved**, low
+
+> **Fixed** (12 Nov 2026): `statusStays` keeps the two refusal messages (not a MuseScore file; could not read this score) until the reader's next action. Found by `open-fail-test` on a PC where the sound font was not yet stored: it failed there with or without the day's other changes; it now checks both messages 1.5 s later.
+
+On a first visit the sound font is still downloading when a file is refused. Its progress line ("Loading MS Basic sound font… 54%") replaced the reason within a moment, and when the sounds were ready the line was cleared: the reader saw the start screen come back with no reason at all.
+
 ## Reading stopped here (12 Nov 2026)
 
 24 findings from about two thirds of the app's own code. The parts listed above as not read may hold more.
@@ -285,13 +297,10 @@ opening flow), 3, 21, 1, 5, 16, 18, then the Composer-only ones (12, 13, 17, 22,
 
 ## Where the fixing stands (12 Nov 2026)
 
-Fixed on branch `bug-hunt`: 2 to 15 (all), 18, 19, 21, 22, 23, and the changes for 25. **Not fixed:**
-- **1** (an update on a bad connection): changes how every reader gets updates and can't be proven here; see B7.
-- **16** (spare Back entry): the Back accounting has broken before (CLAUDE.md, 4 Nov); wants a Node test of
-  `layers` first (B3), then the fix.
-- **17** and **24** (Composer only, hidden on the live site): 24 needs the owner's decision; 17 goes with it,
-  since both are about what a note or setting is tied to once the music can change.
-- **20**: cleanup, the owner's call.
+Fixed on branch `bug-hunt`: 1 to 19 (all), 21, 22, 23, 26, and the changes for 25. **Not fixed:**
+- **24** (Composer only, hidden on the live site): needs the owner's decision on what a note is pinned to once
+  the music can change (bar and beat, not seconds).
+- **20**: stays as it is, the owner's decision (12 Nov 2026): the `ANDROID` check around *Keep playing*'s silent audio is a known exception to the one-block rule.
 Not read at all: `annotations.ts` 608 to 1071, parts of `main.ts` (2362-2420, 3665-3884, 4170-4228, 4852-4958,
 the tour), `typing.ts`, `firsttime.ts`, most of `engine/core/session.cpp`, the test scripts.
 
@@ -320,8 +329,8 @@ a test missed after a change; keep "foundational files run everything" for the e
 
 ### B3. Logic that could be tested in milliseconds is only tested through a browser
 `worklet-burst-test` (new) runs the real worklet under Node on its own clock: no browser, the same result every
-time, and it can imitate a device nobody here owns. The same works for the Back-entry accounting (`layers`,
-finding 16), the cursor clock (already done in `cursor-test`), the note pins, `transcribe.ts` and the draft
+time, and it can imitate a device nobody here owns. The same works for the Back-entry accounting (done:
+`app/src/layers.ts` and `layers-test`, finding 16), the cursor clock (already done in `cursor-test`), the note pins, `transcribe.ts` and the draft
 stores. **Better:** move those pieces out of `main.ts` as plain functions and test them that way; keep
 Playwright for what needs a page. **Cost:** comes almost free with B1. This is also the only way to cover
 iPad and odd Android behaviour from this PC: write down the timing pattern a device shows, then replay it.
@@ -349,6 +358,8 @@ across on first run and kept until the move is confirmed. **Cost:** a day with t
 losing someone's notes in the move, so the old copy stays readable for some versions.
 
 ### B7. The update path (finding 1) can't be tested here, and it is the one path every reader goes through
+> **Done** (12 Nov 2026): `scripts/update-fail-test.mjs`, and finding 1's fix went in with it.
+
 `update-restart-test` covers the restart, not a service worker install on a bad connection. **Better:** a
 test that serves two builds from a local server with a route that fails some files, then checks the old
 version still opens offline. Then finding 1's fix can go in with proof.

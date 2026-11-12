@@ -300,7 +300,7 @@ opening flow), 3, 21, 1, 5, 16, 18, then the Composer-only ones (12, 13, 17, 22,
 ## Where the fixing stands (12 Nov 2026)
 
 Fixed on branch `bug-hunt`: 1 to 19 (all), 21, 22, 23, 26, and the changes for 25. **Not fixed:**
-- **24** is fixed on its own branch, `notes-follow-edits` (not merged into `bug-hunt`).
+- **24** is fixed too (it was done on its own branch, `notes-follow-edits`). Everything is in `main` and live as 1.0.31.
 - **20**: stays as it is, the owner's decision (12 Nov 2026): the `ANDROID` check around *Keep playing*'s silent audio is a known exception to the one-block rule.
 Not read at all: `annotations.ts` 608 to 1071, parts of `main.ts` (2362-2420, 3665-3884, 4170-4228, 4852-4958,
 the tour), `typing.ts`, `firsttime.ts`, most of `engine/core/session.cpp`, the test scripts.

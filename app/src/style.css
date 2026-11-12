@@ -1268,7 +1268,6 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   grid-template-areas:
     "info actions"
     "tools tools"
-    "lengths lengths"
     "more more";
   align-items: center;
   gap: 6px 10px;
@@ -1283,14 +1282,33 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .edit-actions { grid-area: actions; display: flex; gap: 6px; align-items: center; }
 .edit-tools { grid-area: tools; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .edit-gap { flex: 1 1 8px; min-width: 6px; max-width: 28px; }
-.edit-lengths { grid-area: lengths; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+/* The bottom sheet (as the Flat app's): the lengths in a row that scrolls sideways when it must, and the
+   piano under it. Over the playing controls, so the hand that writes stays at the bottom of the screen. */
+.editsheet {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-2);
+  color: var(--text-on-chrome);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.25);
+  z-index: 5;
+  min-width: 0;
+}
+.editsheet[hidden] { display: none; }
+.edit-lengths { display: flex; gap: 4px; align-items: center; padding: 6px 12px; overflow-x: auto; scrollbar-width: none; }
+.edit-lengths::-webkit-scrollbar { display: none; }
+.edit-lengths > * { flex: none; }
+.edit-piano { min-width: 0; }
+.focus .editsheet { display: none !important; }
+.editing .zoom { bottom: calc(var(--transport-h, calc(66px + var(--bar-b))) + var(--editsheet-h, 0px) + 20px); }
 .editbar .btn.small { min-width: 40px; min-height: 40px; padding: 4px 8px; }
 .editbar .btn.oct { font-size: 13px; padding: 4px 10px; }
-.editbar .btn[aria-pressed="true"], .editbar .len[aria-checked="true"] {
+.editbar .btn[aria-pressed="true"], .editsheet .len[aria-checked="true"], .editsheet .len[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.16);
   border-color: rgba(255, 255, 255, 0.5);
 }
-.editbar .len {
+.editsheet .len {
   appearance: none;
   display: inline-flex;
   align-items: center;
@@ -1305,9 +1323,9 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
   cursor: pointer;
   touch-action: manipulation;
 }
-.editbar .len:disabled { opacity: 0.4; cursor: default; }
-.editbar .len.dot { font-size: 22px; font-weight: 700; line-height: 1; }
-.editbar .len svg { display: block; }
+.editsheet .len:disabled { opacity: 0.4; cursor: default; }
+.editsheet .len.dot { font-size: 22px; font-weight: 700; line-height: 1; }
+.editsheet .len svg { display: block; }
 @media (max-width: 699px) { .edit-actions .lbl { display: none; } }
 /* tablets: the name and the actions on top, then the note tools beside the lengths */
 @media (min-width: 700px) {
@@ -1315,17 +1333,17 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "info actions"
-      "tools lengths"
+      "tools tools"
       "more more";
     column-gap: 16px;
   }
-  .edit-tools, .edit-lengths { flex-wrap: nowrap; }
+  .edit-tools { flex-wrap: nowrap; }
 }
 /* wide screens: one row */
 @media (min-width: 1100px) {
   .editbar {
-    grid-template-columns: minmax(8ch, 1fr) auto auto auto;
-    grid-template-areas: "info tools lengths actions" "more more more more";
+    grid-template-columns: minmax(8ch, 1fr) auto auto;
+    grid-template-areas: "info tools actions" "more more more";
   }
 }
 /* More: the less used tools, behind one button */
@@ -1347,16 +1365,10 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .edit-tools .range-only { display: none; }
 .edit-tools.on-range .range-only { display: inline-flex; }
 .edit-tools.on-range .single-only { display: none; }
-.editbar .len.paste { margin-left: auto; width: auto; padding: 0 10px; gap: 6px; font-size: 13px; border-color: rgba(255, 255, 255, 0.3); }
-.editbar .len.paste[hidden] { display: none; }
+.editsheet .len.paste { margin-left: auto; width: auto; padding: 0 10px; gap: 6px; font-size: 13px; border-color: rgba(255, 255, 255, 0.3); }
+.editsheet .len.paste[hidden] { display: none; }
 /* holding a finger on the score makes a range: no callout or text selection on the way */
 .editing .pages { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-/* a rest is selected: the note letters take the place of the pitch buttons, so the bar keeps its height */
-.edit-letters { display: none; flex: 1 1 0; min-width: 0; gap: 4px; }
-.edit-tools.on-rest .edit-letters { display: flex; }
-.edit-tools.on-rest .note-only { display: none; }
-.editbar .btn.small.letter { flex: 1 1 0; min-width: 24px; max-width: 48px; padding: 4px 0; font-weight: 650; }
-@media (max-width: 340px) { .edit-letters { gap: 2px; } }
 /* the note or rest being edited */
 .edit-sel {
   position: absolute;

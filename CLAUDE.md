@@ -93,6 +93,21 @@ build, tests, status) before working here.
   (a ring where each tap lands) and convert with ffmpeg; `scripts/voice-edit-test.mjs` with `VIDEO=dir` does it.
   The Claude-in-Chrome tool can only make GIFs.
 
+## Delegating to Codex
+
+The user set up the Codex CLI (12 Nov 2026) so that work is shared: **Claude stays the lead** and hands Codex
+substantial, well-scoped tasks when that saves time (a contained feature or refactor with clear files, a test
+to write, a review of a diff, a search through `third_party/`). Not for: small edits, anything on the phone,
+publishing, decisions that are the user's.
+
+- Write the task to a file (objective, the files that matter, what must not change, how to tell it is done),
+  then `node scripts/codex-task.mjs <task.md>` (read-only) or `--write` (may change files here). Its final
+  answer is printed and kept in `build/codex/`; `AGENTS.md` holds the rules Codex works under.
+- Codex never commits or publishes. **Review its changes** (`git diff`), run the tests yourself, then
+  integrate. A result that wasn't checked isn't done.
+- Don't edit the same files at the same time. For work in parallel give it its own worktree
+  (`git worktree add ../ps-codex <branch>`, then `--dir ../ps-codex`), and merge after review.
+- If `codex login status` says it is signed out, ask the user to run `codex login`.
 ## Lessons learnt
 
 - **A test that waits for "done" doesn't prove the control did anything.** Previous/Next in Edit mode never

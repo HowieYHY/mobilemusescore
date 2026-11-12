@@ -1,3 +1,20 @@
+# Paused mid-work (12 Nov 2026, evening): Composer like Flat (#33)
+
+The owner's answers: **piano strip** (behaving as desktop's piano keyboard), a too-long note **tied over the
+barline** as desktop, **one part at a time on phones with an All switch**. Research is in `build/codex/`
+(`piano-desktop.out.md`, `part-view.out.md`): a key enters a note at the picked place and moves on
+(`addMidiPitch`), Shift adds to the chord just entered, the picked notes' keys are lit; our `setNoteRest` path
+already ties over barlines; desktop's step input does not add bars at the end (only real-time input and paste
+do). Part view: `Part::setShow` directly, no undo, restored around `saveTo`; `nameTrack` must use the score's own
+visibility.
+
+**Unfinished, and the app is broken until it is done:** `app/index.html` and `style.css` already drop the
+letters row and move the lengths into a bottom sheet (`#editsheet`, `#edit-piano`, `#edit-partsbtn`), but
+`main.ts` still uses `#edit-letters` and *Add to chord*. `app/src/piano.ts`, `piano.css` and
+`scripts/piano-strip-test.mjs` are Codex's, stopped before it finished: review them before use. Next: engine
+`editEnterPitch(midi, chord, den, dots)` and `editShowPart(i)` (selection JSON with the chord's pitches), build
+the engine here, wire main.ts, then the tests that use `#edit-letters`, tour and README.
+
 # Handoff (12 Nov 2026)
 
 ## Where things are

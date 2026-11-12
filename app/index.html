@@ -64,6 +64,7 @@
   <div class="editbar" id="editbar" hidden>
     <div class="edit-info" id="edit-info" aria-live="polite"></div>
     <div class="edit-actions">
+      <button class="btn small" id="edit-partsbtn" aria-haspopup="dialog" aria-label="Lines shown" title="Show one line at a time, or all of them"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="6" r="2.2" fill="currentColor"/><circle cx="15" cy="12" r="2.2" fill="currentColor"/><circle cx="10" cy="18" r="2.2" fill="currentColor"/></svg></button>
       <button class="btn small" id="edit-morebtn" aria-expanded="false" aria-controls="edit-more" aria-label="More" title="More: sharps and flats, ties, words, key, time, bars, lines, singing a tune in"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
       <button class="btn small" id="edit-undo" disabled aria-label="Undo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="btn small" id="edit-redo" disabled aria-label="Redo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -81,9 +82,7 @@
       <button class="btn small oct note-only" id="edit-octave" disabled aria-pressed="false" title="Move by an octave instead of a step">Octave</button>
       <span class="edit-gap note-only"></span>
       <button class="btn small note-only" id="edit-delete" disabled aria-label="Delete"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <span class="edit-letters rest-only" id="edit-letters" role="group" aria-label="Put a note here"></span>
     </div>
-    <div class="edit-lengths" id="edit-lengths" role="group" aria-label="Length"></div>
     <div class="edit-more" id="edit-more" hidden>
       <div class="em-row"><button class="btn" id="edit-voice" disabled aria-label="Sing it in" title="Sing or hum a tune and put it in as notes"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sing it in</span></button></div>
       <div class="em-row"><span class="em-h">Note</span>
@@ -111,7 +110,6 @@
           <button class="btn small" id="edit-cresc" disabled title="Crescendo: under the selected bars, or this note"><svg viewBox="0 0 24 24" width="22" height="18" aria-hidden="true"><path d="M21 6L3 12l18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>cresc.</span></button>
           <button class="btn small" id="edit-dim" disabled title="Diminuendo: under the selected bars, or this note"><svg viewBox="0 0 24 24" width="22" height="18" aria-hidden="true"><path d="M3 6l18 6-18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>dim.</span></button>
         </span></div>
-      <div class="em-row"><span class="em-h">Add to chord</span><span class="em-set" id="edit-chord" role="group" aria-label="Add a note to this one"></span></div>
       <div class="em-row"><span class="em-h">Dynamics</span><span class="em-set" id="edit-dynamics" role="group" aria-label="Loudness mark"></span></div>
       <div class="em-row"><span class="em-h">Words</span>
         <span class="em-set em-words">
@@ -358,7 +356,7 @@
 
   <dialog class="ask newscore" id="newscore" aria-labelledby="newscore-title">
     <h2 id="newscore-title">New score</h2>
-    <p>A blank score to build up line by line: pick a bar, then type notes with the letters or sing them in.</p>
+    <p>A blank score to build up line by line: pick a bar, then tap notes in on the piano or sing them in.</p>
     <label class="ns-row">Title <input type="text" id="ns-title" maxlength="80" placeholder="Untitled" autocomplete="off"></label>
     <fieldset class="ns-lines"><legend>Lines</legend><div id="ns-lines"></div><button class="btn plain" id="ns-add" type="button">Add a line</button></fieldset>
     <div class="ns-grid">
@@ -407,6 +405,12 @@
   </dialog>
 
   <div class="focus-hint" id="focus-hint" aria-live="polite" hidden>Tap off the music to show the controls</div>
+
+  <!-- Edit: the bottom sheet. The lengths the next note gets, and the piano that puts it in. -->
+  <div class="editsheet" id="editsheet" hidden>
+    <div class="edit-lengths" id="edit-lengths" role="group" aria-label="Length"></div>
+    <div class="edit-piano" id="edit-piano" role="group" aria-label="Piano: tap a key to put a note at the picked place"></div>
+  </div>
 
   <footer class="transport" id="transport">
     <button class="btn round" id="rewind" aria-label="Back to start" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor"/></svg></button>

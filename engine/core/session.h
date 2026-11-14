@@ -60,6 +60,13 @@ public:
     std::string editDelete();
     std::string editEnterNote(int letter, int den, int dots);
     std::string editEnterRest(int den, int dots);
+    // A piano key, as desktop's piano keyboard (Score::addMidiPitch): chord 0 puts the note at the selected
+    // place and moves on, 1 adds it to the selected note's chord, 2 to the chord entered just before
+    std::string editEnterPitch(int midi, int chord, int den, int dots);
+    // One line (part) shown at a time while editing, -1 for all of them as the score has them. Not an edit:
+    // nothing to undo, nothing saved, the sound unchanged.
+    std::string editShowPart(int index);
+    std::string editPartsJson() const;
     // a range, as desktop's Shift+click: from the selection to the note or rest nearest the point
     std::string editExtend(int pageIndex, double x, double y, double radius);
     std::string editCopy(bool cut);
@@ -210,6 +217,8 @@ private:
     void setupPlayback();
     void addTrack(Track& t);
     bool nameTrack(mu::engraving::MasterScore* ms, Track& t);
+    bool partShown(const mu::engraving::Part* part) const;
+    void applyShownPart(mu::engraving::MasterScore* ms, bool filtered);
     void buildTracks();
     void rebuildPlayback();
     void syncTracks();
@@ -241,6 +250,12 @@ private:
 
     std::vector<Track> m_tracks;
     size_t m_partCount = 0; // the parts the tracks were made for
+    // Edit's one line at a time: the part shown alone (null: all), and each part's own visibility meanwhile
+    const mu::engraving::Part* m_shownPart = nullptr;
+    std::map<const mu::engraving::Part*, bool> m_partShow;
+    // where the last piano key put its note, for adding to that chord
+    int m_enteredTick = -1;
+    size_t m_enteredTrack = 0;
     std::map<muse::audio::aux_channel_idx_t, AudioBackend::TrackId> m_auxTracks;
     std::map<muse::audio::aux_channel_idx_t, OutputParams> m_auxOut;
     OutputParams m_master;

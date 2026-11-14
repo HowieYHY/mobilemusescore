@@ -1,19 +1,30 @@
-# Paused mid-work (12 Nov 2026, evening): Composer like Flat (#33)
+# Composer like Flat (#33), branch `composer-flat` (14 Nov 2026): first part done, pushed, not merged to main
 
-The owner's answers: **piano strip** (behaving as desktop's piano keyboard), a too-long note **tied over the
-barline** as desktop, **one part at a time on phones with an All switch**. Research is in `build/codex/`
-(`piano-desktop.out.md`, `part-view.out.md`): a key enters a note at the picked place and moves on
-(`addMidiPitch`), Shift adds to the chord just entered, the picked notes' keys are lit; our `setNoteRest` path
-already ties over barlines; desktop's step input does not add bars at the end (only real-time input and paste
-do). Part view: `Part::setShow` directly, no undo, restored around `saveTo`; `nameTrack` must use the score's own
-visibility.
+**Done on this branch, working, not merged to `main` and not published** (details in [docs/COMPOSER.md](docs/COMPOSER.md), phase 5):
+the bottom sheet with the lengths, the rest key, **Chord** and the **piano strip** (a key puts its note at the
+picked place and moves on, as desktop's piano keyboard; a too-long note is tied over the barline), and **one line
+at a time** on phones with the lines button (*All lines* and each line). The letters row and More's *Add to chord*
+are gone (A to G still work on a keyboard). On a phone the picked note's name has a line of its own (the bar no
+longer changes height with the words), and the piano makes way while More is open. The tour and the README are
+updated. The engine has three new functions (`mss_edit_enter_pitch`, `mss_edit_show_part`, `mss_edit_parts`): it
+was built on the second PC on 14 Nov; **the first PC must build it from this branch** before running or publishing.
 
-**Unfinished, and the app is broken until it is done:** `app/index.html` and `style.css` already drop the
-letters row and move the lengths into a bottom sheet (`#editsheet`, `#edit-piano`, `#edit-partsbtn`), but
-`main.ts` still uses `#edit-letters` and *Add to chord*. `app/src/piano.ts`, `piano.css` and
-`scripts/piano-strip-test.mjs` are Codex's, stopped before it finished: review them before use. Next: engine
-`editEnterPitch(midi, chord, den, dots)` and `editShowPart(i)` (selection JSON with the chord's pitches), build
-the engine here, wire main.ts, then the tests that use `#edit-letters`, tour and README.
+**Tests run (second PC, desktop Chromium, phone size unless said):** `step-entry-test` (rewritten for the piano;
+read back by desktop MuseScore), new `parts-view-test` (phone, one-line score, tablet), `piano-strip-test`
+(Codex's, reviewed and corrected), and once each the tests whose letter buttons became piano keys: `edit-test`,
+`edit-more-ui-test`, `composer-tools-test`, `range-copy-test`, `new-score-flow-test`, `new-score-inside-test`,
+`new-score-key-test`, `resume-list-test`, `edit-layout-test` (7 sizes). All pass. `new-score-inside-test` threw
+`RuntimeError: null function` once and passed on the next run (COMPOSER.md has that error as the dev server
+reloading; not seen again).
+
+**Not tested:** any real device (Android, iPhone, iPad), Safari, the piano under real fingers, a score with a
+transposing instrument, a score with multi-bar rests saved while one line shows, notes written with Notes on a
+score while one line shows (they are pinned by staff: a note on a hidden line is placed by its system).
+A 320 x 640 phone has about 100 px of music left in Edit.
+
+**Still to do for #33** (from docs/FLAT-STUDY.md section 14, none agreed in detail yet): More's groups as a
+category strip with headed grids, the floating bar on a held note, a bar added when the last one is filled,
+taps on the tempo, time signature or clef, reasons on dimmed buttons, picture buttons in New score.
 
 # Handoff (12 Nov 2026)
 

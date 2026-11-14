@@ -228,6 +228,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         case "editPitch": result = JSON.parse(callStr("mss_edit_pitch", req.mode)); core._mss_process(); break;
         case "editDuration": result = JSON.parse(callStr("mss_edit_duration", req.den)); core._mss_process(); break;
         case "editEnterNote": result = JSON.parse(callStr("mss_edit_enter_note", req.letter, req.den, req.dots)); core._mss_process(); break;
+        case "editEnterPitch": result = JSON.parse(callStr("mss_edit_enter_pitch", req.midi, req.chord, req.den, req.dots)); core._mss_process(); break;
+        case "editShowPart": result = JSON.parse(callStr("mss_edit_show_part", req.index)); break;
+        case "editParts": result = JSON.parse(callStr("mss_edit_parts")); break;
         case "editEnterRest": result = JSON.parse(callStr("mss_edit_enter_rest", req.den, req.dots)); core._mss_process(); break;
         case "editAddBars": result = JSON.parse(callStr("mss_edit_add_bars", req.n)); core._mss_process(); break;
         case "editSetKey": result = JSON.parse(callStr("mss_edit_set_key", req.key)); core._mss_process(); break;

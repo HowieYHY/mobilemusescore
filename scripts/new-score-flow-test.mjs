@@ -67,10 +67,17 @@ const scoreReady = async () => {
 };
 // the rest or note at the start of a staff: found on the page, then picked with a real touch
 const pickStart = async (staff) => {
+    // a phone shows one line at a time in Edit: bring this one up with the lines button, as a finger would
+    if (await page.evaluate((st) => app.edit.parts.shown >= 0 && app.edit.parts.parts[app.edit.parts.shown].staff !== st, staff)) {
+        await page.evaluate(() => document.getElementById("edit-partsbtn").click());
+        await page.evaluate((st) => document.querySelectorAll("#parts-list button")[1 + app.edit.parts.parts.findIndex((p) => p.staff === st)].click(), staff);
+        await page.waitForFunction((st) => !app.edit.busy && app.edit.parts.parts[app.edit.parts.shown]?.staff === st, staff, { timeout: 10000 });
+        await pause(400);
+    }
     const spot = await page.evaluate(async (st) => {
         const sp = app.state.score.spatium, p0 = app.state.score.pages[0];
         for (let y = p0.h * 0.05; y < p0.h * 0.7; y += sp / 2) {
-            for (let x = p0.w * 0.2; x < p0.w * 0.9; x += sp / 2) {
+            for (let x = p0.w * 0.05; x < p0.w * 0.9; x += sp / 2) { // a line of empty bars by itself has bar 1 far left
                 const s = await app.engine.editSelect(0, x, y, sp * 0.3);
                 if (s && s.staff === st && s.bar === 1) { await app.engine.editClearSelection(); return { x: s.x + s.w / 2, y: s.y + s.h / 2 }; }
             }
@@ -157,11 +164,15 @@ check(a1.length >= 10, "Harmony has a tune too: " + a1.join(" "));
 check((await walk(0)).join() === s1.join(), "and the Melody is as it was");
 // one letter on the third line
 await pickStart(2);
-await tap('#edit-letters button[aria-label="Put a G here"]');
+// the piano makes way while More is open on a phone: close it, and slide the strip to the key
+if (await page.evaluate(() => !document.getElementById("edit-more").hidden)) await tap("#edit-morebtn");
+await page.evaluate(() => document.querySelector('.piano-key[data-midi="67"]').scrollIntoView({ inline: "center", block: "nearest", behavior: "instant" }));
+await pause(300);
+await tap('.piano-key[data-midi="67"]');
 await page.waitForFunction(() => !app.edit.busy && app.edit.step);
 await tap("#edit-prev"); // note input moved on: back to the G
 await page.waitForFunction(() => !app.edit.busy && app.edit.sel && app.edit.sel.kind === "note");
-check(await page.evaluate(() => app.edit.sel.staff === 2 && /^G/.test(app.edit.sel.name)), "a letter puts a note into the third line: " + await page.evaluate(() => app.edit.sel.name));
+check(await page.evaluate(() => app.edit.sel.staff === 2 && /^G/.test(app.edit.sel.name)), "a piano key puts a note into the third line: " + await page.evaluate(() => app.edit.sel.name));
 await pause(1500);
 
 // come back later: the unsaved score is on the start screen

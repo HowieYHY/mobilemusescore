@@ -207,18 +207,18 @@
     "date": "2026-11-04"
   },
   "edit-test": {
-    "streak": 0,
-    "last": "fail",
-    "commit": "d3f41aa+changes",
-    "passCommit": "77fc2b2",
-    "date": "2026-11-04"
+    "streak": 1,
+    "last": "pass",
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "edit-layout-test": {
-    "streak": 5,
+    "streak": 6,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "edit-draft-test": {
     "streak": 7,
@@ -249,11 +249,11 @@
     "date": "2026-11-03"
   },
   "new-score-flow-test": {
-    "streak": 7,
+    "streak": 8,
     "last": "pass",
-    "commit": "3d26797+changes",
-    "passCommit": "3d26797",
-    "date": "2026-11-12"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "edit-more-test": {
     "streak": 2,
@@ -263,18 +263,18 @@
     "date": "2026-11-04"
   },
   "edit-more-ui-test": {
-    "streak": 4,
-    "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
-  },
-  "new-score-inside-test": {
     "streak": 5,
     "last": "pass",
-    "commit": "56435f8+changes",
-    "passCommit": "56435f8",
-    "date": "2026-11-12"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
+  },
+  "new-score-inside-test": {
+    "streak": 6,
+    "last": "pass",
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "notes-edit-switch-test": {
     "streak": 4,
@@ -284,32 +284,32 @@
     "date": "2026-11-12"
   },
   "resume-list-test": {
-    "streak": 4,
+    "streak": 5,
     "last": "pass",
-    "commit": "56435f8+changes",
-    "passCommit": "56435f8",
-    "date": "2026-11-12"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "step-entry-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "range-copy-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "composer-tools-test": {
-    "streak": 1,
+    "streak": 2,
     "last": "pass",
-    "commit": "d3f41aa+changes",
-    "passCommit": "d3f41aa",
-    "date": "2026-11-04"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "pagepair-test": {
     "streak": 2,
@@ -354,11 +354,11 @@
     "date": "2026-11-12"
   },
   "new-score-key-test": {
-    "streak": 2,
+    "streak": 3,
     "last": "pass",
-    "commit": "3d26797+changes",
-    "passCommit": "3d26797",
-    "date": "2026-11-12"
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   },
   "update-fail-test": {
     "streak": 1,
@@ -380,5 +380,19 @@
     "commit": "3d26797+changes",
     "passCommit": "3d26797",
     "date": "2026-11-12"
+  },
+  "parts-view-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
+  },
+  "piano-strip-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "826bf4e+changes",
+    "passCommit": "826bf4e",
+    "date": "2026-11-14"
   }
 }

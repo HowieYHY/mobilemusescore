@@ -459,6 +459,9 @@ std::string Session::load(const std::string& path)
     m_tracks.clear();
     m_auxOut.clear();
     m_anchorIds.clear(); // addresses of the last score's bars mean nothing now
+    m_shownPart = nullptr;
+    m_partShow.clear();
+    m_enteredTick = -1;
     m_hasAudioSettings = false;
     m_audioSettings = AudioSettings();
     ++m_loadKey;
@@ -568,6 +571,13 @@ std::string Session::load(const std::string& path)
     return "{\"ok\":true,\"score\":" + scoreInfoJson() + "}";
 }
 
+// Whether the score itself shows a part (Edit's one line at a time hides the others for a while)
+bool Session::partShown(const Part* part) const
+{
+    auto it = m_partShow.find(part);
+    return it != m_partShow.end() ? it->second : part->show();
+}
+
 // A track's name as PlaybackController::addTrack gives it; false when its part or instrument is missing
 bool Session::nameTrack(MasterScore* ms, Track& t)
 {
@@ -577,7 +587,7 @@ bool Session::nameTrack(MasterScore* ms, Track& t)
     if (t.isMetronome) {
         t.title = "Metronome";
     } else if (const Part* part = ms->partById(t.id.partId)) {
-        t.hidden = !part->show();
+        t.hidden = !partShown(part);
         // Label strips with the name printed on the staff (desktop's mixer uses the
         // part's track name, which is often the sound, e.g. "Piano" for every
         // voice of a choir score), falling back to the part and track names.
@@ -1182,6 +1192,17 @@ std::string Session::seekAt(int pageIndex, double x, double y, double radius, bo
 // ---------------------------------------------------------------------------
 // Editing: one undo step per call; then the playback model and play time follow the score
 
+// The first staff a system shows (staff 0 may be hidden: an instrument switched off, or Edit's one line)
+static staff_idx_t topStaff(const Score* score, const System* system)
+{
+    for (size_t i = 0; i < score->nstaves() && i < system->staves().size(); ++i) {
+        if (system->staff(i)->show() && score->staff(i)->show()) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 static std::string editResult(bool ok, const std::string& error = "")
 {
     return ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":" + jsonStr(error) + "}";
@@ -1357,6 +1378,12 @@ std::string Session::editSelectionJson() const
         json += ",\"pitch\":" + std::to_string(note->epitch())
                 + ",\"name\":" + jsonStr(note->tpcUserName(false, false).toStdString())
                 + ",\"tie\":" + (note->tieFor() ? "true" : "false");
+        // every note of its chord, as written (desktop's piano lights the picked note and its chord mates)
+        std::string pitches;
+        for (const Note* n : note->chord()->notes()) {
+            pitches += std::string(pitches.empty() ? "" : ",") + std::to_string(n->epitch());
+        }
+        json += ",\"pitches\":[" + pitches + "]";
     }
     json += std::string(",\"tuplet\":") + (cr->tuplet() ? "true" : "false");
     return json + "}";
@@ -1369,6 +1396,9 @@ static EngravingItem* nearestNoteOrRest(Page* page, double x, double y, double r
     double bestD = radius;
     for (EngravingItem* item : page->items(RectF(x - radius, y - radius, 2 * radius, 2 * radius))) {
         if (!(item->isNote() || item->isRest()) || !item->visible()) {
+            continue;
+        }
+        if (const Staff* st = item->staff(); st && !st->show()) {
             continue;
         }
         const RectF r = item->pageBoundingRect();
@@ -1632,6 +1662,186 @@ std::string Session::editEnterRest(int den, int dots)
         }
     });
     return editResult(true);
+}
+
+// A piano key. As desktop's piano keyboard panel with a note or rest selected (NotationMidiInput: note input
+// starts at the selection, then Score::addMidiPitch with the written pitch): the note goes in at the selected
+// place with the chosen length, replacing what is there, tied over the barline when it is longer than the
+// bar's room (setNoteRest), and the next place is selected. `chord` 1 adds the pitch to the selected note's
+// chord; 2 adds it to the chord the last key entered (desktop: Shift, or a second key held), and the
+// selection stays on the next place.
+std::string Session::editEnterPitch(int midi, int chord, int den, int dots)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms || midi < 0 || midi > 127) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    InputState& is = ms->inputState();
+    const bool playing = m_audio && m_audio->status() == PlaybackStatus::Running;
+
+    if (chord) {
+        Note* picked = nullptr;
+        ChordRest* sel = selectedChordRest(ms, &picked);
+        Chord* target = nullptr;
+        if (chord == 2 && m_enteredTick >= 0) {
+            Segment* seg = ms->tick2segment(Fraction::fromTicks(m_enteredTick), false, SegmentType::ChordRest);
+            EngravingItem* e = seg ? seg->element(m_enteredTrack) : nullptr;
+            target = e && e->isChord() ? toChord(e) : nullptr;
+        } else if (chord == 1 && picked) {
+            target = picked->chord();
+        }
+        if (!target) {
+            return editResult(false, chord == 2 ? "Put a note in first, then add to it." : "Select a note first.");
+        }
+        for (const Note* n : target->notes()) {
+            if (n->epitch() == midi) {
+                return editResult(false, "That note is already in the chord.");
+            }
+        }
+        const Fraction selTick = sel ? sel->tick() : Fraction(-1, 1);
+        const track_idx_t selTrack = sel ? sel->track() : 0;
+        const int selPitch = picked ? picked->epitch() : -1;
+        is.setTrack(target->track());
+        is.setSegment(target->segment());
+        is.setLastSegment(target->segment());
+        is.setDuration(target->durationType());
+        is.setRest(false);
+        is.setNoteEntryMode(true);
+        ms->startCmd(TranslatableString::untranslatable("Add note to chord"));
+        Note* note = ms->addMidiPitch(midi, true, true);
+        ms->endCmd();
+        is.setNoteEntryMode(false);
+        if (!note) {
+            return editResult(false, "A note can't be added here.");
+        }
+        if (chord == 1) {
+            ms->select(note); // the note just added: its key is lit with its chord mates
+        } else if (ChordRest* again = selTick >= Fraction(0, 1) ? ms->findCR(selTick, selTrack) : nullptr) {
+            // the place the next key goes to stays picked
+            EngravingItem* pick = again;
+            if (again->isChord()) {
+                pick = toChord(again)->upNote();
+                for (Note* n : toChord(again)->notes()) {
+                    if (n->epitch() == selPitch) {
+                        pick = n;
+                    }
+                }
+            }
+            ms->select(pick);
+        }
+        afterEdit(ms, m_playbackModel.get(), []() {});
+        if (!playing && m_playbackModel) {
+            m_playbackModel->triggerEventsForItems({ note }, 500000, true);
+        }
+        return editResult(true);
+    }
+
+    track_idx_t track = 0;
+    if (!startStep(ms, den, dots, track)) {
+        return editResult(false, "Select a note or rest first.");
+    }
+    const Fraction tick = is.segment()->tick();
+    ms->startCmd(TranslatableString::untranslatable("Enter note"));
+    Note* note = ms->addMidiPitch(midi, false, true);
+    ms->endCmd();
+    is.setNoteEntryMode(false);
+    if (!note) {
+        return editResult(false, "A note can't go here.");
+    }
+    m_enteredTick = tick.ticks();
+    m_enteredTrack = track;
+    selectNextStep(ms, track, tick);
+    afterEdit(ms, m_playbackModel.get(), [this, ms]() {
+        m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
+        if (m_audio && m_audioReady) {
+            m_audio->setDuration(m_totalPlayTime);
+        }
+    });
+    if (!playing && m_playbackModel) {
+        m_playbackModel->triggerEventsForItems({ note }, 500000, true);
+    }
+    return editResult(true);
+}
+
+// ---- one line at a time
+
+// Sets every part's visibility: the one shown alone (`filtered`), or as the score has it. Part::setShow
+// itself, as desktop's Instruments panel reaches through Pid::VISIBLE, but outside the undo stack.
+void Session::applyShownPart(MasterScore* ms, bool filtered)
+{
+    for (Part* part : ms->parts()) {
+        auto it = m_partShow.find(part);
+        if (it == m_partShow.end()) {
+            continue; // a line added meanwhile: shown
+        }
+        part->setShow(filtered ? part == m_shownPart : it->second);
+    }
+}
+
+std::string Session::editPartsJson() const
+{
+    const MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms) {
+        return "{\"shown\":-1,\"parts\":[]}";
+    }
+    int shown = -1;
+    std::string parts;
+    for (size_t i = 0; i < ms->parts().size(); ++i) {
+        const Part* part = ms->parts()[i];
+        if (part == m_shownPart) {
+            shown = int(i);
+        }
+        String name = part->instrument()->nameAsPlainText();
+        if (name.empty()) {
+            name = part->partName();
+        }
+        parts += std::string(parts.empty() ? "" : ",") + "{\"name\":" + jsonStr(name.toStdString())
+                 + ",\"show\":" + (partShown(part) ? "true" : "false")
+                 + ",\"staff\":" + std::to_string(part->startTrack() / VOICES)
+                 + ",\"staves\":" + std::to_string(part->nstaves()) + "}";
+    }
+    return "{\"shown\":" + std::to_string(shown) + ",\"parts\":[" + parts + "]}";
+}
+
+std::string Session::editShowPart(int index)
+{
+    MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
+    if (!ms) {
+        return editPartsJson();
+    }
+    const Part* want = index >= 0 && index < int(ms->parts().size()) ? ms->parts()[index] : nullptr;
+    if (want == m_shownPart) {
+        return editPartsJson();
+    }
+    // the place picked, to pick the same moment in the line now shown
+    ChordRest* cr = ms->selection().isRange() ? nullptr : selectedChordRest(ms);
+    const Fraction tick = cr ? cr->tick() : Fraction(-1, 1);
+    const track_idx_t crTrack = cr ? cr->track() : 0;
+    ms->deselectAll();
+
+    if (m_shownPart) {
+        applyShownPart(ms, false);
+        m_partShow.clear();
+        m_shownPart = nullptr;
+    }
+    if (want) {
+        for (const Part* part : ms->parts()) {
+            m_partShow[part] = part->show();
+        }
+        m_shownPart = want;
+        applyShownPart(ms, true);
+    }
+    ms->setLayoutAll();
+    ms->doLayout();
+
+    if (cr) {
+        ChordRest* now = ms->findCR(tick, want ? want->startTrack() : crTrack);
+        if (now) {
+            ms->select(now->isChord() ? static_cast<EngravingItem*>(toChord(now)->upNote()) : now);
+        }
+    }
+    m_enteredTick = -1;
+    return editPartsJson();
 }
 
 // ---- ranges, copy and paste
@@ -2089,7 +2299,14 @@ std::string Session::editSelectStart()
     MasterScore* ms = m_project ? m_project->masterScore() : nullptr;
     Measure* m = ms ? ms->firstMeasure() : nullptr;
     Segment* seg = m ? m->first(SegmentType::ChordRest) : nullptr;
-    EngravingItem* el = seg ? seg->element(0) : nullptr;
+    track_idx_t track = 0;
+    for (size_t i = 0; ms && i < ms->nstaves(); ++i) {
+        if (ms->staff(i)->show()) {
+            track = i * VOICES;
+            break;
+        }
+    }
+    EngravingItem* el = seg ? seg->element(track) : nullptr;
     if (!el) {
         return "null";
     }
@@ -2397,6 +2614,14 @@ std::string Session::editUndoRedo(bool undo)
         return editResult(false, "Nothing to " + std::string(undo ? "undo." : "redo."));
     }
     ms->undoRedo(undo, nullptr);
+    m_enteredTick = -1;
+    if (m_shownPart && std::find(ms->parts().begin(), ms->parts().end(), m_shownPart) == ms->parts().end()) {
+        applyShownPart(ms, false);
+        m_partShow.clear();
+        m_shownPart = nullptr;
+        ms->setLayoutAll();
+        ms->doLayout();
+    }
     afterEdit(ms, m_playbackModel.get(), [this, ms]() {
         m_totalPlayTime = uticksToSecs(ms, ms->repeatList(true).ticks()) + PLAYBACK_TAIL_SECS;
     });
@@ -2425,7 +2650,26 @@ std::string Session::saveTo(const std::string& path)
         if (!ret) {
             return editResult(false, "Could not write the file: " + ret.toString());
         }
+        // The file gets each line's own visibility, never Edit's one line at a time. Multi-bar rests are
+        // written as laid out, so with those on the page is laid out as the file should have it too.
+        MasterScore* ms = m_project->masterScore();
+        const bool filtered = m_shownPart != nullptr;
+        const bool relayout = filtered && ms->style().styleB(Sid::createMultiMeasureRests);
+        if (filtered) {
+            applyShownPart(ms, false);
+            if (relayout) {
+                ms->setLayoutAll();
+                ms->doLayout();
+            }
+        }
         ok = m_project->writeMscz(writer, /*createThumbnail*/ false) && !writer.hasError();
+        if (filtered) {
+            applyShownPart(ms, true);
+            if (relayout) {
+                ms->setLayoutAll();
+                ms->doLayout();
+            }
+        }
         writer.close();
     }
     if (!ok) {
@@ -2930,7 +3174,7 @@ std::string Session::timelineJson() const
         }
         const int pageIdx = int(std::find(pages.begin(), pages.end(), page) - pages.begin());
         const double x = canvasX - spatium - page->pos().x();
-        const double y = system->staffCanvasYpage(0) - 3.0 * spatium;
+        const double y = system->staffCanvasYpage(topStaff(score, system)) - 3.0 * spatium;
         const double h = bottomY + 6.0 * spatium;
         const double secs = uticksToSecs(score, utick);
         points.push_back({ std::round(secs * 10000.0) / 10000.0, pageIdx,
@@ -3024,7 +3268,7 @@ std::string Session::stavesJson() const
                 continue;
             }
             // the same top as timelineJson's points, so the two match up
-            const double y = std::round(system->staffCanvasYpage(0) - 3.0 * spatium);
+            const double y = std::round(system->staffCanvasYpage(topStaff(score, system)) - 3.0 * spatium);
             std::string staves;
             for (size_t i = 0; i < score->nstaves() && i < system->staves().size(); ++i) {
                 const SysStaff* ss = system->staff(i);
@@ -3132,7 +3376,7 @@ std::string Session::cursorJson(double secs) const
 
         // canvas -> page coordinates (pages are drawn individually)
         const double rx = x - spatium - pagePos.x();
-        const double ry = system->staffCanvasYpage(0) - 3.0 * spatium;
+        const double ry = system->staffCanvasYpage(topStaff(score, system)) - 3.0 * spatium;
 
         return head + ",\"page\":" + std::to_string(pageIdx)
                + ",\"x\":" + num(rx) + ",\"y\":" + num(ry)

@@ -74,6 +74,9 @@ EMSCRIPTEN_KEEPALIVE const char* mss_edit_duration(int den) { return ret(Session
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_dot() { return ret(Session::instance()->editDot()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_note(int letter, int den, int dots) { return ret(Session::instance()->editEnterNote(letter, den, dots)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_rest(int den, int dots) { return ret(Session::instance()->editEnterRest(den, dots)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_enter_pitch(int midi, int chord, int den, int dots) { return ret(Session::instance()->editEnterPitch(midi, chord, den, dots)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_show_part(int index) { return ret(Session::instance()->editShowPart(index)); }
+EMSCRIPTEN_KEEPALIVE const char* mss_edit_parts() { return ret(Session::instance()->editPartsJson()); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_extend(int page, double x, double y, double radius) { return ret(Session::instance()->editExtend(page, x, y, radius)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_copy(int cut) { return ret(Session::instance()->editCopy(cut != 0)); }
 EMSCRIPTEN_KEEPALIVE const char* mss_edit_paste() { return ret(Session::instance()->editPaste()); }

@@ -49,6 +49,9 @@ export type WorkerRequest =
     | Req<{ cmd: "editDuration"; den: number }>
     | Req<{ cmd: "editEnterNote"; letter: number; den: number; dots: number }>
     | Req<{ cmd: "editEnterRest"; den: number; dots: number }>
+    | Req<{ cmd: "editEnterPitch"; midi: number; chord: number; den: number; dots: number }>
+    | Req<{ cmd: "editShowPart"; index: number }>
+    | Req<{ cmd: "editParts" }>
     | Req<{ cmd: "editInsertNotes"; spec: string }>
     | Req<{ cmd: "editAddBars"; n: number }>
     | Req<{ cmd: "editSetKey"; key: number }>
@@ -71,11 +74,16 @@ export interface EditSelection {
     /** The pitch of the staff's middle line: where a tune should sit. */
     mid?: number;
     pitch?: number; name?: string;
+    /** Every note of the picked note's chord, as written (the piano's lit keys). */
+    pitches?: number[];
     /** The name of the line, and whether the note is tied on or the note or rest is in a tuplet. */
     part?: string; tie?: boolean; tuplet?: boolean;
     barEnd?: number; staves?: number; boxes?: { page: number; x: number; y: number; w: number; h: number }[];
 }
 export interface EditResult { ok: boolean; error?: string }
+/** The score's lines (parts): `shown` is the one Edit shows alone, -1 for all of them. `show` is the score's
+ *  own setting for a line; `staff` its first staff and `staves` how many it has. */
+export interface EditParts { shown: number; parts: { name: string; show: boolean; staff: number; staves: number }[] }
 
 export type WorkerReply =
     | { type: "reply"; id: number; result?: unknown; error?: string }

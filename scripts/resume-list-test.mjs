@@ -44,7 +44,7 @@ for (const name of ["A", "B", "C"]) {
     await page.fill("#ns-title", name);
     await page.tap("#ns-create");
     await page.waitForFunction(() => app.edit.on && app.edit.sel);
-    await page.tap("#edit-letters button >> nth=0");
+    await page.tap('.piano-key[data-midi="60"]');
     await page.waitForFunction(() => app.edit.undo > 0);
     await page.waitForTimeout(1300); // the draft is written 800 ms after a change
     await boot();

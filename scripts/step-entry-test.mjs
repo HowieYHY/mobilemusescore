@@ -1,8 +1,9 @@
-// Note input that moves on, as desktop's (composer #2), by touch on a phone-sized page: a new score in 4/4.
-// Eighth, C D E: each letter goes in after the last and the letters stay; the rest key puts in an eighth
-// rest; Quarter, F; ← goes back to the F with Higher/Lower (an octave up), → returns to the letters;
-// lengths carry over; Undo takes out one step; the edit bar keeps its height throughout. The copy is read
-// back by desktop MuseScore: C8 D8 E8 rest8 F4(up an octave) G4 ... in that order.
+// Note input that moves on, as desktop's piano keyboard, by touch on a phone-sized page: a new score in 4/4.
+// Eighth, the keys C D E: each note goes in after the last; the rest key puts in an eighth rest; Quarter, F;
+// ← goes back to the F with Higher/Lower (an octave up), → returns; a half note with one beat left in the
+// bar is tied over the barline; Chord makes the next key join the note just put in; the picked note's keys
+// are lit; Undo takes out one step; the bars keep their height throughout. The copy is read back by desktop
+// MuseScore: C8 D8 E8 rest8 F4(up an octave) G4 tied to G4, then A4 with C5 in one chord.
 // Needs the dev server: (cd app && npx vite --port 5180 --host 127.0.0.1)
 import fs from "node:fs";
 import path from "node:path";
@@ -40,21 +41,39 @@ await page.waitForFunction(() => app.edit.on && app.edit.sel);
 
 const st = () => page.evaluate(() => ({
     sel: app.edit.sel && { kind: app.edit.sel.kind, name: app.edit.sel.name, bar: app.edit.sel.bar, x: app.edit.sel.x, pitch: app.edit.sel.pitch },
-    letters: getComputedStyle(document.getElementById("edit-letters")).display !== "none",
+    piano: document.getElementById("edit-piano").getBoundingClientRect().height > 60,
+    lit: [...document.querySelectorAll(".piano-key.lit")].map((k) => Number(k.dataset.midi)),
+    sheetH: Math.round(document.getElementById("editsheet").getBoundingClientRect().height),
     up: getComputedStyle(document.getElementById("edit-up")).display !== "none",
     len: document.querySelector("#edit-lengths .len[aria-checked='true']")?.dataset.den,
     barH: Math.round(document.getElementById("editbar").getBoundingClientRect().height),
     info: document.getElementById("edit-info")?.textContent ?? "",
 }));
 const idle = () => page.waitForFunction(() => !app.edit.busy);
-const tapLetter = async (l) => { await page.tap(`#edit-letters button:has-text("${l}")`); await idle(); };
+const MIDI = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71, C5: 72 };
+// a key is tapped where it shows: the strip is scrolled to it first, as a finger would
+const tapLetter = async (l) => {
+    const key = page.locator(`.piano-key[data-midi="${MIDI[l]}"]`);
+    await key.scrollIntoViewIfNeeded();
+    const b = await key.boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height * 0.85);
+    await page.waitForTimeout(60);
+    await page.waitForFunction(() => !app.edit.busy);
+};
 
 let s = await st();
 const h0 = s.barH;
-check(s.letters && s.sel.kind === "rest", "a new score: the first rest picked, the letters shown");
+const sheet0 = s.sheetH;
+check(s.piano && s.sel.kind === "rest", "a new score: the first rest picked, the piano shown");
 check(s.len === "4", "note input starts on quarters");
-const lettersFit = await page.$$eval("#edit-letters button", (bs) => bs.map((b) => b.getBoundingClientRect()).every((r, i, a) => r.width >= 24 && Math.abs(r.top - a[0].top) < 2));
-check(lettersFit, "360 px: C to B and the rest key fit on one row, each at least 24 px wide");
+const fit = await page.evaluate(() => {
+    const sheet = document.getElementById("editsheet").getBoundingClientRect();
+    const foot = document.getElementById("transport").getBoundingClientRect();
+    const viewer = document.getElementById("viewer").getBoundingClientRect();
+    const keys = [...document.querySelectorAll(".piano-white")].map((k) => k.getBoundingClientRect().width);
+    return { above: sheet.bottom <= foot.top + 1, music: Math.round(viewer.height), key: Math.min(...keys) };
+});
+check(fit.above && fit.music >= 200 && fit.key >= 40, `360 px: the piano sits over the playing controls, keys ${fit.key} px wide, ${fit.music} px of music left`);
 
 await page.tap('#edit-lengths .len[data-den="8"]');
 s = await st();
@@ -66,22 +85,23 @@ for (const l of ["C", "D", "E"]) {
     await tapLetter(l);
     s = await st();
     xs.push(s.sel.x);
-    check(s.letters && s.len === "8", `${l}: in, the letters stay, still eighths`);
+    check(s.len === "8", `${l}: in, still eighths`);
 }
-check(xs[0] < xs[1] && xs[1] < xs[2], "each letter moved the place on");
+check(xs[0] < xs[1] && xs[1] < xs[2], "each key moved the place on");
 await page.tap("#edit-rest");
 await idle();
-check((await st()).letters, "the rest key: in, and on to the next place");
+check((await st()).sel.x > xs[2], "the rest key: in, and on to the next place");
 await page.tap('#edit-lengths .len[data-den="4"]');
 await tapLetter("F");
 s = await st();
-check(s.barH === h0, `the edit bar keeps its height while entering (${s.barH} px)`);
+check(s.barH === h0 && s.sheetH === sheet0, `the edit bar and the sheet keep their height while entering (${s.barH} and ${s.sheetH} px)`);
 
 // fix the octave of the note just entered: back to it, up an octave, on again
 await page.tap("#edit-prev");
 await page.waitForTimeout(200);
 s = await st();
-check(s.sel.kind === "note" && s.sel.name.startsWith("F") && s.up && !s.letters, "← goes back to the F, with Higher and Lower");
+check(s.sel.kind === "note" && s.sel.name.startsWith("F") && s.up, "← goes back to the F, with Higher and Lower");
+check(s.lit.length === 1 && s.lit[0] === 65, `the F's key is lit (${s.lit})`);
 check(s.barH === h0, "same height with the note tools");
 const before = s.sel.pitch;
 await page.tap("#edit-octave");
@@ -92,18 +112,37 @@ check(s.sel.pitch === before + 12, `Octave + Higher: the F an octave up (${befor
 await page.tap("#edit-next");
 await page.waitForTimeout(200);
 s = await st();
-check(s.letters && s.sel.kind === "rest" && s.len === "4", "→ back to the next place: the letters, quarters still chosen");
+check(s.sel.kind === "rest" && s.len === "4" && s.lit.length === 0, "→ back to the next place: quarters still chosen, no key lit");
 
+// one beat is left in bar 1: a half note is tied over the barline, as on desktop
+await page.tap('#edit-lengths .len[data-den="2"]');
 await tapLetter("G");
-const undoBefore = await page.evaluate(() => app.edit.undo);
+s = await st();
+check(s.sel.bar === 2, "a half note with one beat left: on into bar 2");
+await page.tap('#edit-lengths .len[data-den="4"]');
 await tapLetter("A");
+// Chord: the next key joins the A just put in, and the place stays
+const place = (await st()).sel.x;
+await page.tap("#edit-chordkey");
+const undoBefore = await page.evaluate(() => app.edit.undo);
+await tapLetter("C5");
+s = await st();
+check(Math.abs(s.sel.x - place) < 1 && await page.evaluate(() => app.edit.undo) === undoBefore + 1, "Chord: the key joined the note before, the place did not move");
+await page.tap("#edit-prev");
+await page.waitForTimeout(200);
+s = await st();
+check(s.lit.join() === "69,72", `the chord's two keys are lit (${s.lit})`);
+await page.tap("#edit-chordkey");
+await page.tap("#edit-next");
+await page.waitForTimeout(200);
+await tapLetter("B");
 await page.tap("#edit-undo");
 await idle();
 s = await st();
-check(await page.evaluate(() => app.edit.undo) === undoBefore, "Undo takes out one step (the A)");
+check(await page.evaluate(() => app.edit.undo) === undoBefore + 1, "Undo takes out one step (the B)");
 
-// the end of the score: fill bar 2, and the last letter keeps what it entered
-for (let i = 0; i < 6; i++) {
+// the end of the score: fill bar 2, and the last key keeps what it entered
+for (let i = 0; i < 4; i++) {
     await tapLetter("B");
 }
 s = await st();
@@ -123,9 +162,12 @@ if (copy && fs.existsSync(musescore)) {
         if (/<rest/.test(n)) return "r:" + type;
         return (n.match(/<step>(\w)<\/step>/) || [])[1] + (n.match(/<octave>(\d)<\/octave>/) || [])[1] + ":" + type;
     });
-    const got = notes.slice(0, 6).join(" ");
+    const got = notes.slice(0, 9).join(" ");
     const f = notes[4] || "";
-    check(/^C\d:eighth D\d:eighth E\d:eighth r:eighth F\d:quarter G\d:quarter$/.test(got), "MuseScore reads C D E (eighths), a rest, F G (quarters): " + got);
+    check(/^C4:eighth D4:eighth E4:eighth r:eighth F\d:quarter G4:quarter G4:quarter A4:quarter C5:quarter$/.test(got), "MuseScore reads C D E (eighths), a rest, F, G over the barline, A with C: " + got);
+    const ties = [...x.matchAll(/<tie type="(\w+)"/g)].map((t) => t[1]).join(" ");
+    check(ties === "start stop", "the G is tied over the barline: " + ties);
+    check(/<note[^>]*>\s*<chord\/>\s*<pitch>\s*<step>C<\/step>\s*<octave>5/.test(x), "the C is in the A's chord");
     const fOct = Number(f.slice(1, 2)), eOct = Number((notes[2] || "").slice(1, 2));
     check(fOct >= eOct + 1, `the F is the octave up (E${eOct}, F${fOct})`);
 }

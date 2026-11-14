@@ -45,7 +45,8 @@ const tapAt = async (x, y) => {
     await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 };
 const tap = async (selector) => {
-    const box = await page.evaluate((sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, selector);
+    // a piano key is brought into view first, as a finger slides the strip to it
+    const box = await page.evaluate((sel) => { const el = document.querySelector(sel); if (el.classList.contains("piano-key")) el.scrollIntoView({ inline: "center", block: "nearest", behavior: "instant" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, selector);
     await tapAt(box.x, box.y);
 };
 const shot = async (name) => shots && page.screenshot({ path: path.join(shots, name + ".png") });
@@ -82,6 +83,7 @@ const screenPoint = () => page.evaluate(({ x, y }) => {
     return { x: r2.left + x / p0.w * r2.width, y: r2.top + y / p0.h * r2.height };
 }, spot);
 let pt = await screenPoint();
+await page.evaluate(() => { app.edit.sel = null; }); // wait for this tap's own selection, not the one the undo left
 await tapAt(pt.x, pt.y);
 await page.waitForFunction(() => app.edit.sel, null, { timeout: 5000 }).catch(() => {});
 let sel = await page.evaluate(() => app.edit.sel);
@@ -109,6 +111,7 @@ await tap("#edit-undo"); await idle(); await tap("#edit-undo"); await idle();
 
 // undo drops the selection: tap the note again
 pt = await screenPoint();
+await page.evaluate(() => { app.edit.sel = null; }); // wait for this tap's own selection, not the one the undo left
 await tapAt(pt.x, pt.y);
 await page.waitForFunction(() => app.edit.sel, null, { timeout: 5000 }).catch(() => {});
 sel = await page.evaluate(() => app.edit.sel);
@@ -125,20 +128,20 @@ await tap("#edit-delete"); await idle();
 sel = await page.evaluate(() => app.edit.sel);
 check(sel === null || sel.kind === "rest", `Delete leaves a rest (${sel?.kind})`);
 
-// phase 2: a note goes onto the rest through the letter buttons; the bar keeps its height
-check(await page.evaluate(() => document.querySelectorAll("#edit-letters button").length === 8 && !document.getElementById("edit-letters").offsetParent === false), "a rest shows the seven note letters and the rest key");
-check(await page.evaluate(() => document.getElementById("edit-up").offsetParent === null), "the pitch buttons make room for them");
+// phase 2: a note goes onto the rest through the piano; the bar keeps its height
+check(await page.evaluate(() => document.querySelectorAll(".piano-key").length === 88 && !document.getElementById("edit-rest").disabled), "a rest: the piano's 88 keys and the rest key are ready");
+check(await page.evaluate(() => document.getElementById("edit-up").disabled), "Higher and Lower wait for a note");
 const barH = await page.evaluate(() => document.getElementById("editbar").getBoundingClientRect().height);
 const restSel = sel;
 const inputDen = await page.evaluate(() => app.edit.len.den); // note input: the chosen length, as desktop's
-await tapAndWait('#edit-letters button[aria-label="Put a E here"]');
+await tapAndWait('.piano-key[data-midi="64"]');
 const moved = await page.evaluate(() => app.edit.sel);
-check(moved && (moved.x !== restSel.x || moved.bar !== restSel.bar), "the letter moved the selection on to the next place");
+check(moved && (moved.x !== restSel.x || moved.bar !== restSel.bar), "the key moved the selection on to the next place");
 await tap("#edit-prev"); // back to the E (moving is not an edit: wait for the selection itself)
 await page.waitForFunction((m) => app.edit.sel && app.edit.sel.x !== m.x, moved, { timeout: 5000 }).catch(() => {});
 sel = await page.evaluate(() => app.edit.sel);
 check(sel && sel.kind === "note" && /^E/.test(sel.name) && sel.den === inputDen && sel.bar === restSel.bar, `E entered on the rest: ${sel?.name}, 1/${sel?.den}, bar ${sel?.bar}`);
-check(Math.abs(sel.pitch - spot.pitch) <= 12, `in the octave near the music (pitch ${sel?.pitch}, neighbours ${spot.pitch})`);
+check(sel.pitch === 64, `at the pitch of its key, E4 (pitch ${sel?.pitch})`);
 const barH2 = await page.evaluate(() => document.getElementById("editbar").getBoundingClientRect().height);
 check(Math.abs(barH - barH2) < 1, `the edit bar keeps its height (${barH} -> ${barH2})`);
 await tap("#edit-up"); await idle(); // back on the new note, it can be adjusted
@@ -146,6 +149,7 @@ sel = await page.evaluate(() => app.edit.sel);
 check(sel && sel.kind === "note", `the new note can be moved (${sel?.name})`);
 await tap("#edit-undo"); await idle(); await tap("#edit-undo"); await idle(); // pitch, then the entry: the rest is back
 pt = await screenPoint();
+await page.evaluate(() => { app.edit.sel = null; }); // wait for this tap's own selection, not the one the undo left
 await tapAt(pt.x, pt.y);
 await page.waitForFunction(() => app.edit.sel, null, { timeout: 5000 }).catch(() => {});
 sel = await page.evaluate(() => app.edit.sel);
@@ -157,7 +161,8 @@ await page.waitForFunction(({ x, y }) => app.edit.sel && (app.edit.sel.x !== x |
 check(await page.evaluate(({ x, y }) => app.edit.sel.x !== x || app.edit.sel.y !== y, beforeNext), "Next moves to another note");
 await tap("#edit-prev");
 await page.waitForFunction(({ x, y }) => app.edit.sel && app.edit.sel.x === x && app.edit.sel.y === y, beforeNext, { timeout: 4000 }).catch(() => {});
-check(await page.evaluate(({ x, y }) => app.edit.sel.x === x && app.edit.sel.y === y, beforeNext), "Previous comes back");
+const backAt = await page.evaluate(() => ({ x: app.edit.sel.x, y: app.edit.sel.y, kind: app.edit.sel.kind, bar: app.edit.sel.bar, voice: app.edit.sel.voice }));
+check(backAt.x === beforeNext.x && backAt.y === beforeNext.y, `Previous comes back (from ${JSON.stringify(beforeNext)} to ${JSON.stringify(backAt)})`);
 
 // the copy
 check(await page.evaluate(() => !document.getElementById("edit-copy").disabled), "Save a copy is on after edits");

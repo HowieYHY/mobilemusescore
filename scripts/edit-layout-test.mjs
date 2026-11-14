@@ -50,7 +50,7 @@ for (const [name, width, height] of sizes) {
     failures += ok ? 0 : 1;
     console.log((ok ? "ok   " : "FAIL ") + `${name} ${width}x${height}: edit bar ${r.bar.b - r.bar.t}px high, smallest button ${Math.round(r.minTap)}px, Open ${r.open.l}..${r.open.r}, Edit ${r.edit.l}..${r.edit.r}, View ${r.view.l}..${r.view.r}${r.bad.length ? ", OUTSIDE: " + r.bad.join(" ") : ""}`);
     await page.screenshot({ path: path.join(shots, `layout-${name}.png`) });
-    // a rest selected: the letters replace the pitch buttons, same bar height, nothing outside, readable taps
+    // a rest selected: the same bar height; the sheet's lengths and the piano inside the screen, over the playing controls
     await page.evaluate(async () => {
         const sp = app.state.score.spatium, p0 = app.state.score.pages[0];
         for (let y = p0.h * 0.1; y < p0.h * 0.6; y += sp / 2) {
@@ -62,13 +62,21 @@ for (const [name, width, height] of sizes) {
     });
     const rr = await page.evaluate(() => {
         const W = document.documentElement.clientWidth;
-        const L = [...document.querySelectorAll("#edit-letters button")].map((b) => b.getBoundingClientRect());
+        const L = [...document.querySelectorAll("#edit-lengths .len")].map((b) => b.getBoundingClientRect()).filter((b) => b.width);
+        const K = [...document.querySelectorAll(".piano-white")].map((b) => b.getBoundingClientRect());
         const bar = document.getElementById("editbar").getBoundingClientRect();
-        return { n: L.length, minW: Math.min(...L.map((b) => b.width)), minH: Math.min(...L.map((b) => b.height)), out: L.some((b) => b.right > W + 0.5 || b.left < -0.5), h: Math.round(bar.height), oneRow: new Set(L.map((b) => Math.round(b.top))).size === 1 };
+        const sheet = document.getElementById("editsheet").getBoundingClientRect();
+        const foot = document.getElementById("transport").getBoundingClientRect();
+        const music = document.getElementById("viewer").getBoundingClientRect();
+        return { n: L.length, minW: Math.min(...L.map((b) => b.width)), minH: Math.min(...L.map((b) => b.height)), keyW: Math.min(...K.map((b) => b.width)), keyH: Math.round(K[0].height),
+            out: sheet.right > W + 0.5 || sheet.left < -0.5 || sheet.bottom > foot.top + 1, h: Math.round(bar.height), music: Math.round(music.height), oneRow: new Set(L.map((b) => Math.round(b.top))).size === 1 };
     });
-    const rok = rr.n === 8 && rr.minW >= 24 // C to B and the rest key && rr.minH >= 34 && !rr.out && rr.oneRow && (width < 340 || rr.h === r.bar.b - r.bar.t);
+    // six lengths, the dot, the rest key and Chord (Paste shows only once something is copied)
+    // (the lengths share a narrow phone's width, 28 px at 320: the letters they replace were 24; a 320x640 phone
+    // has little room for the music in Edit, 100 px)
+    const rok = rr.n === 9 && rr.minW >= 28 && rr.minH >= 34 && rr.keyW >= 40 && rr.keyH >= 60 && !rr.out && rr.oneRow && rr.h === r.bar.b - r.bar.t && rr.music >= (height < 700 ? 90 : 180);
     failures += rok ? 0 : 1;
-    console.log((rok ? "ok   " : "FAIL ") + `${name} rest: letters ${Math.round(rr.minW)}x${Math.round(rr.minH)} px, bar ${rr.h}px (note: ${r.bar.b - r.bar.t}px), one row ${rr.oneRow}`);
+    console.log((rok ? "ok   " : "FAIL ") + `${name} rest: lengths ${Math.round(rr.minW)}x${Math.round(rr.minH)} px in one row ${rr.oneRow}, keys ${Math.round(rr.keyW)}x${rr.keyH} px, bar ${rr.h}px (note: ${r.bar.b - r.bar.t}px), ${rr.music}px of music`);
     await page.screenshot({ path: path.join(shots, `layout-${name}-rest.png`) });
     await context.close();
 }

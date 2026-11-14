@@ -39,7 +39,7 @@ async function create(name) {
 await page.tap("#new-score");
 await create("First");
 await page.waitForFunction(() => app.edit.on && app.edit.sel);
-await page.tap("#edit-letters button >> nth=0");
+await page.tap('.piano-key[data-midi="60"]');
 await page.waitForFunction(() => app.edit.undo > 0);
 check((await title()).includes("First"), "first score open in Edit, one note in");
 

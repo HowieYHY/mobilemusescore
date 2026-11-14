@@ -65,7 +65,11 @@ const hold = async (p) => {
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await page.waitForTimeout(300);
 };
-const letter = async (l) => { await page.tap(`#edit-letters button:has-text("${l}")`); await idle(); };
+// on a phone the piano and the lengths make way while More is open: close it first, as a finger would
+const less = async () => {
+    if (await page.evaluate(() => !document.getElementById("edit-more").hidden)) await page.tap("#edit-morebtn");
+};
+const letter = async (l) => { await less(); await page.tap(`.piano-key[data-midi="${{ C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 }[l]}"]`); await idle(); };
 const more = async () => {
     if (await page.evaluate(() => document.getElementById("edit-more").hidden)) await page.tap("#edit-morebtn");
 };
@@ -90,11 +94,13 @@ await goTo(1, 0);
 await tapIn('#edit-voices button[data-voice="2"]');
 check((await sel())?.voice === 2, "Voice 2 on a note moves it to voice 2");
 await page.tap("#edit-undo"); await idle();
-// enter a second tune in voice 2 of bar 2: pick its rest (entering), voice 2, then letters
+// enter a second tune in voice 2 of bar 2: pick its rest (entering), voice 2, then piano keys
 await goTo(2, 0);
 await tapIn('#edit-voices button[data-voice="2"]');
 let s = await sel();
-check(s?.voice === 2 && s.kind === "rest" && await page.evaluate(() => getComputedStyle(document.getElementById("edit-letters")).display !== "none"), "Voice 2 on a rest: the place in voice 2, letters ready");
+check(s?.voice === 2 && s.kind === "rest" && await page.evaluate(() => !document.getElementById("edit-rest").disabled), "Voice 2 on a rest: the place in voice 2, ready for notes");
+await less();
+check(await page.evaluate(() => document.getElementById("editsheet").offsetHeight > 100), "More closed: the piano is back");
 await page.tap('#edit-lengths .len[data-den="2"]');
 await letter("A"); await letter("A");
 check(await page.evaluate(() => /voice 2/.test(document.getElementById("edit-info").textContent)) || (await sel())?.voice === 2, "entering carries on in voice 2");

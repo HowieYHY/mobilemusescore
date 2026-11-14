@@ -84,7 +84,7 @@ edit bar at 320 to 1366 px).
 (same bar height). `mss_edit_enter_note(letter)` (`Session::editEnterNote`) does what desktop's letter keys do:
 `Score::resolveNoteInputParams` (key signature, octave nearest the previous note) then `cmdAddPitch`, one undo
 step, the rest's length kept (a whole-bar rest gets a quarter), the new note stays selected for Higher/Lower.
-Tests: edit-test (enter, bar height, adjust, undo) and edit-layout-test (letters at every width).
+Tests: edit-test (enter, bar height, adjust, undo) and edit-layout-test. (The letters gave way to the piano in phase 5.)
 
 **Silent draft.** `app/src/editdraft.ts`: after each edit (800 ms later, and when the page is hidden) the edited
 score is saved with `mss_save` into IndexedDB, one draft per score key. Opening the same score asks *Continue my
@@ -176,6 +176,34 @@ sound of an existing line; several voices in one staff; the panel scrolls on a s
 - **#10 Keys** (main.ts "Edit by keyboard"): A-G, 0, 1-7 (desktop's lengths, no 64th), ".", arrows, Shift+arrows
   (`editMove("extend-…")`), ↑ ↓ and Ctrl+↑ ↓, Delete, Ctrl+C/X/V/Z/Y; only while Edit is the top layer and no field
   has focus. `composer-tools-test.mjs` covers #3-#6 and #10.
+
+**Phase 5 (14 Nov 2026), the Composer like Flat (#33, docs/FLAT-STUDY.md; the owner's three answers).**
+
+- **The bottom sheet** (`#editsheet`, over the playing controls): the lengths, the dot, the rest key, **Chord** and
+  Paste in one row that scrolls sideways when it must, and the piano under it. The letters row and More's *Add to
+  chord* are gone; the Edit bar on top keeps the name, the actions, the note tools and More.
+- **The piano strip** (`app/src/piano.ts`, 88 keys A0 to C8 as desktop's default, middle C in view to start): a
+  key calls `editEnterPitch(midi, chord, den, dots)`, which is desktop's piano keyboard with a note or rest
+  selected (`NotationMidiInput`: note input starts at the selection, then `Score::addMidiPitch` with the written
+  pitch): the note replaces what is at the picked place, is tied over the barline when it is too long
+  (`setNoteRest`), and the next place is picked. Chord (desktop: Shift, or a second key held) is `chord` 2 while
+  entering (the chord at the place the last key filled, `m_enteredTick`) and 1 on a picked note. The selection
+  carries `pitches` (the chord's written pitches) for the lit keys; the strip scrolls to the picked note only when
+  its key is out of sight (desktop never scrolls; a phone shows two octaves). Keys tapped quickly are queued
+  (`pianoTaps`) so none is lost while the page is drawn again. Desktop's step input doesn't add bars at the end,
+  and neither does this. The letter keys A to G on a keyboard still use `editEnterNote`.
+- **One line at a time** (`editShowPart(i)`, `editPartsJson`; main.ts `showPart`, `startParts`, `endParts`):
+  `Part::setShow` directly, outside the undo stack, then a full layout. Under 700 px Edit opens on one line (the
+  picked note's, or the first shown); the lines button lists them and *All lines*; leaving Edit restores them.
+  Kept out of everything else: `saveTo` writes the score's own visibility (and lays the page out for the file when
+  multi-bar rests are on, since those are written as laid out), the mixer's *hidden* goes by the score's own
+  visibility (`partShown`), a line added while one is shown becomes the one shown, an undo that takes the shown
+  line away shows them all. The playback line, the staves list and the cursor take their top from the first staff
+  a system shows (`topStaff`), which a score with its first instrument hidden needed anyway. Every line still
+  plays. `parts-view-test.mjs`.
+- Not taken from the study yet: categories as a strip with headed grids, the floating bar on a held note, a bar
+  added when the last one is filled, taps on the tempo, time signature or clef, reasons on dimmed buttons, picture
+  buttons in New score.
 
 Still to come, by the same list: #7 transpose, #8 a line's clef and sound, delete and reorder lines, #9 title and
 composer text, then #11-#19 (tempo, repeats, rehearsal marks, breath marks done in #5, pickup bar, verse 2, respell,

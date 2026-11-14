@@ -2,7 +2,7 @@
 // worklet, connects them with a MessageChannel (MuseScore's audio RPC), and
 // exposes a small promise-based API to the UI.
 
-import type { CursorInfo, EditResult, EditSelection, PracticeInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
+import type { CursorInfo, EditParts, EditResult, EditSelection, PracticeInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
 
 type Listener = (data: any) => void;
 
@@ -505,6 +505,11 @@ export class Engine {
     editAddLine(name: string, clef: number): Promise<EditResult> { return this.request({ cmd: "editAddLine", name, clef }); }
     /** Note input, one step: a note as long as den/dots at the selected place, then the next place is selected */
     editEnterNote(letter: number, den: number, dots: number): Promise<EditResult> { return this.request({ cmd: "editEnterNote", letter, den, dots }); }
+    /** A piano key: `chord` 0 puts the note at the picked place and moves on, 1 adds it to the picked note's chord, 2 to the chord just entered. */
+    editEnterPitch(midi: number, chord: 0 | 1 | 2, den: number, dots: number): Promise<EditResult> { return this.request({ cmd: "editEnterPitch", midi, chord, den, dots }); }
+    /** Shows one line alone while editing (-1: all, as the score has them). The pages are laid out anew. */
+    editShowPart(index: number): Promise<EditParts> { return this.request({ cmd: "editShowPart", index }); }
+    editParts(): Promise<EditParts> { return this.request({ cmd: "editParts" }); }
     editEnterRest(den: number, dots: number): Promise<EditResult> { return this.request({ cmd: "editEnterRest", den, dots }); }
     /** A tune from the selection on: [midi, sixteenths] pairs, midi -1 for a rest. One undo step. */
     editInsertNotes(events: [number, number][]): Promise<EditResult & { done?: number; total?: number }> {

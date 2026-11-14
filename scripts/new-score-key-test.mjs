@@ -46,7 +46,7 @@ const moveNote = async () => {
 };
 const addNote = async () => {
     const before = await page.evaluate(() => app.edit.undo);
-    await page.tap("#edit-letters button >> nth=0");
+    await page.tap('.piano-key[data-midi="60"]');
     await page.waitForFunction((n) => app.edit.undo > n, before);
     await page.waitForTimeout(1300); // the draft is written 800 ms after a change
 };

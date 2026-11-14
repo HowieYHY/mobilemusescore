@@ -585,14 +585,21 @@
     ]
   },
   "step-entry-test": {
-    "files": [],
+    "files": [
+      "app/src/piano.ts",
+      "app/src/piano.css"
+    ],
     "words": [
       "editEnterNote",
       "editEnterRest",
+      "editEnterPitch",
+      "pianoKey",
+      "edit.chord",
       "enterStep",
       "edit.len",
       "edit.step",
-      "entering("
+      "entering(",
+      "editsheet"
     ]
   },
   "range-copy-test": {
@@ -714,5 +721,30 @@
       "mss_anchors",
       "afterEdit"
     ]
+  },
+  "parts-view-test": {
+    "files": [],
+    "words": [
+      "editShowPart",
+      "editParts",
+      "showPart",
+      "startParts",
+      "endParts",
+      "shownParts",
+      "partShown",
+      "applyShownPart",
+      "topStaff",
+      "edit-partsbtn"
+    ]
+  },
+  "piano-strip-test": {
+    "files": [
+      "app/src/piano.ts",
+      "app/src/piano.css"
+    ],
+    "words": [
+      "PianoStrip"
+    ],
+    "onlyOnChange": true
   }
 }

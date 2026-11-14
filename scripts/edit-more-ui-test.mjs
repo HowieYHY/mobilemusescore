@@ -49,6 +49,12 @@ const settle = () => page.waitForFunction(() => !app.edit.busy, null, { timeout:
 // a tap on a button, then its effect: the change counter went up (undo list longer) and the bar is idle again
 const press = async (selector, label) => {
     const before = await page.evaluate(() => app.edit.undo);
+    // More's tools need More open; the piano makes way while it is, so a key needs it closed
+    const wantMore = !selector.startsWith(".piano-key");
+    if (await page.evaluate((w) => document.getElementById("edit-more").hidden === w, wantMore)) {
+        await page.evaluate(() => document.getElementById("edit-morebtn").click());
+        await page.waitForTimeout(150);
+    }
     await tap(selector);
     const did = await page.waitForFunction((n) => app.edit.undo > n && !app.edit.busy, before, { timeout: 8000 }).then(() => true, () => false);
     check(did, `${label} changed the score`);
@@ -94,14 +100,18 @@ await settle();
 check(await page.evaluate(() => !document.getElementById("edit-triplet").disabled && document.getElementById("edit-sharp").disabled), "a rest picked: triplet and words are on, note-only tools off");
 
 // bar 1: E, sharpened, with a G in its chord, mezzo forte, words above and a lyric; then the second note
-await page.evaluate(() => { document.querySelector("#edit-letters button[aria-label='Put a E here']").click(); });
+await page.evaluate(() => { document.querySelector('.piano-key[data-midi="64"]').click(); });
 await page.waitForFunction(() => app.edit.sel && !app.edit.busy && app.edit.step);
 await page.evaluate(() => document.getElementById("edit-prev").click()); // note input moved on: back to the E
 await page.waitForFunction(() => app.edit.sel && app.edit.sel.kind === "note" && !app.edit.busy);
 const e0 = await page.evaluate(() => app.edit.sel.pitch);
 await press("#edit-sharp", "Sharp");
 check(await page.evaluate((p) => app.edit.sel.pitch === p + 1, e0), "the sharp raised the note by a semitone");
-await press('#edit-chord button[aria-label="Add a G to this chord"]', "Add a G to the chord");
+// Chord: the next key joins the picked note
+await page.evaluate(() => document.getElementById("edit-chordkey").click());
+await press('.piano-key[data-midi="67"]', "Add a G to the chord");
+check(await page.evaluate(() => app.edit.sel.pitches?.length === 2), "the E's chord has two notes");
+await page.evaluate(() => document.getElementById("edit-chordkey").click());
 await press('#edit-dynamics button[aria-label="Mark mf"]', "mf");
 await page.fill("#edit-words", "dolce");
 await press("#edit-text", "Words above");
@@ -124,8 +134,8 @@ const step = async (id) => {
 for (let i = 0; i < 12 && !(await page.evaluate(() => app.edit.sel.kind === "rest" && app.edit.sel.bar === 2)); i++) await step("#edit-next");
 check(await page.evaluate(() => app.edit.sel.kind === "rest" && app.edit.sel.bar === 2), "walked to the rest of bar 2 with the arrows");
 // note input: the second C goes straight after the first, at the same height (nearest the note before)
-await press('#edit-letters button[aria-label="Put a C here"]', "C on bar 2");
-await press('#edit-letters button[aria-label="Put a C here"]', "a second C after it");
+await press('.piano-key[data-midi="60"]', "C on bar 2");
+await press('.piano-key[data-midi="60"]', "a second C after it");
 await step("#edit-prev");
 const pitches = await page.evaluate(() => app.edit.sel.pitch);
 await step("#edit-prev");

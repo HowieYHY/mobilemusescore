@@ -13,6 +13,8 @@ export class PianoStrip {
     readonly el: HTMLElement;
     private keys = new Map<number, HTMLButtonElement>();
     private pending: { midi: number; smooth: boolean; force: boolean } | null = null;
+    private left = 0; // where the strip was scrolled to while it showed
+    private showing = false;
 
     constructor(host: HTMLElement, opts: PianoOptions) {
         const low = opts.low ?? 21;
@@ -71,8 +73,31 @@ export class PianoStrip {
             row.append(space);
         }
         host.append(this.el);
-        // Edit can open while its host is hidden; keep the latest request until it has a width.
-        const observer = new ResizeObserver(() => this.applyCenter());
+        // Edit can open while its host is hidden; keep the latest request until it has a width. A strip that was
+        // hidden comes back where it was: a browser may forget the place, or put it back a moment after the
+        // request was applied, so the place is set here, and the request applied again on the next frame.
+        this.el.addEventListener("scroll", () => {
+            if (this.el.clientWidth) this.left = this.el.scrollLeft;
+        }, { passive: true });
+        const observer = new ResizeObserver(() => {
+            const visible = this.el.clientWidth > 0;
+            if (visible && !this.showing) {
+                const wanted = this.pending;
+                this.el.scrollLeft = this.left;
+                this.applyCenter();
+                requestAnimationFrame(() => {
+                    if (wanted && !this.pending) {
+                        this.pending = wanted;
+                    } else if (!wanted && !this.pending && this.el.clientWidth) {
+                        this.el.scrollLeft = this.left;
+                    }
+                    this.applyCenter();
+                });
+            } else if (visible) {
+                this.applyCenter();
+            }
+            this.showing = visible;
+        });
         observer.observe(this.el);
         this.centerOn(Math.max(low, Math.min(high, 60)), false, true);
     }
@@ -103,6 +128,7 @@ export class PianoStrip {
             left: this.el.scrollLeft + box.left + box.width / 2 - view.left - this.el.clientWidth / 2,
             behavior: smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "instant",
         });
+        if (!smooth) this.left = this.el.scrollLeft;
     }
 
     setDisabled(off: boolean): void {

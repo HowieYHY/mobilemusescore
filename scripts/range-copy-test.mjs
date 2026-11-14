@@ -94,7 +94,7 @@ const pointOf = async (bar, nth) => {
 
 // bar 1: C D E F by note input
 for (const l of ["C", "D", "E", "F"]) {
-    await page.tap(`#edit-letters button:has-text("${l}")`);
+    await page.tap(`.piano-key[data-midi="${{ C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 }[l]}"]`);
     await idle();
 }
 await settle();

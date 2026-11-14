@@ -4,7 +4,7 @@ import { CLEFS, KEYS, TIMES, buildScore, type LineChoice } from "./newscore";
 import { CLICK_HZ, CLICK_SECS, SAMPLE_RATE, decodeTo16k, findNotes, removeClicks, toGrid, trackPitch, type GridNote, type SungNote } from "./voice/transcribe";
 import * as firstTime from "./firsttime";
 import { Engine } from "./engine/engine";
-import type { CursorInfo, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
+import type { CursorInfo, EditParts, EditSelection, EditResult, PracticeInfo, ScoreInfo, SoundList, SoundNode, TrackInfo, ViewMode } from "./engine/protocol";
 import { CSS_PX_PER_INCH, UNITS_PER_INCH, ensureFonts, ensureImages, pageDrawer, forgetImages } from "./render/pagerenderer";
 import { Annotations, COLORS, MORE_COLORS, type ScoreAnchors, type Tool } from "./annotations";
 import { MixStore, mixOf, sameMix, slot, type Mix } from "./mixerstore";
@@ -13,6 +13,7 @@ import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings"
 import { numberField } from "./typing";
 import { PlayLog, stamp } from "./playlog";
 import { makeLayers } from "./layers";
+import { PianoStrip } from "./piano";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -63,6 +64,9 @@ const ui = {
     editOctave: $<HTMLButtonElement>("edit-octave"),
     editDelete: $<HTMLButtonElement>("edit-delete"),
     editLengths: $("edit-lengths"),
+    editSheet: $("editsheet"),
+    editTools: document.querySelector<HTMLElement>(".edit-tools")!,
+    editPartsBtn: $<HTMLButtonElement>("edit-partsbtn"),
     notesbar: $("notesbar"),
     swatches: $("swatches"),
     notesUndo: $<HTMLButtonElement>("notes-undo"),
@@ -4000,9 +4004,13 @@ const edit = {
     draftTimer: 0,
     fresh: false, // made with New score: no file behind it
     // note input, as desktop's: the length the next note or rest gets (a quarter to start), and whether the
-    // selection is the place after the one just entered (then the letters stay, even over an existing note)
+    // selection is the place after the one just entered (then the lengths are the next note's, and Chord
+    // adds to the note just entered)
     len: { den: 4, dots: 0 },
     step: false,
+    chord: false, // Chord is on: a piano key joins the last note instead of going in after it
+    // the score's lines, and the one shown alone (phones start on one line: there is room for little more)
+    parts: { shown: -1, parts: [] } as EditParts,
 };
 
 const LENGTHS: [number, string][] = [[1, "Whole"], [2, "Half"], [4, "Quarter"], [8, "Eighth"], [16, "16th"], [32, "32nd"]];
@@ -4129,33 +4137,156 @@ $("edit-cut").onclick = async () => {
 const lengthName = (den: number, dots: number) =>
     (dots ? "dotted " : "") + (LENGTHS.find(([d]) => d === den)?.[1].toLowerCase() ?? "long");
 
-const LETTERS = ["C", "D", "E", "F", "G", "A", "B"];
-LETTERS.forEach((name, i) => {
-    const b = document.createElement("button");
-    b.className = "btn small letter";
-    b.textContent = name;
-    b.setAttribute("aria-label", `Put a ${name} here`);
-    b.title = `Put a ${name} here, then go on to the next place`;
-    b.onclick = () => void enterStep(() => engine.editEnterNote(i, edit.len.den, edit.len.dots));
-    $("edit-letters").appendChild(b);
-});
-// a rest of the chosen length, as desktop's 0 key: rhythms with rests go in without leaving the letters
+// A rest of the chosen length, as desktop's 0 key: rhythms with rests go in without leaving the piano
+const lenGap = document.createElement("span");
+lenGap.className = "len-gap";
 const restButton = document.createElement("button");
-restButton.className = "btn small letter rest-key";
+restButton.className = "len rest-key";
 restButton.id = "edit-rest";
+restButton.disabled = true;
 restButton.setAttribute("aria-label", "Put a rest here");
-restButton.title = "Put a rest here, then go on to the next place";
+restButton.title = "Put a rest of this length here, then go on to the next place";
 restButton.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="20" aria-hidden="true"><path d="M10 3l4.5 5.2-3 3.6 3.6 4.7c-2.4-.9-4.6-.5-4.2 2.5L8.5 21c-2-2.2-1.4-5.2 2.4-4.6L7.6 12.5l3.2-3.7z" fill="currentColor"/></svg>';
 restButton.onclick = () => void enterStep(() => engine.editEnterRest(edit.len.den, edit.len.dots));
-$("edit-letters").appendChild(restButton);
+// Chord: the next keys join the note just put in (or the picked note), as holding Shift does on desktop
+const chordButton = document.createElement("button");
+chordButton.className = "len wide";
+chordButton.id = "edit-chordkey";
+chordButton.disabled = true;
+chordButton.textContent = "Chord";
+chordButton.setAttribute("aria-pressed", "false");
+chordButton.title = "Chord: the next keys join the note you just put in, or the note you picked";
+chordButton.onclick = () => {
+    edit.chord = !edit.chord;
+    updateEditBar();
+};
+ui.editLengths.insertBefore(chordButton, pasteButton);
+ui.editLengths.insertBefore(restButton, chordButton);
+ui.editLengths.insertBefore(lenGap, restButton);
 
-// Note input shows the letters: on a rest, and on the place after a note just entered
+// Note input: the lengths are those of the notes about to go in, on a rest and on the place after a note
+// just entered
 const entering = () => !!edit.sel && (edit.sel.kind === "rest" || edit.step);
 async function enterStep(change: () => Promise<EditResult>) {
     if (await runEdit(change)) {
         edit.step = true;
         updateEditBar();
     }
+}
+
+// The piano, as desktop's piano keyboard: a key puts its note at the picked place, as long as the chosen
+// length, and goes on to the next place; what was there is replaced. The picked note's keys are lit.
+// Keys tapped quickly go in one after another, none lost while the page is drawn again.
+let pianoTaps: Promise<void> = Promise.resolve();
+const piano = new PianoStrip($("edit-piano"), {
+    onKey: (midi) => {
+        pianoTaps = pianoTaps.then(() => pianoKey(midi)).catch((err) => console.warn("piano key failed:", err));
+    },
+});
+async function pianoKey(midi: number) {
+    const s = edit.sel;
+    if (!edit.on) {
+        return;
+    }
+    if (!s || s.kind === "range") {
+        setStatus(s ? "Tap one note or rest first: the key puts its note there." : "Tap a note or rest first: the key puts its note there.", "info", 4000);
+        return;
+    }
+    const { den, dots } = edit.len;
+    if (edit.chord && edit.step) {
+        await enterStep(() => engine.editEnterPitch(midi, 2, den, dots)); // joins the note just put in
+    } else if (edit.chord && s.kind === "note") {
+        await runEdit(() => engine.editEnterPitch(midi, 1, den, dots)); // joins the picked note
+    } else {
+        await enterStep(() => engine.editEnterPitch(midi, 0, den, dots));
+    }
+}
+// The lit keys follow the picked note. The strip moves only for a note picked whose key is out of sight, and
+// for a rest on another line (to where that line's notes sit); never while notes are going in, so a tune
+// put in low or high keeps its keys under the fingers.
+let pianoAt = "";
+function updatePiano() {
+    const s = edit.sel;
+    const single = s && s.kind !== "range" ? s : null;
+    piano.setLit(single?.pitches ?? []);
+    if (!single || edit.step || edit.busy) {
+        return;
+    }
+    const at = `${single.staff}:${single.pitch ?? "rest"}`;
+    if (at !== pianoAt) {
+        const line = pianoAt.split(":")[0] !== String(single.staff);
+        pianoAt = at;
+        const to = single.pitch ?? (line ? single.mid : undefined);
+        if (to !== undefined) {
+            piano.centerOn(Math.max(21, Math.min(108, to)), true);
+        }
+    }
+}
+// The zoom buttons sit above the sheet
+new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--editsheet-h", ui.editSheet.offsetHeight + "px");
+}).observe(ui.editSheet, { box: "border-box" });
+
+// ---- Lines shown: one line by itself while editing, or all of them (as the Flat app does on a phone)
+const partsDlg = $<HTMLDialogElement>("parts");
+const shownParts = () => edit.parts.parts.map((p, i) => ({ ...p, i })).filter((p) => p.show);
+// The pages are laid out anew for the lines shown: everything placed on them follows
+async function showPart(index: number) {
+    if (edit.busy || index === edit.parts.shown) {
+        return;
+    }
+    edit.busy = true;
+    edit.step = false;
+    updateEditBar();
+    try {
+        edit.parts = await engine.editShowPart(index);
+        await afterEdit();
+    } catch (err) {
+        console.warn("showing a line failed:", err);
+    } finally {
+        edit.busy = false;
+        updateEditBar();
+    }
+}
+ui.editPartsBtn.onclick = () => {
+    const list = $("parts-list");
+    list.innerHTML = "";
+    const add = (label: string, index: number) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = label;
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", String(edit.parts.shown === index));
+        b.onclick = () => {
+            partsDlg.close();
+            void showPart(index);
+        };
+        list.appendChild(b);
+    };
+    add("All lines", -1);
+    shownParts().forEach((p, n) => add(p.name || `Line ${n + 1}`, p.i));
+    partsDlg.showModal();
+};
+$("parts-close").onclick = () => partsDlg.close();
+// Edit opens on one line where the screen is narrow (phones): the picked note's, or the first
+const oneLineScreen = () => matchMedia("(max-width: 699px)").matches;
+async function startParts() {
+    edit.parts = await engine.editParts();
+    updateEditBar();
+    const lines = shownParts();
+    if (edit.on && oneLineScreen() && lines.length > 1 && edit.parts.shown < 0) {
+        const staff = edit.sel?.staff;
+        const mine = staff === undefined ? undefined : lines.find((p) => staff >= p.staff && staff < p.staff + p.staves);
+        await showPart((mine ?? lines[0]).i);
+    }
+}
+// Leaving Edit: every line is back, as the score has them
+async function endParts() {
+    if (edit.parts.shown < 0) {
+        return;
+    }
+    edit.parts = await engine.editShowPart(-1);
+    await afterEdit();
 }
 
 // ---- More: the tools a composer needs less often, behind one button
@@ -4174,15 +4305,6 @@ em.btn.onclick = () => {
     em.btn.setAttribute("aria-pressed", String(!em.panel.hidden));
     em.btn.setAttribute("aria-expanded", String(!em.panel.hidden));
 };
-LETTERS.forEach((name, i) => {
-    const b = document.createElement("button");
-    b.className = "btn small letter-more";
-    b.textContent = name;
-    b.setAttribute("aria-label", `Add a ${name} to this chord`);
-    b.title = `Add a ${name} above this note, in the same chord`;
-    b.onclick = () => void runEdit(() => engine.editAddToChord(i));
-    $("edit-chord").appendChild(b);
-});
 const DYNAMICS = ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"];
 DYNAMICS.forEach((name, i) => {
     const b = document.createElement("button");
@@ -4253,7 +4375,10 @@ $("edit-addline").onclick = async () => {
     const lines = state.tracks.filter((t) => !t.metronome).length;
     const name = em.line.value.trim() || `Line ${lines + 1}`;
     const clef = Math.max(0, CLEFS.findIndex(([v]) => v === em.clef.value));
-    await runEdit(() => engine.editAddLine(name, clef));
+    const alone = edit.parts.shown >= 0;
+    if (await runEdit(() => engine.editAddLine(name, clef)) && alone) {
+        await showPart(edit.parts.parts.length - 1); // one line at a time: on to the new one
+    }
     em.line.value = "";
 };
 function updateMore(s: EditSelection | null, idle: boolean) {
@@ -4263,7 +4388,6 @@ function updateMore(s: EditSelection | null, idle: boolean) {
     set(["edit-sharp", "edit-flat", "edit-natural", "edit-tie", "edit-lyric"], note);
     set(["edit-triplet", "edit-text", "edit-rename"], any);
     em.key.disabled = em.time.disabled = !any;
-    $("edit-chord").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !note));
     $("edit-dynamics").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = !any));
     const range = s?.kind === "range";
     $("edit-voices").querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
@@ -4301,16 +4425,24 @@ function updateEditBar() {
         rest.textContent = ` · ${lengthName(len.den, len.dots)}${s.voice > 1 ? ` · voice ${s.voice}` : ""}${s.tuplet ? " · triplet" : ""} · bar ${s.bar}${lines > 1 && s.part ? " · " + s.part : ""}`;
         ui.editInfo.append(b, rest);
     } else {
-        ui.editInfo.textContent = "Tap a note or rest to change it; hold another to select up to it";
+        ui.editInfo.textContent = "Tap a note or rest; hold another to select up to it";
     }
     const idle = edit.busy;
     const input = entering();
-    $("edit-letters").parentElement!.classList.toggle("on-rest", input);
-    $("edit-letters").parentElement!.classList.toggle("on-range", range);
+    ui.editTools.classList.toggle("on-range", range);
     $<HTMLButtonElement>("edit-copysel").disabled = $<HTMLButtonElement>("edit-cut").disabled = !range || idle;
     pasteButton.hidden = !edit.clip;
     pasteButton.disabled = !s || idle;
-    $("edit-letters").querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.disabled = idle));
+    // Chord has something to join: the note just put in, or a picked note
+    const single = !!s && !range;
+    chordButton.disabled = !single;
+    chordButton.setAttribute("aria-pressed", String(edit.chord));
+    ui.editPartsBtn.hidden = shownParts().length < 2;
+    ui.editPartsBtn.disabled = idle;
+    ui.editPartsBtn.setAttribute("aria-pressed", String(edit.parts.shown >= 0));
+    const alone = edit.parts.parts[edit.parts.shown];
+    ui.editPartsBtn.title = alone ? `Showing ${alone.name || "one line"} only. Tap to show another line, or all of them` : "Show one line at a time, or all of them";
+    updatePiano();
     updateMore(s, idle);
     $("edit-voice").toggleAttribute("disabled", !s || idle);
     $("edit-voice").title = s ? "Sing or hum a tune and put it in as notes" : "Pick the note or rest where the tune should start";
@@ -4320,7 +4452,7 @@ function updateEditBar() {
     ui.editUndo.disabled = edit.undo === 0 || idle;
     ui.editRedo.disabled = edit.redo === 0 || idle;
     ui.editCopy.disabled = !edit.dirty || idle;
-    ui.editLengths.querySelectorAll<HTMLButtonElement>(".len:not(.paste)").forEach((b) => {
+    ui.editLengths.querySelectorAll<HTMLButtonElement>(".len[data-den], .len.dot, .len.rest-key").forEach((b) => {
         b.disabled = !s || range || idle;
         if (b.dataset.den) {
             // entering: the length the next note gets; otherwise the selected one's
@@ -4426,6 +4558,7 @@ async function afterEdit() {
         state.tracks = tracks;
         buildMixer();
     }
+    edit.parts = await engine.editParts();
     edit.sel = await engine.editSelection();
     showEditSel(true);
 }
@@ -4632,6 +4765,7 @@ async function saveCopy(): Promise<boolean> {
 function setEditActive(on: boolean) {
     edit.on = on;
     ui.editbar.hidden = !on;
+    ui.editSheet.hidden = !on;
     ui.editToggle.setAttribute("aria-pressed", String(on));
     document.documentElement.classList.toggle("editing", on);
     if (on) {
@@ -4642,10 +4776,13 @@ function setEditActive(on: boolean) {
         if (state.playing) {
             void engine.pause();
         }
+        void startParts();
     } else {
         edit.sel = null;
+        edit.chord = false;
         clearEditSel();
         void engine.editClearSelection();
+        void endParts();
     }
     updateEditBar();
 }
@@ -4659,9 +4796,12 @@ function resetEdit() {
     edit.dirty = false;
     edit.undo = edit.redo = 0;
     edit.step = false;
+    edit.chord = false;
+    edit.parts = { shown: -1, parts: [] }; // the engine shows every line of a score it has just opened
     edit.len = { den: 4, dots: 0 }; // each score starts note input on quarters, as desktop does
     clearEditSel();
     ui.editbar.hidden = true;
+    ui.editSheet.hidden = true;
     ui.editToggle.setAttribute("aria-pressed", "false");
     document.documentElement.classList.remove("editing");
 }
@@ -5289,7 +5429,7 @@ function tourSteps(): TourStep[] {
         { target: el("play"), also: () => [el("rewind")(), document.querySelector<HTMLElement>(".timeline")], title: "Play and move around", text: "Play and pause here; the blue line shows where you are, and the page follows it. Drag the slider to jump anywhere, or type a bar number under it" + (sections.length ? " or pick a section from the menu beside it" : "") + ". The button on the left goes back to the start." },
         { target: el("speed-open"), also: () => [el("loop-open")()], title: "Practise", text: "Speed: play slower or faster, or type the tempo you want. Loop: repeat a passage, from a marker on its first note to one on its last." },
         { target: el("mixer-toggle"), title: "Mixer", text: "Hear your own part: change each part's volume, mute or solo it, or choose a different sound." },
-        ...(!composer ? [] : [{ target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes (a metronome beeps the beat while you record), and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." }]),
+        ...(!composer ? [] : [{ target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. To put notes in, pick a note or rest, choose a length at the bottom and tap keys on the piano one after another: each note goes in after the last (slide the piano for higher or lower keys). The rest key puts in a rest, and Chord makes the next keys join the note just put in. On a phone a score with several lines shows one line at a time; the lines button at the top right of the bar shows another, or all of them. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes (a metronome beeps the beat while you record), and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." }]),
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Two pages shows two side by side with the device on its side, and hides the controls (tap off the music to bring them back); each swipe slides along one page, so the right page becomes the left (Settings can make a swipe turn both). Continuous lays the music out in one long line." },
         { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, and a playback report to send if the music stutters. ? shows this tour again." },

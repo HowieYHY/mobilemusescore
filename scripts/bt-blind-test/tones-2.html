@@ -1,0 +1,117 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BT blind test 2</title>
+<style>
+  body { font: 17px system-ui; margin: 0; padding: 16px; background: #fff; color: #111; }
+  h1 { font-size: 19px; margin: 0 0 8px; }
+  p { margin: 6px 0 12px; color: #333; }
+  button { display: block; width: 100%; padding: 18px; margin: 10px 0; font-size: 19px; border: 2px solid #345; border-radius: 12px; background: #eef; }
+  #rate button { display: inline-block; width: 31%; margin: 4px 1%; padding: 22px 4px; }
+  #seg { font-size: 22px; font-weight: 600; margin: 10px 0; }
+  #bar { height: 10px; background: #dde; border-radius: 5px; overflow: hidden; }
+  #bar i { display: block; height: 100%; width: 0; background: #47c; }
+  #done { font: 13px monospace; white-space: pre-wrap; }
+</style>
+<h1>Bluetooth blind test</h1>
+<p>Wear the AirPods. Each segment plays a steady tone for 30 s. When it ends, rate it: <b>Clean</b> (no crackle at all), <b>Slight</b> (a few ticks) or <b>Bad</b> (lots). 15 segments, about 9 minutes. Keep the phone where it is and don't switch apps.</p>
+<button id="start">Start</button>
+<div id="seg"></div>
+<div id="bar"><i></i></div>
+<div id="rate" hidden>
+  <button data-r="0">Clean</button><button data-r="1">Slight</button><button data-r="2">Bad</button>
+</div>
+<div id="done"></div>
+<script>
+const TONE = (t) => 0.25 * Math.sin(2 * Math.PI * 440 * t) * (0.7 + 0.3 * Math.sin(2 * Math.PI * 2 * t));
+function sineBuffer(ctx, secs) {
+  const n = Math.floor(ctx.sampleRate * secs), buf = ctx.createBuffer(2, n, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) d[i] = TONE(i / ctx.sampleRate); }
+  return buf;
+}
+const WORKLET = `class T extends AudioWorkletProcessor { constructor(){super(); this.i=0;} process(_, o){ const l=o[0][0], r=o[0][1]||o[0][0]; for(let k=0;k<l.length;k++){ const t=this.i++/sampleRate; const v=0.25*Math.sin(2*Math.PI*440*t)*(0.7+0.3*Math.sin(2*Math.PI*2*t)); l[k]=v; r[k]=v; } return true; } } registerProcessor("t", T);`;
+
+// One half second of the tone is an exact number of cycles of both the tone (220) and the slow pulse (1), so a
+// loop or a run of back-to-back chunks has no seam.
+const CHUNK = 0.5;
+const WORKLET_COPY = `class T extends AudioWorkletProcessor { constructor(){super(); this.buf=null; this.i=0; this.port.onmessage=(e)=>{this.buf=e.data;}; } process(_, o){ const l=o[0][0], r=o[0][1]||o[0][0]; const b=this.buf; if(!b){ return true; } const n=b.length; for(let k=0;k<l.length;k++){ const v=b[this.i]; this.i=(this.i+1)%n; l[k]=v; r[k]=v; } return true; } } registerProcessor("tc", T);`;
+function workletCopy(opts) {
+  const ctx = new AudioContext(opts); let node;
+  const url = URL.createObjectURL(new Blob([WORKLET_COPY], { type: "text/javascript" }));
+  ctx.audioWorklet.addModule(url).then(() => {
+    node = new AudioWorkletNode(ctx, "tc", { numberOfInputs: 0, outputChannelCount: [2] }); node.connect(ctx.destination);
+    const n = Math.round(ctx.sampleRate * CHUNK), buf = new Float32Array(n);
+    for (let i = 0; i < n; i++) buf[i] = TONE(i / ctx.sampleRate);
+    node.port.postMessage(buf);
+  });
+  return () => { try { node && node.disconnect(); } catch (e) {} ctx.close(); };
+}
+// Streaming the way a player without a worklet would: a fresh buffer for every half second, scheduled
+// back to back on the audio clock, about a second ahead, from a timer
+function chunked(opts) {
+  const ctx = new AudioContext(opts);
+  const n = Math.round(ctx.sampleRate * CHUNK), data = new Float32Array(n);
+  for (let i = 0; i < n; i++) data[i] = TONE(i / ctx.sampleRate);
+  let next = ctx.currentTime + 0.3, live = true; const srcs = [];
+  const fill = () => {
+    if (!live) return;
+    while (next < ctx.currentTime + 1.2) {
+      const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+      buf.copyToChannel(data, 0); buf.copyToChannel(data, 1);
+      const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination); s.start(next);
+      srcs.push(s); next += CHUNK;
+      if (srcs.length > 8) srcs.shift();
+    }
+  };
+  fill(); const t = setInterval(fill, 100);
+  return () => { live = false; clearInterval(t); ctx.close(); };
+}
+const V = {
+  A: { name: "control: buffer loop, playback", start() { const ctx = new AudioContext({ latencyHint: "playback" }); const s = ctx.createBufferSource(); s.buffer = sineBuffer(ctx, CHUNK); s.loop = true; s.connect(ctx.destination); s.start(); return () => { s.stop(); ctx.close(); }; } },
+  C: { name: "worklet computing the tone, playback", start() { return worklet({ latencyHint: "playback" }); } },
+  K: { name: "worklet copying from memory, playback", start() { return workletCopy({ latencyHint: "playback" }); } },
+  L: { name: "worklet copying from memory, interactive", start() { return workletCopy({ latencyHint: "interactive" }); } },
+  H: { name: "chunked buffers scheduled ahead, playback", start() { return chunked({ latencyHint: "playback" }); } },
+};
+function worklet(opts) {
+  const ctx = new AudioContext(opts); let node;
+  const url = URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" }));
+  ctx.audioWorklet.addModule(url).then(() => { node = new AudioWorkletNode(ctx, "t", { numberOfInputs: 0, outputChannelCount: [2] }); node.connect(ctx.destination); });
+  return () => { try { node && node.disconnect(); } catch (e) {} ctx.close(); };
+}
+function longWav(secs) {
+  const rate = 44100, n = rate * secs, v = new DataView(new ArrayBuffer(44 + n * 2));
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, 32767 * TONE(i / rate), true);
+  return URL.createObjectURL(new Blob([v], { type: "audio/wav" }));
+}
+
+// two rounds of all seven, each round in its own random order (kept in page memory; the labels are not shown)
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const order = [...shuffle(Object.keys(V)), ...shuffle(Object.keys(V)), ...shuffle(Object.keys(V))];
+window.__results = [];
+const SEG = 30000;
+let idx = 0, stop = null;
+const seg = document.getElementById("seg"), bar = document.querySelector("#bar i"), rate = document.getElementById("rate");
+
+function next() {
+  if (idx >= order.length) { seg.textContent = "All done. Thank you!"; document.getElementById("done").textContent = window.__results.map((r) => `${r.v} ${r.rating}`).join("  "); return; }
+  const key = order[idx];
+  seg.textContent = `Segment ${idx + 1} of ${order.length}: listen…`;
+  rate.hidden = true;
+  const t0 = Date.now(), wall = new Date().toISOString();
+  stop = V[key].start();
+  const rec = { i: idx + 1, v: key, name: V[key].name, startedAt: wall, startMs: t0, rating: null };
+  window.__results.push(rec);
+  const tick = setInterval(() => { bar.style.width = Math.min(100, (Date.now() - t0) / SEG * 100) + "%"; }, 200);
+  setTimeout(() => { clearInterval(tick); try { stop(); } catch (e) {} stop = null; rec.endMs = Date.now(); bar.style.width = "100%"; seg.textContent = `Segment ${idx + 1}: how did it sound?`; rate.hidden = false; }, SEG);
+}
+rate.onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  window.__results[window.__results.length - 1].rating = ["clean", "slight", "bad"][+b.dataset.r];
+  idx++; bar.style.width = "0"; next();
+};
+document.getElementById("start").onclick = (e) => { e.target.hidden = true; next(); };
+</script>

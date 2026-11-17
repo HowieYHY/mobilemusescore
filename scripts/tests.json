@@ -714,5 +714,28 @@
       "mss_anchors",
       "afterEdit"
     ]
+  },
+  "chunk-player-test": {
+    "files": [
+      "app/src/engine/chunkplayer.ts"
+    ],
+    "words": [
+      "ChunkPlayer",
+      "player=chunk",
+      "chunkPlayer"
+    ]
+  },
+  "android-bt-player-ab": {
+    "files": [
+      "app/src/engine/chunkplayer.ts"
+    ],
+    "words": [
+      "ChunkPlayer",
+      "player=chunk",
+      "chunkPlayer",
+      "AudioWorkletNode"
+    ],
+    "phone": true,
+    "onlyOnChange": true
   }
 }

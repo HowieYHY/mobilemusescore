@@ -1,5 +1,27 @@
-# Handoff (12 Nov 2026)
+# Handoff (18 Nov 2026)
 
+## Latest: the Bluetooth crackle, branch `buffer-player` (not merged, nothing published)
+- **Found:** over the user's AirPods on the Pixel 9a, Chrome's **AudioWorklet output crackles** (blind listening
+  tests: even a worklet that only copies memory), while buffer sources are clean. PocketScore plays through a
+  worklet. Other apps and PocketScore on the speaker are clean. Full record, numbers and what I got wrong on the
+  way: `docs/DEVELOPMENT.md`, *Open: crackle over Bluetooth*; lessons in `CLAUDE.md`.
+- **Built:** `?player=chunk` (`app/src/engine/chunkplayer.ts`, wired in `engine.ts`): the same audio worker,
+  played as buffer sources scheduled back to back. Default is still the worklet. `chunk-player-test.mjs` passes
+  for both players on desktop (and fails on a deliberately broken flush).
+- **Not done:** the blind A/B of PocketScore itself over the AirPods, `scripts/android-bt-player-ab.mjs`. The user
+  paused it to push the branch. Setup: `cd app && npm run build && npx vite preview --host --port 4173`,
+  `adb reverse tcp:4173 tcp:4173`, the AirPods connected to the **phone**, screen on, no other Chrome tab using the
+  camera, phone cool (`dumpsys thermalservice`). The user taps Clean / Slight / Bad after each of 6 segments.
+- **Then decide:** buffer player clean 3 times and worklet not -> make it the one player for every platform (one
+  code path), after the user checks iPad and iPhone by hand; otherwise the branch stays a flag.
+- **Not tested:** screen off, walking, iPhone, iPad, Safari, other earbuds or phones, a main thread frozen longer
+  than the queue (the buffer player schedules from the main thread).
+- Scripts for the phone (read-only, no taps): `android-bt-earlyplay-test`, `-soak`, `-watch`, `-player-ab`;
+  tone pages in `scripts/bt-blind-test/`.
+- The Gesture Synth repo is cloned beside this one (`d:\cloned repos\gesture-synth`); its tab held the phone's
+  camera open and loaded the phone during the first tests.
+
+## Older state (12 Nov 2026)
 ## Where things are
 - **Live: 1.0.31**, from `main`. It holds everything that was on `voice-metronome` (issue #35, Sing it in's
   metronome), `bug-hunt` and `notes-follow-edits`; those branches have nothing more than `main`.
@@ -51,3 +73,8 @@ B2 (narrow `scripts/tests.json`, an hour), then B1 (the ScoreSession object).
 ## Continuation prompt
 "Read HANDOFF.md and docs/BUG-HUNT.md (B1 to B9). On `main`: if this PC has not built the engine since 12 Nov
 2026, build it first. Then narrow `scripts/tests.json` (B2) and start the ScoreSession object (B1)."
+
+## Continuation prompt (Bluetooth)
+"Read HANDOFF.md and docs/DEVELOPMENT.md (*Open: crackle over Bluetooth*). On branch `buffer-player`, run the
+blind A/B `scripts/android-bt-player-ab.mjs` on the Pixel with the AirPods connected to the phone, and decide
+whether `?player=chunk` becomes the default."

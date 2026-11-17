@@ -329,6 +329,29 @@ build, tests, status) before working here.
   2026). Rule: no choice from the user agent; decide from what is measured, keep what a device has taught the
   app, and count as a stutter only sound that was cut. A device nobody here owns is imitated from its report
   (`worklet-burst-test.mjs`), and the fix is called unproven until its owner sends a new report.
+- **Compare two cases in one interleaved run, never one after the other.** On the Pixel with AirPods (17 Nov 2026),
+  tapping Play before the sounds loaded gave one sound gap in each of 4 rounds and waiting gave none in 4, so I
+  called early Play the cause. Repeated an hour later, early Play gave 0 gaps in 8 rounds, and 12 rounds alternating
+  early/waited gave 0 in both: the phone's own state had changed (swap 99% full, a camera service at 100% CPU,
+  other apps playing sound). Rule: alternate the cases within one run (`ALTERNATE=1` in
+  `android-bt-earlyplay-test.mjs`), record the phone's load and memory (`top`, `dumpsys meminfo`) with each run, and
+  don't name a cause from a single before/after pair. The same run showed the Bluetooth side clean (AudioFlinger's
+  A2DP thread and the Bluetooth quality report both at 0 underruns) when Chrome's audio buffer still ran dry.
+- **When the app's counters say "fine" and the user hears crackle, believe the ear and ask the cheap questions first.**
+  The Bluetooth crackle (18 Nov 2026) read clean everywhere I looked (0 gaps counted, engine load 8%, AudioFlinger
+  and the Bluetooth quality report at 0 underruns), and I blamed in turn the radio link, early Play, a camera tab
+  and clipping. The user's own answers (other apps clean over the same earbuds, PocketScore clean on the
+  speaker) pointed at the sound path from the start. What settled it was a blind, randomised listening test of the
+  paths themselves (`scripts/bt-blind-test/`): Chrome's AudioWorklet output crackled over Bluetooth even when it
+  only copied memory; buffer sources did not. Rule: ask "does it happen in other apps, and on the speaker?" before
+  measuring; when only the ear can tell, build a blind test with the variant hidden, random order and three
+  rounds, and take the counters as a record, not a verdict.
+- **A check that reads the thing under test's own bookkeeping cannot fail.** The buffer player's "silent after
+  Pause" check read the level the player itself reported, which is 0 as soon as its list of scheduled chunks is
+  cleared, so it passed on a player whose flush forgot to `stop()` the sources. And looking a second late
+  passed it too, because the leftover audio had played out by itself. Rule: check the real object (here every
+  `AudioBufferSourceNode` with sound in it, 40 ms after Pause) and show the check failing on a deliberately
+  broken copy (`chunk-player-test.mjs`: 3-5 loud buffers left, against none).
 
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 

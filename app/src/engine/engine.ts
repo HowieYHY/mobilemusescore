@@ -3,6 +3,7 @@
 // exposes a small promise-based API to the UI.
 
 import type { CursorInfo, EditResult, EditSelection, PracticeInfo, ScoreInfo, SoundList, TrackInfo, ViewMode, WorkerReply, WorkerRequest } from "./protocol";
+import { ChunkPlayer } from "./chunkplayer";
 
 type Listener = (data: any) => void;
 
@@ -18,6 +19,7 @@ export class Engine {
     private listeners = new Map<string, Set<Listener>>();
     private ctx: AudioContext | null = null;
     private node: AudioWorkletNode | null = null;
+    private player: ChunkPlayer | null = null; // the buffer-source player, when `?player=chunk` (see chunkplayer.ts)
     private out: GainNode | null = null; // between the worklet and the speaker: fades for leaving the app
     private rpcForAudio: MessagePort;
     private audioStarting: Promise<void> | null = null;
@@ -144,13 +146,16 @@ export class Engine {
             this.emit("audioState", ctx.state);
         };
 
+        // `?player=chunk` plays through scheduled buffer sources instead of the AudioWorklet (chunkplayer.ts)
+        const chunkPlayer = new URLSearchParams(location.search).get("player") === "chunk";
+        this.note("player", chunkPlayer ? "buffer sources (?player=chunk)" : "audio worklet");
         this.audioStarting = (async () => {
             this.emit("audioStatus", { text: "Loading MS Basic sound font…" });
             let sf: ArrayBuffer;
             try {
                 [sf] = await Promise.all([
                     this.fetchSoundFont(),
-                    ctx.audioWorklet.addModule(this.base + "worklet/msaudio-worklet.js"),
+                    chunkPlayer ? Promise.resolve() : ctx.audioWorklet.addModule(this.base + "worklet/msaudio-worklet.js"),
                 ]);
             } catch (err: any) {
                 // The download dropped (49 MB on mobile data) or the worklet didn't load. Nothing has
@@ -170,15 +175,19 @@ export class Engine {
 
             // MuseScore's audio engine renders ahead in its own worker; the
             // AudioWorklet only plays from the queue it is sent.
-            const node = new AudioWorkletNode(ctx, "msaudio", { numberOfInputs: 0, outputChannelCount: [2] });
-            this.node = node;
             this.out = ctx.createGain();
-            node.connect(this.out).connect(ctx.destination);
-            node.port.onmessage = (e) => {
-                if (e.data.type === "queued") {
-                    this.onQueued(e.data.frames, e.data.peak);
-                }
-            };
+            this.out.connect(ctx.destination);
+            let node: AudioWorkletNode | null = null;
+            if (!chunkPlayer) {
+                node = new AudioWorkletNode(ctx, "msaudio", { numberOfInputs: 0, outputChannelCount: [2] });
+                this.node = node;
+                node.connect(this.out);
+                node.port.onmessage = (e) => {
+                    if (e.data.type === "queued") {
+                        this.onQueued(e.data.frames, e.data.peak);
+                    }
+                };
+            }
 
             const worker = new Worker(this.base + "worklet/msaudio-worker.js", { type: "module" });
             this.audioWorker = worker;
@@ -207,7 +216,11 @@ export class Engine {
             });
 
             const audioPath = new MessageChannel(); // engine worker -> worklet
-            node.port.postMessage({ type: "init", inPort: audioPath.port2 }, [audioPath.port2]);
+            if (node) {
+                node.port.postMessage({ type: "init", inPort: audioPath.port2 }, [audioPath.port2]);
+            } else {
+                this.player = new ChunkPlayer(ctx, this.out, audioPath.port2, { queued: (frames, peak) => this.onQueued(frames, peak) });
+            }
 
             // The score engine must be listening before the audio engine announces itself
             await this.request({ cmd: "startAudio", sampleRate: ctx.sampleRate, blockSize: 1024, soundFontUri: "file://" + SOUND_FONT_PATH });
@@ -313,7 +326,11 @@ export class Engine {
 
     // Drop audio queued ahead of the speaker, so a seek, pause or stop is heard at once
     private flush() {
-        this.node?.port.postMessage({ type: "flush" });
+        if (this.player) {
+            this.player.flush();
+        } else {
+            this.node?.port.postMessage({ type: "flush" });
+        }
     }
 
     // The audio clock, in seconds (0 before audio starts). currentTime only

@@ -53,6 +53,71 @@ the user and closed on 18 Oct 2026.
    reaching another app's session, not reproduced in 2 more runs). What remains: `updateKeepAlive` is
    still Android-only, against the user's one-code-path rule (17 Oct).
 
+### Open: crackle over Bluetooth, and the buffer player (17-18 Nov 2026, branch `buffer-player`)
+
+**What the user heard.** Pixel 9a (Android 17, Chrome), AirPods over A2DP (AAC, 48 kHz, hardware offload).
+"Feeling Good" (7 parts) crackled about every other beat and sometimes "tripped on itself" (sped up to catch
+up), in the installed 1.0.31. **Other apps over the same AirPods were clean, and PocketScore on the phone's
+speaker was clean**, also with Play pressed before the sounds had finished loading.
+
+**What the app's own counters said: nothing.** Over 4 minutes of the crackle the app counted 0 new sound gaps,
+engine load was 8% (slowest block 6 ms), the phone was cool, no camera in use. AudioFlinger's counters for the
+Bluetooth output thread (`dumpsys media.audio_flinger`) and the Bluetooth quality report both read 0
+underruns. The controller did log one `A2DP choppy` event (951 retransmissions, 948 packets not received of
+22 051 sent) and its RF report said the signal was below -80 dBm for 38-69% of the time, but that did not
+explain why other apps were clean. Peak level reached 1.14 (full scale 1.0) in only 5 of 1471 reports.
+
+**Blind listening tests settled it** (`scripts/bt-blind-test/`: steady tone, 30 s segments, random order,
+labels hidden, the listener rates each; no PocketScore code in them):
+
+| Sound path in Chrome over the AirPods | Ratings |
+| --- | --- |
+| Web Audio buffer loop, "playback" / "interactive" / 44.1 kHz | clean in every segment (2 each) |
+| Plain `<audio>` element | clean x2 |
+| Chunked buffers scheduled ahead on the audio clock | clean x3 |
+| **AudioWorklet computing the tone**, "playback" / "interactive" | slight, slight, slight (+ bad, slight in the first test) |
+| **AudioWorklet that only copies from memory**, "playback" / "interactive" | slight x5, clean x1 |
+| Web Audio into a `MediaStreamDestination` into an `<audio>` | bad, bad |
+
+So on this phone and these earbuds, **Chrome's AudioWorklet output crackles over Bluetooth even when the worklet
+does nothing but copy memory**; buffer sources do not. PocketScore plays through an AudioWorklet
+(`app/public/worklet/msaudio-worklet.js`). Why it does is not known: Chrome logged `PushPullFIFO ... underflow`
+only in one segment, none in the ones rated bad. Not tried: other earbuds, other phones, other Chrome versions.
+
+**What was built: `?player=chunk`** (`app/src/engine/chunkplayer.ts`, wired in `engine.ts`). The audio worker is
+unchanged and speaks the same messages (`audio`, `consumed`, `underrun`, `flush`); the player receives the
+worker's blocks on the main thread and schedules each as a buffer source back to back on the audio clock
+(integer frame positions, so chunks meet exactly). It keeps the worklet's priming (six blocks, or half the
+queue, at Play and after a flush), counts a gap when everything scheduled has played, and stops every scheduled
+source on a flush. **Default is still the worklet**; `?player=chunk` switches (the playback log notes which in
+a `player` line). Cost: chunks are scheduled from the page's main thread, so a main thread frozen for longer
+than the queue (512 ms or more) leaves a gap; the worklet only copied from its own queue.
+
+**Tested:** `chunk-player-test.mjs` (desktop Chromium, both players alternating): sound plays, clock and
+position agree, no gaps in steady play, nothing audible left scheduled 40 ms after Pause (shown to fail on a
+player whose flush forgets `stop()`: 3-5 loud buffers left, against none), a jump while playing lands and plays,
+no page errors; all pass for both. **Not yet run:** the blind A/B of PocketScore itself over the AirPods
+(`android-bt-player-ab.mjs`: 3 rounds of both players, random order, the listener taps Clean / Slight / Bad
+after each; needs `npm run build`, `npx vite preview --host --port 4173`, `adb reverse tcp:4173 tcp:4173`, the
+AirPods connected to the phone). Nothing on iPhone, iPad or Safari (scheduling buffer sources there is
+untested), and nothing with the screen off or while moving.
+
+**Decision waiting on that A/B:** if the buffer player is clean three times and the worklet is not, make it
+the one player for every platform (the one-code-path rule), after checking iPad and iPhone by hand; if both
+are clean or both crackle, the cause is elsewhere and the branch stays a flag.
+
+**Things I got wrong on the way (so they are not repeated), each from a before/after pair on a phone whose own
+load was changing:** early Play seemed to cause a gap in 4 of 4 rounds and not when waiting; an hour later 0 of
+8, and 0 of 12 alternating. The phone then had the front camera held open by another Chrome tab (the camera
+service at 100% of a core, thermal status severe, swap full). The gaps at a 512 ms queue under heavy CPU load
+(1 in 153 s with 8 busy loops) grow the queue to 683-853 ms and stop: that is the self-correcting queue
+working, and unrelated to the crackle. The Bluetooth radio's weak signal readings were real but not the cause.
+
+**Tools** (all read-only on the phone, no taps): `android-bt-earlyplay-test.mjs` (fresh page, tap Play at once,
+`ALTERNATE=1` vs waiting, `THROTTLE=4`), `android-bt-soak.mjs` (long play, optional `LOAD=2,4,8` busy loops with
+a heat guard and a dead-man `timeout`), `android-bt-watch.mjs` (attach to what the reader is playing; gaps,
+level histogram, the controller's quality reports, Chrome's underflow lines), `android-bt-player-ab.mjs`.
+
 ### Open: Android sound stutters in Page view (seen 15 Oct 2026, untested guesses)
 
 > **Temporary.** These are guesses made without the phone connected. Once the tests below are done,
@@ -249,6 +314,7 @@ exported audio file.
 | Save stays dark when nothing changed (`no-change-test.mjs`): waits for sounds, mixer, sound list, touching every slider, notes mode, play/pause, tapping a note, zoom, views, reopening | Chromium, 5 scores | pass (27 failures on 0.3.3) |
 | Several parts' sound at once and back (`sounds-multi-test.mjs`) | Chromium | pass |
 | Self-check (`selfcheck-test.mjs`): a gap caused on purpose is detected, logged, told once, the queue grows, no further gaps | Chromium | pass |
+| Buffer player vs worklet player (`chunk-player-test.mjs`, `?player=chunk`): sound, clock vs position, no gaps, Pause leaves no audible buffer scheduled (fails on a flush that forgets `stop()`), a jump while playing | Chromium (phone size), 1 score | pass for both players (17 Nov 2026). Over Bluetooth: not run yet (`android-bt-player-ab.mjs`) |
 | Playback log (`playlog-test.mjs`, #31): play, 10 s samples, a gap and a held-back audio clock are logged, none in steady playback; Settings' Send copies the report and the stutter notice has no report link; the log survives a reload; a full log (600 entries) stays under 15 000 characters | Chromium, 5 scores | pass |
 | Typing leaves nothing to undo (`undo-typing-test.mjs`): Bar (caret, Backspace, Enter, leaving the field), tempo (Enter, letters ignored, arrow up), a text box typed, finished, edited again (Backspace, a new line, mid-line); `queryCommandEnabled("undo")` false after each; a plain input shows the check can fail | WebKit and Chromium, 1 score (the fields don't depend on the score) | pass |
 | Leaving while playing is silent (`leave-silence-test.mjs`): the speaker from 60 ms after leaving, 3 times per score; Play heard and the output at full volume after coming back; Keep playing on heard while away | Chromium, 5 scores | pass (without the fade: sound after leaving on all 4 scores with sound, up to 0.54 against 0.16 playing) |

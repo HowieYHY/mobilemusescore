@@ -116,10 +116,6 @@
       "notesbar",
       "tnote",
       "ink\\b"
-    ],
-    "known": [
-      "choosing a colour closes the palette",
-      "Done hides the toolbar"
     ]
   },
   "chunk-inflight-test": {

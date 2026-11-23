@@ -129,6 +129,15 @@
       "inFlight"
     ]
   },
+  "voice-double-record-test": {
+    "files": [],
+    "words": [
+      "voiceRecord",
+      "voiceStarting",
+      "voiceReleaseMic",
+      "getUserMedia"
+    ]
+  },
   "erase-pinch-test": {
     "files": [
       "app/src/annotations.ts"

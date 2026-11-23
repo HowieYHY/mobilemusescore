@@ -20,6 +20,7 @@ reading the code only), and the fix proposed.
 - [x] **Read on 23 Nov 2026:** `typing.ts`, `firsttime.ts` (nothing found; a fresh profile counts as new, checked), `annotations.ts` 478-1291 (finding 27; also: the pieces of a stroke split by `placeFromPins` carry no `part`, unlike the ones made by a bar being removed, so undoing a later removal of bars cannot re-join them: not proved, left)
 - [x] **Read on 23 Nov 2026, the buffer player and the audio worker** (`chunkplayer.ts`, `msaudio-worker.js`): one suspicion, that frames which played before a restart after running dry are never reported as consumed (so the worker would believe its queue fuller until the next pause or seek). Tested, not a bug: after four 900 ms main-thread freezes the worker's count stayed within 12-51 ms of the real queue (`chunk-inflight-test.mjs`; its control, 500 ms of unreported audio injected, is seen). The test stays as a guard.
 - [x] **`notes-test`'s two "known failures" were the test, not the app** (23 Nov 2026): the palette and the notes toolbar fade out (`hidden` is set at once, `display: none` after the transition), and the test looked a frame too early. It now waits for the fade; both checks pass and the test has no known failures. `main.ts` 3690-3900 read (update reopen, shared score, install, the palette): nothing else found.
+- [x] **Also read on 23 Nov 2026:** `main.ts` 2360-2435 (the stave test), 4175-4240 (Edit's chord, dynamics, key and time controls) and the voice recording code (findings 29 and 30). `voice-edit-test` fails two checks (the tune found, the notes in the score) on the old code as well as the new, with different counts each run (4 notes, then 2): a race in the test between the fake microphone's recording and the chosen file, not touched here.
 - [ ] **Still not read:** `main.ts` 2362-2420, 3665-3884 (install, notes bar), 4170-4228, 4852-4958, the tour, the audio worker and worklet in `app/public/worklet`, `scripts/`
 
 ## Findings
@@ -302,6 +303,21 @@ input, `scripts/erase-pinch-test.mjs`: a stroke 40 px from the first finger, a s
 moves over the stroke: the stroke was erased; its control (one finger) erases, and the touch-down alone erases
 nothing. **Fixed** (23 Nov 2026): the second finger also sets `this.erasing = null`; the test passes, `notes-test`
 as before (its two known failures).
+
+### 29. A double tap on Record in Sing it in opens two microphones and leaves one on (`main.ts` `voiceRecord`) — **proved**, low-medium (Composer only, hidden on the live site)
+`#voice-record` called `voiceRecord()` with no guard. A second tap before the first `getUserMedia` answered (a
+double tap, or a tap while the microphone question was up) opened a second stream and replaced `voice.stream`;
+the first stream's tracks were never stopped, so the microphone (and the browser's recording indicator) stayed
+on after Stop. **Proved** with Chromium's fake microphone (`scripts/voice-double-record-test.mjs`): two taps opened
+2 streams and 1 track was still live after Stop; one tap (the control) left none. **Fixed** (23 Nov 2026): a
+`voiceStarting` guard (and none while a recorder exists).
+
+### 30. Closing Sing it in while the microphone question is up starts recording into a closed dialog (`main.ts` `voiceRecord`) — **proved**, low (Composer only)
+Closing the dialog runs `voiceReset`, which stops the stream only if it is open already. A stream that arrived
+after the close was kept: the recorder started with nothing on screen, the microphone stayed on and its timer ran
+up to the 3-minute limit. **Proved** in the same test (dialog closed in the tap itself: 1 track live with the guard
+off, 0 with it). **Fixed**: the recording notes the dialog's `voice.token` when it starts and drops (stops the
+tracks of) a stream that arrives after it changed.
 
 ## Reading stopped here (12 Nov 2026)
 

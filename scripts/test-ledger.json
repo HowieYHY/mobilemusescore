@@ -395,5 +395,12 @@
     "passCommit": "8782bdc",
     "date": "2026-11-23",
     "note": "two runs, 23 Nov 2026"
+  },
+  "voice-double-record-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "37f7e84+changes",
+    "passCommit": "37f7e84",
+    "date": "2026-11-23"
   }
 }

@@ -4895,7 +4895,23 @@ async function voiceProcess(data: ArrayBuffer, beeped = false) {
     voiceRefresh();
 }
 
+// One recording at a time: a double tap on Record (or a tap during the microphone question) used to open a
+// second microphone and lose the first, which stayed on (bug hunt, finding 29)
+let voiceStarting = false;
 async function voiceRecord() {
+    if (voiceStarting || voice.recorder) {
+        return;
+    }
+    voiceStarting = true;
+    try {
+        await voiceRecordNow();
+    } finally {
+        voiceStarting = false;
+    }
+}
+
+async function voiceRecordNow() {
+    const mine = voice.token; // closing the dialog while the microphone is being asked for makes this recording nobody's
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
         voiceSay("This browser can't record here. Choose a recording instead.", true);
         return;
@@ -4904,16 +4920,23 @@ async function voiceRecord() {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
     const beat: AudioContext = new Ctx();
     void beat.resume();
+    let stream: MediaStream;
     try {
-        voice.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
     } catch (err) {
         void beat.close();
         voiceSay("PocketScore can't use the microphone. Allow it in the browser's settings for this site, or choose a recording instead.", true);
         return;
     }
-    if (state.playing) {
+    if (state.playing && voice.token === mine) {
         await engine.pause();
     }
+    if (voice.token !== mine) {
+        stream.getTracks().forEach((t) => t.stop()); // the dialog was closed meanwhile: the microphone goes off again
+        void beat.close();
+        return;
+    }
+    voice.stream = stream;
     voice.chunks = [];
     let rec: MediaRecorder;
     try {

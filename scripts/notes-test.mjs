@@ -112,6 +112,8 @@ await page.click('.tool[data-tool="pen"]');
 await page.click("#more-colors");
 check(await page.isVisible("#palette"), "More colours opens the palette");
 await page.click('#palette .swatch[data-color="#5f3dc4"]');
+// the palette fades out (hidden at once, display none after the transition): wait for the end, not the first frame
+await page.waitForSelector("#palette", { state: "hidden", timeout: 2000 }).catch(() => {});
 check(!(await page.isVisible("#palette")), "choosing a colour closes the palette");
 check(await page.locator("#more-colors.custom").count() === 1, "a palette colour shows on the More colours button");
 await page.mouse.move(sx, sy + 140);
@@ -148,6 +150,7 @@ await page.click("#notes-undo");
 check(await page.locator(".page .ink path.highlighter").count() === 1, "undo restored it");
 
 await page.click("#notes-done");
+await page.waitForSelector("#notesbar", { state: "hidden", timeout: 2000 }).catch(() => {}); // it fades out
 check(!(await page.isVisible("#notesbar")), "Done hides the toolbar");
 await page.locator(".page").first().screenshot({ path: path.join(outDir, "page1-notes.png") });
 

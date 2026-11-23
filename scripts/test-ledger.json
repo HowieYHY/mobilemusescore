@@ -46,12 +46,12 @@
     "note": "only its known failure"
   },
   "notes-test": {
-    "streak": 13,
+    "streak": 14,
     "last": "pass",
-    "commit": "0526e02+changes",
-    "passCommit": "0526e02",
+    "commit": "206dd8e+changes",
+    "passCommit": "206dd8e",
     "date": "2026-11-23",
-    "note": "known failures only (23 Nov 2026, after finding 27)"
+    "note": "no known failures now (23 Nov 2026)"
   },
   "goto-test": {
     "streak": 8,

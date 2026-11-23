@@ -11,7 +11,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <script type="module" crossorigin src="./assets/index-XRMYT7wq.js"></script>
+  <script type="module" crossorigin src="./assets/index-MPMz2BKi.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-53cr_hWa.css">
 </head>
 <body>
@@ -227,6 +227,24 @@
       <label class="set-row">
         <span class="set-text"><span class="set-name">Keep playing when I leave PocketScore</span><span class="set-hint">The music goes on in another app, on the home screen or with the screen locked.<span class="apple-only" hidden> On iPhone and iPad the system may still stop it.</span></span></span>
         <input type="checkbox" role="switch" data-set="keepPlaying">
+      </label>
+      <label class="set-row">
+        <span class="set-text"><span class="set-name">Sound delay</span><span class="set-hint">Over Bluetooth the sound can arrive after the cursor. Raise this to show the score later; lower it if the cursor is behind.</span></span>
+        <select data-set="soundDelayMs">
+          <option value="-200">-200 ms</option>
+          <option value="-150">-150 ms</option>
+          <option value="-100">-100 ms</option>
+          <option value="-50">-50 ms</option>
+          <option value="0">None</option>
+          <option value="50">+50 ms</option>
+          <option value="100">+100 ms</option>
+          <option value="150">+150 ms</option>
+          <option value="200">+200 ms</option>
+          <option value="250">+250 ms</option>
+          <option value="300">+300 ms</option>
+          <option value="400">+400 ms</option>
+          <option value="500">+500 ms</option>
+        </select>
       </label>
       <label class="set-row">
         <span class="set-text"><span class="set-name">Metronome on when a score opens</span><span class="set-hint">Otherwise it starts muted; turn it on in the Mixer.</span></span>

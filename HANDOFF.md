@@ -1,6 +1,9 @@
 # Handoff (18 Nov 2026)
 
-## Latest: the Bluetooth crackle, branch `buffer-player` (23 Nov 2026; uncommitted, nothing published)
+## Released: 1.0.32 on 23 Nov 2026 (the buffer player is the default, Sound delay in Settings), from `main`
+Published with this PC's `deploy-pages.sh`; the engine is the live 1.0.31 one copied from `gh-pages` (identical bytes, no engine change; this PC's old engine is in `build/engine-backup-23nov`). The user asked for the release without checking iPad and iPhone: **a report from either is still the first thing to look for.** `buffer-player` is merged and deleted.
+
+## The Bluetooth crackle (23 Nov 2026)
 - **Proven on the Pixel 9a + AirPods:** blind A/B of PocketScore itself, 3 rounds: worklet bad x3 (1 gap counted each),
   buffer player clean x3 (0 gaps). The user then used the buffer player freely, in a Chrome tab and as an installed
   copy (127.0.0.1:4173 installed as a second home-screen app), and heard no stutter.
@@ -12,7 +15,7 @@
   the user's pick was -200 ms but they couldn't tell it from 0, so the default stays 0. A microphone loopback is not
   possible (opening the mic switches the AirPods to `bt_sco`). Details: `docs/DEVELOPMENT.md`.
 - **Next:** (1) the user checks iPad and iPhone by hand with this build (scheduling buffer sources there is untested);
-  (2) then commit, merge to `main`, bump the version, `npm run build` + `deploy-pages.sh` (the engine check applies);
+  (2) done: released as 1.0.32;
   (3) optional: log the time of each sound gap, to see whether one gap per worklet segment is the start of play or the crackle.
 - **Not tested:** screen off, walking, iPhone, iPad, Safari, other earbuds or phones, a main thread frozen longer than the queue.
 

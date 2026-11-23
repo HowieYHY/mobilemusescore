@@ -387,5 +387,13 @@
     "commit": "0526e02+changes",
     "passCommit": "0526e02",
     "date": "2026-11-23"
+  },
+  "chunk-inflight-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "8782bdc+changes",
+    "passCommit": "8782bdc",
+    "date": "2026-11-23",
+    "note": "two runs, 23 Nov 2026"
   }
 }

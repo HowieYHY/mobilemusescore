@@ -122,6 +122,17 @@
       "Done hides the toolbar"
     ]
   },
+  "chunk-inflight-test": {
+    "files": [
+      "app/src/engine/chunkplayer.ts",
+      "app/public/worklet/msaudio-worker.js"
+    ],
+    "words": [
+      "lastAccounted",
+      "consumed",
+      "inFlight"
+    ]
+  },
   "erase-pinch-test": {
     "files": [
       "app/src/annotations.ts"

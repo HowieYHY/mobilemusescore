@@ -1,4 +1,13 @@
-# Handoff (18 Nov 2026)
+# Handoff (24 Nov 2026)
+
+## State at the end of the 24 Nov session
+- **Live: 1.0.33** (bug-hunt fixes: eraser stops on a second finger, Sing it in opens one microphone, the buffer player reports every frame it played), from `main`. Still unreported from iPad and iPhone.
+- **The Reso website's frozen copy is now 1.0.33** (reso-website PR #68, merged 23 Nov; checked live at nusresonance.com/pocketscore: same precache version and file hashes). Replace it again only on request; the way is in `CLAUDE.md` and DEVELOPMENT.md.
+- **Deleted at the owner's request:** `docs/BUG-HUNT.md` (and the merged `bug-hunt` and `voice-metronome` branches). The unread parts (rest of `session.cpp`, test scripts) are no longer listed anywhere.
+- A one-off "audio sounds weird" on the live site (24 Nov) was not reproduced; it sounded fine afterwards. Cause unknown: ask where (tab or installed app), earbuds or speaker, what it sounded like.
+- **Next: the Composer.** Tracker card says "Building Composer mode". `composer-flat` (GitHub only; issue #33; piano strip, Chord, one line at a time) is 3 commits ahead of and 13 behind `main`: merge `main` into it (conflicts in `HANDOFF.md`, the test records, and `docs/BUG-HUNT.md`, whose deletion should win), build the engine from it on the publishing PC, then test on devices. Its remaining list is in that branch's HANDOFF.md. Issue #35 (voice metronome) waits for a real-voice test once the Composer is done.
+
+## Earlier: 18 Nov 2026
 
 ## Released: 1.0.32 on 23 Nov 2026 (the buffer player is the default, Sound delay in Settings), from `main`
 Published with this PC's `deploy-pages.sh`; the engine is the live 1.0.31 one copied from `gh-pages` (identical bytes, no engine change; this PC's old engine is in `build/engine-backup-23nov`). The user asked for the release without checking iPad and iPhone: **a report from either is still the first thing to look for.** `buffer-player` is merged and deleted.

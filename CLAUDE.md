@@ -69,9 +69,11 @@ build, tests, status) before working here.
   nothing kept on the device. PocketScore takes a score only from the website's own page. The
   connection does not go the other way (no searching the library from PocketScore): the user's
   decision after a first version was built.
-  The website serves its **own frozen copy of PocketScore 1.0.4** (`public/pocketscore/` there), so it
-  works when this site is down; releases here don't reach it, and the user doesn't plan to update it
-  (their decision, 10 Oct 2026). Features for the preview's bar (e.g. Files: the `.mscz` download and
+  The website serves its **own frozen copy of PocketScore** (`public/pocketscore/` there), so it
+  works when this site is down; releases here don't reach it. It was 1.0.4 until 23 Nov 2026, when the user
+  asked for it to be updated to 1.0.33 (PR prepared on branch `update-pocketscore-1.0.33`). Replace it with
+  the build's `app/dist` copied byte for byte (never from a git checkout with line-ending conversion:
+  the service worker's hashes then fail), and check every file against `precache.json`. Features for the preview's bar (e.g. Files: the `.mscz` download and
   the score's PDFs and recordings) go in the website's `ScorePreview.js`, not in PocketScore.
 - **Every new or changed feature updates the tour and the README**, without being asked: a tour step
   (`tour` steps in `main.ts`) for any new control, and the README's user guide. The user's standing

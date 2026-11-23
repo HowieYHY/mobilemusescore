@@ -1,25 +1,20 @@
 # Handoff (18 Nov 2026)
 
-## Latest: the Bluetooth crackle, branch `buffer-player` (not merged, nothing published)
-- **Found:** over the user's AirPods on the Pixel 9a, Chrome's **AudioWorklet output crackles** (blind listening
-  tests: even a worklet that only copies memory), while buffer sources are clean. PocketScore plays through a
-  worklet. Other apps and PocketScore on the speaker are clean. Full record, numbers and what I got wrong on the
-  way: `docs/DEVELOPMENT.md`, *Open: crackle over Bluetooth*; lessons in `CLAUDE.md`.
-- **Built:** `?player=chunk` (`app/src/engine/chunkplayer.ts`, wired in `engine.ts`): the same audio worker,
-  played as buffer sources scheduled back to back. Default is still the worklet. `chunk-player-test.mjs` passes
-  for both players on desktop (and fails on a deliberately broken flush).
-- **Not done:** the blind A/B of PocketScore itself over the AirPods, `scripts/android-bt-player-ab.mjs`. The user
-  paused it to push the branch. Setup: `cd app && npm run build && npx vite preview --host --port 4173`,
-  `adb reverse tcp:4173 tcp:4173`, the AirPods connected to the **phone**, screen on, no other Chrome tab using the
-  camera, phone cool (`dumpsys thermalservice`). The user taps Clean / Slight / Bad after each of 6 segments.
-- **Then decide:** buffer player clean 3 times and worklet not -> make it the one player for every platform (one
-  code path), after the user checks iPad and iPhone by hand; otherwise the branch stays a flag.
-- **Not tested:** screen off, walking, iPhone, iPad, Safari, other earbuds or phones, a main thread frozen longer
-  than the queue (the buffer player schedules from the main thread).
-- Scripts for the phone (read-only, no taps): `android-bt-earlyplay-test`, `-soak`, `-watch`, `-player-ab`;
-  tone pages in `scripts/bt-blind-test/`.
-- The Gesture Synth repo is cloned beside this one (`d:\cloned repos\gesture-synth`); its tab held the phone's
-  camera open and loaded the phone during the first tests.
+## Latest: the Bluetooth crackle, branch `buffer-player` (23 Nov 2026; uncommitted, nothing published)
+- **Proven on the Pixel 9a + AirPods:** blind A/B of PocketScore itself, 3 rounds: worklet bad x3 (1 gap counted each),
+  buffer player clean x3 (0 gaps). The user then used the buffer player freely, in a Chrome tab and as an installed
+  copy (127.0.0.1:4173 installed as a second home-screen app), and heard no stutter.
+- **Changed on the branch:** the buffer player is the default (`?player=worklet` for the old one); a new **Sound delay**
+  setting (Settings > Playback, default 0, `engine.extraLatency`), with its README row and tour wording. Scripts:
+  `android-bt-delay-tune.mjs` (user taps Earlier/Later on the phone), `android-bt-player-ab.mjs` now passes
+  `?player=worklet` for the worklet. Typecheck and `chunk-player-test` pass on the PC.
+- **Sound delay findings:** Android says 230 ms for the A2DP path; Chrome's `outputLatency` with "playback" is 344-648 ms;
+  the user's pick was -200 ms but they couldn't tell it from 0, so the default stays 0. A microphone loopback is not
+  possible (opening the mic switches the AirPods to `bt_sco`). Details: `docs/DEVELOPMENT.md`.
+- **Next:** (1) the user checks iPad and iPhone by hand with this build (scheduling buffer sources there is untested);
+  (2) then commit, merge to `main`, bump the version, `npm run build` + `deploy-pages.sh` (the engine check applies);
+  (3) optional: log the time of each sound gap, to see whether one gap per worklet segment is the start of play or the crackle.
+- **Not tested:** screen off, walking, iPhone, iPad, Safari, other earbuds or phones, a main thread frozen longer than the queue.
 
 ## Older state (12 Nov 2026)
 ## Where things are

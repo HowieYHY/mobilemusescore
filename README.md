@@ -269,6 +269,7 @@ every score. Until you change them, PocketScore works as described above.
 | **Keep playing when I leave PocketScore** | The music goes on in another app, on the home screen or with the screen locked, for listening on the go. Off: it pauses. On Android, PocketScore then shows in your notifications while it plays, with play and pause there. On iPhone and iPad the system may still stop it |
 | **Metronome on when a score opens** | Every score opens with the click on. Off: it starts muted |
 | **Tap a note to hear it** | While stopped, a tap on a note plays it. Off: the tap only moves to that note |
+| **Sound delay** | Over Bluetooth the sound can reach the earbuds later than the phone says, so the cursor runs ahead of the music. Raise this (50 ms steps) to show the score later; lower it if the cursor lags. None is how PocketScore works out the delay by itself, and is right for most earbuds |
 | **Start focus by itself** | Hides the bars when you leave the screen alone |
 | **Wait while playing** / **while stopped** | How long before focus starts by itself (4 and 10 seconds at first) |
 | **Full screen with the Focus button** | The phone's or browser's own bars go too. Not on iPhone, which doesn't allow it |

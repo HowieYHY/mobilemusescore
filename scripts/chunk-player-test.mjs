@@ -35,7 +35,7 @@ for (let round = 1; round <= rounds; round++) {
         const page = await context.newPage();
         const errors = [];
         page.on("pageerror", (e) => errors.push(e.message));
-        await page.goto(base + (player === "chunk" ? "?player=chunk" : ""));
+        await page.goto(base + (player === "chunk" ? "?player=chunk" : "?player=worklet"));
         await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 180000 });
         await page.setInputFiles("#file-input", scorePath);
         await page.waitForFunction(() => app.state.playbackReady, null, { timeout: 180000 });

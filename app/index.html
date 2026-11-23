@@ -227,6 +227,24 @@
         <input type="checkbox" role="switch" data-set="keepPlaying">
       </label>
       <label class="set-row">
+        <span class="set-text"><span class="set-name">Sound delay</span><span class="set-hint">Over Bluetooth the sound can arrive after the cursor. Raise this to show the score later; lower it if the cursor is behind.</span></span>
+        <select data-set="soundDelayMs">
+          <option value="-200">-200 ms</option>
+          <option value="-150">-150 ms</option>
+          <option value="-100">-100 ms</option>
+          <option value="-50">-50 ms</option>
+          <option value="0">None</option>
+          <option value="50">+50 ms</option>
+          <option value="100">+100 ms</option>
+          <option value="150">+150 ms</option>
+          <option value="200">+200 ms</option>
+          <option value="250">+250 ms</option>
+          <option value="300">+300 ms</option>
+          <option value="400">+400 ms</option>
+          <option value="500">+500 ms</option>
+        </select>
+      </label>
+      <label class="set-row">
         <span class="set-text"><span class="set-name">Metronome on when a score opens</span><span class="set-hint">Otherwise it starts muted; turn it on in the Mixer.</span></span>
         <input type="checkbox" role="switch" data-set="metronomeOn">
       </label>

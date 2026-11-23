@@ -71,7 +71,7 @@ for (let i = 0; i < order.length; i++) {
     try {
         await page.goto(url);
         await page.evaluate(() => localStorage.removeItem("pocketscore.queue"));
-        await page.goto(url + (player === "chunk" ? "?player=chunk" : ""));
+        await page.goto(url + (player === "chunk" ? "?player=chunk" : "?player=worklet"));
         await page.bringToFront();
         await page.waitForFunction(() => !!window.app?.state && document.getElementById("status").textContent.startsWith("Ready"), null, { timeout: 120000 }).catch(() => {});
         await page.evaluate(async ({ name, b64 }) => {

@@ -16,6 +16,7 @@ export interface Settings {
     follow: boolean;           // the view follows the music
     keepAwake: boolean;        // the screen stays on while playing
     pairSwipeTwo: boolean;     // Two pages: a swipe turns both pages (off: it moves on by one)
+    soundDelayMs: number;      // the score is shown this much later than the device says (Bluetooth reports its delay wrongly)
 }
 
 export const DEFAULTS: Readonly<Settings> = {
@@ -30,6 +31,7 @@ export const DEFAULTS: Readonly<Settings> = {
     follow: true,
     keepAwake: false,
     pairSwipeTwo: false,
+    soundDelayMs: 0,
 };
 
 const KEY = "pocketscore.settings";

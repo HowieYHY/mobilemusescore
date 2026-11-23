@@ -353,6 +353,15 @@ build, tests, status) before working here.
   `AudioBufferSourceNode` with sound in it, 40 ms after Pause) and show the check failing on a deliberately
   broken copy (`chunk-player-test.mjs`: 3-5 loud buffers left, against none).
 
+- **A listening test must use the sound path that is known to be good.** The first Sound delay run played through
+  the AudioWorklet, which crackles over the user's AirPods, and its loop jumps restarted the sound each time; the user
+  said it was not a fair test (23 Nov 2026). Rule: when a path has a known fault, a test of something else (delay,
+  sync) uses the clean one (`?player=chunk`), plays straight through with no restarts, and short segments (15 s) are enough.
+- **Opening the microphone on Android Chrome changes where the sound goes.** With AirPods connected, `getUserMedia`
+  switched them from music (`bt_a2dp`) to the call profile (`bt_sco`), so a loopback measured the wrong thing and found
+  no clicks (23 Nov 2026). Rule: never measure Bluetooth music delay with a microphone in the same Chrome; watch the
+  audio route (`dumpsys audio`, *Active communication device*) during any run that opens an input.
+
 ### iPhone (tested by hand on 10 Oct 2026, iOS 26; it can't be automated from this PC)
 
 - **How to test on an iPhone from Windows.** There is no USB control (no `adb` equivalent; Safari's

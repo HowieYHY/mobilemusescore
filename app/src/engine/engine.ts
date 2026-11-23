@@ -146,8 +146,8 @@ export class Engine {
             this.emit("audioState", ctx.state);
         };
 
-        // `?player=chunk` plays through scheduled buffer sources instead of the AudioWorklet (chunkplayer.ts)
-        const chunkPlayer = new URLSearchParams(location.search).get("player") === "chunk";
+        // Scheduled buffer sources, not the AudioWorklet (chunkplayer.ts), unless `?player=worklet`
+        const chunkPlayer = new URLSearchParams(location.search).get("player") !== "worklet"; // the buffer player is the default on this branch (an installed app launches without a query)
         this.note("player", chunkPlayer ? "buffer sources (?player=chunk)" : "audio worklet");
         this.audioStarting = (async () => {
             this.emit("audioStatus", { text: "Loading MS Basic sound font…" });
@@ -293,7 +293,7 @@ export class Engine {
         }
         this.stats.queuedSecs = frames / this.ctx.sampleRate;
         const out = (this.ctx as any).outputLatency || 0;
-        const latency = frames / this.ctx.sampleRate + (this.ctx.baseLatency || 0) + out;
+        const latency = Math.max(0, frames / this.ctx.sampleRate + (this.ctx.baseLatency || 0) + out + this.extra);
         if (Math.abs(latency - this.lastLatency) > 0.01) {
             this.lastLatency = latency;
             void this.request({ cmd: "latency", secs: latency });
@@ -398,7 +398,16 @@ export class Engine {
             return 0;
         }
         const queued = this.stats.targetSecs || (24 * 1024) / ctx.sampleRate; // the worker's playing queue
-        return queued + (ctx.baseLatency || 0) + ((ctx as any).outputLatency || 0);
+        return Math.max(0, queued + (ctx.baseLatency || 0) + ((ctx as any).outputLatency || 0) + this.extra);
+    }
+
+    /** The reader's own correction (Settings' Sound delay), in seconds, added to the delay the device reports,
+     *  for outputs that report it wrongly (Bluetooth). Positive: the score is shown later. */
+    private extra = 0;
+    get extraLatency() { return this.extra; }
+    set extraLatency(secs: number) {
+        this.extra = secs;
+        this.lastLatency = -1; // sent again with the next level report
     }
 
     get sampleRate(): number {

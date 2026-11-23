@@ -102,9 +102,24 @@ after each; needs `npm run build`, `npx vite preview --host --port 4173`, `adb r
 AirPods connected to the phone). Nothing on iPhone, iPad or Safari (scheduling buffer sources there is
 untested), and nothing with the screen off or while moving.
 
-**Decision waiting on that A/B:** if the buffer player is clean three times and the worklet is not, make it
-the one player for every platform (the one-code-path rule), after checking iPad and iPhone by hand; if both
-are clean or both crackle, the cause is elsewhere and the branch stays a flag.
+**A/B result (23 Nov 2026, Pixel 9a, AirPods, "I am move it", 15 s segments, order hidden and random, 3 rounds):**
+worklet bad, bad, bad (the app counted 1 sound gap in each); buffer player clean, clean, clean (0 gaps). The user then
+used the buffer player freely, in a Chrome tab and as an installed copy (a second home-screen app made from
+`http://127.0.0.1:4173/`, running as a WebAPK activity), over the AirPods and heard no stutter. **Decision:** the buffer
+player is the default on this branch (`?player=worklet` brings the worklet back); it is not published, and the user
+checks iPad and iPhone by hand first. The one gap per worklet segment may be the start of play and not the crackle
+itself (the log keeps no time per gap), so it is not yet a crackle detector. **Sound delay** (Settings, `soundDelayMs`, default 0; `engine.extraLatency` is added to the queue, `baseLatency` and
+`outputLatency` that the cursor is held back by; clamped at 0). Measured on the Pixel 9a and AirPods (23 Nov 2026):
+Android's own figure for the A2DP output is 230 ms; Chrome's `outputLatency` is ~24 ms with `latencyHint: "interactive"`
+(misses the Bluetooth delay) and 344-648 ms with `"playback"` (what the app uses; it moves from run to run). By eye and
+ear the user settled on -200 ms, but could not tell it from 0 reliably (200 ms is under half a beat at 120 bpm), and
+published figures for AirPods run 140-280 ms by model, so no fixed value is shipped: the default stays 0. **Ruled
+out:** measuring the delay with the phone's microphone (`getUserMedia` on Android Chrome switches the earbuds to the call
+profile, `bt_sco`, when the microphone opens, and the phone's own mic can't be chosen without moving the sound to the speaker); the
+run measured the call profile, not music. Untried: a camera-and-ear check, or a second device as the microphone.
+
+Still untested: screen off, walking,
+Safari, other earbuds or phones, a main thread frozen longer than the queue.
 
 **Things I got wrong on the way (so they are not repeated), each from a before/after pair on a phone whose own
 load was changing:** early Play seemed to cause a gap in 4 of 4 rounds and not when waiting; an hour later 0 of
@@ -314,7 +329,7 @@ exported audio file.
 | Save stays dark when nothing changed (`no-change-test.mjs`): waits for sounds, mixer, sound list, touching every slider, notes mode, play/pause, tapping a note, zoom, views, reopening | Chromium, 5 scores | pass (27 failures on 0.3.3) |
 | Several parts' sound at once and back (`sounds-multi-test.mjs`) | Chromium | pass |
 | Self-check (`selfcheck-test.mjs`): a gap caused on purpose is detected, logged, told once, the queue grows, no further gaps | Chromium | pass |
-| Buffer player vs worklet player (`chunk-player-test.mjs`, `?player=chunk`): sound, clock vs position, no gaps, Pause leaves no audible buffer scheduled (fails on a flush that forgets `stop()`), a jump while playing | Chromium (phone size), 1 score | pass for both players (17 Nov 2026). Over Bluetooth: not run yet (`android-bt-player-ab.mjs`) |
+| Buffer player vs worklet player (`chunk-player-test.mjs`, `?player=chunk`): sound, clock vs position, no gaps, Pause leaves no audible buffer scheduled (fails on a flush that forgets `stop()`), a jump while playing | Chromium (phone size), 1 score | pass for both players (17 Nov 2026; the bare URL now gets the buffer player, 23 Nov). Over Bluetooth (`android-bt-player-ab.mjs`, 23 Nov 2026): worklet bad x3, buffer player clean x3 |
 | Playback log (`playlog-test.mjs`, #31): play, 10 s samples, a gap and a held-back audio clock are logged, none in steady playback; Settings' Send copies the report and the stutter notice has no report link; the log survives a reload; a full log (600 entries) stays under 15 000 characters | Chromium, 5 scores | pass |
 | Typing leaves nothing to undo (`undo-typing-test.mjs`): Bar (caret, Backspace, Enter, leaving the field), tempo (Enter, letters ignored, arrow up), a text box typed, finished, edited again (Backspace, a new line, mid-line); `queryCommandEnabled("undo")` false after each; a plain input shows the check can fail | WebKit and Chromium, 1 score (the fields don't depend on the score) | pass |
 | Leaving while playing is silent (`leave-silence-test.mjs`): the speaker from 60 ms after leaving, 3 times per score; Play heard and the output at full volume after coming back; Keep playing on heard while away | Chromium, 5 scores | pass (without the fade: sound after leaving on all 4 scores with sound, up to 0.54 against 0.16 playing) |

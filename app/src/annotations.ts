@@ -1078,6 +1078,7 @@ export class Annotations {
             this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (this.touches.size > 1) {
                 this.cancelStroke(); // two fingers: scroll and zoom instead
+                this.erasing = null; // and the eraser stops too, or the first finger wipes notes during a pinch
                 return;
             }
         }

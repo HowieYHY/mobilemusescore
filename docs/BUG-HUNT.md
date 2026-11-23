@@ -17,7 +17,8 @@ reading the code only), and the fix proposed.
 - [ ] `app/src/annotations.ts` (only the storage part, lines 254-478, read)
 - [ ] `app/src/main.ts` (in parts). Read so far: 118-1625 (pages, tiles, zoom, pinch, taps, scroll handle, cursor, playback log: nothing found beyond 8), 2960-3290 (save, ask, opening, changeView), 3415-3665 (updates, restart, shared file), 3884-3960 and 4228-4565 (Edit: selection, runEdit, drafts, keys, Save a copy), 2095-2335 (Back-button layers, Focus), 4958-5128 (New score, Continue, website preview), 1625-1775 (wake lock, keep playing, Play), 2874-2960 (mixer restore and save: nothing found), 1774-2095 (seek, mixer, sound list), 3960-4170 (Edit's More tools), 2420-2855 (speed, loop, go to bar, panels, Settings: nothing new), 3290-3420 (Two pages: turning, swipes). Checked across all of `app/src`: no text from a score (title, part and sound names) is put into the page as HTML; it all goes through `textContent`
 - [ ] `engine/core/session.cpp`: only `Session::load` read. The rest (3,100 lines of C++, the edit functions above all) is **not read**; a bug there needs an engine build to confirm
-- [ ] **Not read:** `annotations.ts` drawing and text boxes (478-1071), `main.ts` 2362-2420, 3665-3884 (install, notes bar), 4170-4228, 4852-4958, the tour, `typing.ts`, `firsttime.ts`, the audio worker and worklet in `app/public/worklet`, `scripts/`
+- [x] **Read on 23 Nov 2026:** `typing.ts`, `firsttime.ts` (nothing found; a fresh profile counts as new, checked), `annotations.ts` 478-1291 (finding 27; also: the pieces of a stroke split by `placeFromPins` carry no `part`, unlike the ones made by a bar being removed, so undoing a later removal of bars cannot re-join them: not proved, left)
+- [ ] **Still not read:** `main.ts` 2362-2420, 3665-3884 (install, notes bar), 4170-4228, 4852-4958, the tour, the audio worker and worklet in `app/public/worklet`, `scripts/`
 
 ## Findings
 
@@ -289,6 +290,16 @@ next step is to time the audio worker's message handling (`rpc.onmessage`) and p
 > **Fixed** (12 Nov 2026): `statusStays` keeps the two refusal messages (not a MuseScore file; could not read this score) until the reader's next action. Found by `open-fail-test` on a PC where the sound font was not yet stored: it failed there with or without the day's other changes; it now checks both messages 1.5 s later.
 
 On a first visit the sound font is still downloading when a file is refused. Its progress line ("Loading MS Basic sound font… 54%") replaced the reason within a moment, and when the sounds were ready the line was cleared: the reader saw the start screen come back with no reason at all.
+
+### 27. A second finger does not stop the eraser: the first finger erases notes during a pinch (`annotations.ts` `onDown`) — **proved**, low-medium
+With *Draw with finger* on and the Eraser chosen, one finger down starts an erase (`this.erasing`) and every move of
+it erases what it passes. When a second finger lands, `onDown` cancels a pen stroke ("two fingers: scroll and zoom
+instead") but left `erasing` set, so the first finger kept erasing while the reader pinched or scrolled with two
+fingers: notes under it vanished (each erase is undoable, but nothing tells the reader). **Proved** with real touch
+input, `scripts/erase-pinch-test.mjs`: a stroke 40 px from the first finger, a second finger down, the first finger
+moves over the stroke: the stroke was erased; its control (one finger) erases, and the touch-down alone erases
+nothing. **Fixed** (23 Nov 2026): the second finger also sets `this.erasing = null`; the test passes, `notes-test`
+as before (its two known failures).
 
 ## Reading stopped here (12 Nov 2026)
 

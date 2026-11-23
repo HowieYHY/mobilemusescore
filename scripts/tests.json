@@ -122,6 +122,15 @@
       "Done hides the toolbar"
     ]
   },
+  "erase-pinch-test": {
+    "files": [
+      "app/src/annotations.ts"
+    ],
+    "words": [
+      "erasing",
+      "cancelStroke"
+    ]
+  },
   "notes-views-test": {
     "files": [
       "app/src/annotations.ts",

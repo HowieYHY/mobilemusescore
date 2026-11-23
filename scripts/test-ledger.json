@@ -46,12 +46,12 @@
     "note": "only its known failure"
   },
   "notes-test": {
-    "streak": 12,
+    "streak": 13,
     "last": "pass",
-    "commit": "3d26797+changes",
-    "passCommit": "3d26797",
-    "date": "2026-11-12",
-    "note": "only its two known failures"
+    "commit": "0526e02+changes",
+    "passCommit": "0526e02",
+    "date": "2026-11-23",
+    "note": "known failures only (23 Nov 2026, after finding 27)"
   },
   "goto-test": {
     "streak": 8,
@@ -380,5 +380,12 @@
     "commit": "3d26797+changes",
     "passCommit": "3d26797",
     "date": "2026-11-12"
+  },
+  "erase-pinch-test": {
+    "streak": 1,
+    "last": "pass",
+    "commit": "0526e02+changes",
+    "passCommit": "0526e02",
+    "date": "2026-11-23"
   }
 }

@@ -23,11 +23,10 @@ Published with this PC's `deploy-pages.sh`; the engine is the live 1.0.31 one co
 ## Where things are
 - **Live: 1.0.31**, from `main`. It holds everything that was on `voice-metronome` (issue #35, Sing it in's
   metronome), `bug-hunt` and `notes-follow-edits`; those branches have nothing more than `main`.
-- **The bug hunt** ([docs/BUG-HUNT.md](docs/BUG-HUNT.md)): 26 findings, all fixed except 20, which stays as it is
+- **The bug hunt** (its record, `docs/BUG-HUNT.md`, was deleted on 24 Nov 2026 at the owner's request; the fixes stay in the code, marked "bug hunt, finding N"): 26 findings, all fixed except 20, which stays as it is
   by the owner's decision (the `ANDROID` check around *Keep playing*'s silent audio). Finding 24 (the reader's
   notes follow the music when it is edited, as desktop's staff texts do) needed an engine change
-  (`Session::anchorsJson`, and two more values in the timeline). Nine things that could be done better across the
-  codebase are B1 to B9 in the same file; B7 is done, B3 is started (`app/src/layers.ts`, `app/src/notepins.ts`).
+  (`Session::anchorsJson`, and two more values in the timeline). The list of nine possible clean-ups (B1 to B9) went with the file.
 - **The engine that is live was built on the second PC** from `main`, and compared with the 1.0.30 one on that
   PC's five scores (`compare-engines.mjs`: drawings, timelines, staves, info and audio identical). The first PC
   must build the engine from `main` before it publishes again, or `check-engine.mjs` refuses (`mss_anchors`).
@@ -43,7 +42,7 @@ worker), `notes-follow-test`, `notes-oldpins-test`; and again `open-fail-test`, 
 `focus-test` (its known failure), `tour-test`, `settings-test`, `edit-draft-test`, `resume-list-test`,
 `new-score-flow-test`, `new-score-inside-test`, `sounds-retry-test`, `selfcheck-test`, `update-restart-test`,
 `notes-test` (its two known failures), `notes-views-test`, `notes-align-test`, `no-change-test`. Each new test was
-seen failing on the old code. Many of the bug hunt's small fixes are typechecked only; the record says which.
+seen failing on the old code. Many of the bug hunt's small fixes were typechecked only.
 
 ## Needs the user or their friend
 - The friend's tablet: play as before and send a new playback report. The queue should start at 512 ms, no gap
@@ -69,8 +68,7 @@ B2 (narrow `scripts/tests.json`, an hour), then B1 (the ScoreSession object).
   scripts/copy-engine.mjs`.
 
 ## Continuation prompt
-"Read HANDOFF.md and docs/BUG-HUNT.md (B1 to B9). On `main`: if this PC has not built the engine since 12 Nov
-2026, build it first. Then narrow `scripts/tests.json` (B2) and start the ScoreSession object (B1)."
+(The 12 Nov continuation prompt, about the clean-ups B1 to B9, is gone with docs/BUG-HUNT.md.)
 
 ## Continuation prompt (Bluetooth)
 "Read HANDOFF.md and docs/DEVELOPMENT.md (*Open: crackle over Bluetooth*). On branch `buffer-player`, run the

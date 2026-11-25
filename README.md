@@ -46,7 +46,12 @@ No app store needed.
   never your notes or files), on this device too: it leaves only if you send it yourself (see
   *Playback report* in [Settings](#settings)).
   (The app itself is downloaded from GitHub's website hosting, which sees visits like any website.
-  PocketScore has no accounts, ads or tracking.)
+  PocketScore has no accounts or ads.)
+- **One thing is counted: that the app was opened, and for how long.** So the maker can tell whether
+  PocketScore is used, each visit sends a random number made on your device, the app's version,
+  whether it is installed or in a browser, how long it was open and how long music played. No score,
+  file name, note, account or IP address is sent or kept. To stop it, turn off **Share anonymous usage
+  counts** in [Settings](#settings).
 - **The music pauses when you leave the app** (another app, home screen, screen locked), and
   goes quiet at once. Tap Play when you're back. To keep it playing instead, turn on **Keep playing when I leave
   PocketScore** in **Settings** (the gear at the top).
@@ -277,6 +282,7 @@ every score. Until you change them, PocketScore works as described above.
 | **Two pages: a swipe turns both** | In *Two pages*, each swipe shows the next two pages (1-2, then 3-4). Off: it moves on one page, the right page going to the left (1-2, then 2-3) |
 | **Follow the music** | The score moves along as it plays. Off: it stays where you put it |
 | **Keep the screen on while playing** | The screen doesn't dim or lock in the middle of a piece |
+| **Share anonymous usage counts** | On at first. Sends the anonymous count of visits described under *Good to know* (a random number, the version, how long the app was open and how long music played; no scores, files or notes). Off: nothing is sent |
 | **Playback report**, *Send* | If the music stutters or lags, tap **Send** soon after. Your phone's share menu opens, and the report is also copied, so you can paste it into a [GitHub issue](https://github.com/HowieYHY/mobilemusescore/issues) or a message. It tells how the device kept up during your recent plays: times, score names and the device's own figures, never your notes or files. It works offline and later too: the log stays on the device after the app is closed. Please add what you were doing and whether battery saver was on or the phone was warm, which apps can't see |
 
 ---

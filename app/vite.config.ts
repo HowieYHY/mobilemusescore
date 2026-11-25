@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -23,15 +23,20 @@ const CSP = [
     "frame-src 'none'",
 ].join("; ");
 
-export default defineConfig({
+// The owner's usage counter (VITE_USAGE_URL, tracker/worker.js) is the one address the page may send to
+export default defineConfig(({ mode }) => {
+const usageUrl = loadEnv(mode, process.cwd(), "VITE_").VITE_USAGE_URL || "";
+const csp = usageUrl ? CSP.replace("connect-src 'self'", `connect-src 'self' ${new URL(usageUrl).origin}`) : CSP;
+return {
     base: "./",
     plugins: [{
         name: "content-security-policy",
         apply: "build",
-        transformIndexHtml: (html) => html.replace(/(<meta charset="utf-8">)/, `$1\n  <meta http-equiv="Content-Security-Policy" content="${CSP}">`),
+        transformIndexHtml: (html) => html.replace(/(<meta charset="utf-8">)/, `$1\n  <meta http-equiv="Content-Security-Policy" content="${csp}">`),
     }],
     define: { __APP_VERSION__: JSON.stringify(pkg.version) },
     worker: { format: "es" },
     server: { host: true },
     build: { target: "es2022", assetsInlineLimit: 0 },
+};
 });

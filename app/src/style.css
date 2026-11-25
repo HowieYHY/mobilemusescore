@@ -1427,3 +1427,22 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .resume-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
 .resume-item .btn:first-child { justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resume-item .hint { white-space: nowrap; }
+
+/* the owner's hidden usage screen */
+.ask.owner { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; }
+.owner .ou-msg { margin: 0 0 10px; min-height: 1.4em; }
+.ou-keyrow { display: flex; gap: 8px; margin-bottom: 12px; }
+.ou-keyrow[hidden], .owner [hidden] { display: none; }
+.ou-key { flex: 1; min-width: 0; font-size: 16px; padding: 8px 10px; border: 1px solid #c7ccd2; border-radius: 8px; }
+.ou-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ou-stat { display: flex; flex-direction: column; padding: 10px; border-radius: 10px; background: #f1f3f5; }
+.ou-num { font-size: 22px; font-weight: 700; line-height: 1.15; }
+.ou-label { font-size: 13px; color: var(--ink-2); }
+.ou-note { font-size: 12px; color: var(--ink-2); margin: 4px 0 0; }
+.ou-block { margin-bottom: 14px; }
+.ou-block h3 { margin: 0 0 6px; font-size: 14px; }
+.ou-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 3px 0; border-bottom: 1px solid #eceff1; }
+.ou-day { display: grid; grid-template-columns: 44px 70px 1fr; gap: 8px; align-items: center; font-size: 12px; padding: 2px 0; }
+.ou-track { height: 10px; border-radius: 5px; background: #eceff1; overflow: hidden; }
+.ou-bar { display: block; height: 100%; background: #2f6fed; border-radius: 5px; }
+.ou-n { color: var(--ink-2); }

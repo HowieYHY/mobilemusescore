@@ -75,6 +75,12 @@ build, tests, status) before working here.
   the build's `app/dist` copied byte for byte (never from a git checkout with line-ending conversion:
   the service worker's hashes then fail), and check every file against `precache.json`. Features for the preview's bar (e.g. Files: the `.mscz` download and
   the score's PDFs and recordings) go in the website's `ScorePreview.js`, not in PocketScore.
+- **Usage counter (the owner's, 25 Nov 2026):** the owner wants to see how many people use PocketScore, how
+  often and for how long, privately. It is `tracker/` (a Cloudflare Worker + D1, outside the app) plus
+  `app/src/usage.ts` and the hidden screen `usageview.ts` (seven taps on the version line, then the owner's
+  key). It stays off until `VITE_USAGE_URL` is built in. Keep it anonymous (random id, no IP, score names,
+  files or notes), keep the owner's key out of the app and the repo, keep the reader's off switch and the
+  README's plain description of it in step with what is sent, and never turn it on in the Reso preview.
 - **Every new or changed feature updates the tour and the README**, without being asked: a tour step
   (`tour` steps in `main.ts`) for any new control, and the README's user guide. The user's standing
   request (10 Oct 2026).

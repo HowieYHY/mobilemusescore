@@ -762,5 +762,19 @@
     ],
     "phone": true,
     "onlyOnChange": true
+  },
+  "usage-test": {
+    "files": [
+      "app/src/usage.ts",
+      "app/src/usageview.ts",
+      "tracker/worker.js",
+      "tracker/schema.sql"
+    ],
+    "words": [
+      "usage",
+      "shareUsage",
+      "VITE_USAGE_URL",
+      "pocketscore.owner"
+    ]
   }
 }

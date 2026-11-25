@@ -13,6 +13,8 @@ import { DEFAULTS, loadSettings, saveSettings, type Settings } from "./settings"
 import { numberField } from "./typing";
 import { PlayLog, stamp } from "./playlog";
 import { makeLayers } from "./layers";
+import { USAGE_URL, startUsage } from "./usage";
+import { openOwnerScreen } from "./usageview";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -157,6 +159,22 @@ const state = {
     scoreKey: "",
     focus: false, // focus mode: only the music and a play button (issue #17)
 };
+
+// The owner's private count of visits (usage.ts): not in the website's preview, and the reader can switch it
+// off. Seven taps on the version line open the owner's own screen, which needs the owner's key.
+if (USAGE_URL && !embedded) {
+    $("usage-note").hidden = false;
+    startUsage({ version: __APP_VERSION__, enabled: () => settings.shareUsage, playing: () => state.playing });
+    let taps: number[] = [];
+    $("version").addEventListener("click", () => {
+        const now = Date.now();
+        taps = [...taps.filter((t) => now - t < 4000), now];
+        if (taps.length >= 7) {
+            taps = [];
+            openOwnerScreen($<HTMLDialogElement>("owner"));
+        }
+    });
+}
 
 // ---------------------------------------------------------------- status
 
@@ -2761,6 +2779,7 @@ const rootEl = document.documentElement as any;
 const unavailable: Partial<Record<keyof Settings, boolean>> = {
     focusFullscreen: !(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen), // iPhone
     keepAwake: !canWakeLock,
+    shareUsage: !USAGE_URL, // a copy with no counter built in sends nothing
 };
 $("send-report").onclick = () => void sendReport("Settings");
 const settingInputs = [...ui.settings.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-set]")];
@@ -5304,7 +5323,7 @@ function tourSteps(): TourStep[] {
             { target: el("open-label"), title: "Open a score", text: "Choose a MuseScore file (.mscz) on this device. On iPhone and iPad, save your scores to the Files app first. On Android you can also share a score to PocketScore from the Files app." },
             ...(ui.installRow.hidden ? [] : [{ target: el("install-row"), title: "Install PocketScore", text: "Add it to your home screen or app list, so it opens like an app and works offline." }]),
             ...($("install-ios").hidden ? [] : [{ target: el("install-ios"), title: "Install PocketScore", text: installSteps + " It opens like an app and works offline." }]),
-            { target: el("settings-open"), also: () => [$("help")], title: "Settings and help", text: "The gear has Settings, such as keeping the music playing when you leave the app, a sound delay for Bluetooth earbuds, and a playback report to send if the music stutters. Once a score is open, tap ? again to see how to play it, practise your part and write on it." },
+            { target: el("settings-open"), also: () => [$("help")], title: "Settings and help", text: "The gear has Settings, such as keeping the music playing when you leave the app, a sound delay for Bluetooth earbuds, whether to share anonymous usage counts, and a playback report to send if the music stutters. Once a score is open, tap ? again to see how to play it, practise your part and write on it." },
             tipStep,
         ];
     }
@@ -5318,7 +5337,7 @@ function tourSteps(): TourStep[] {
         ...(!composer ? [] : [{ target: el("edit-toggle"), title: "Change the notes", text: "Edit lets you change the music itself. Tap a note or rest, then move it up or down, change its length, or delete it. On a rest, pick a length and tap letters C to B one after another: each note goes in after the last. Hold your finger on a second note to select everything up to it, then Copy, Cut, Paste or move it. The three dots (More) hold sharps and flats, ties, triplets, voices, marks, slurs and hairpins, chords, dynamics, words and lyrics, key and time, bars and lines, the microphone that turns a tune you sing into notes (a metronome beeps the beat while you record), and New score. Undo and Redo are at the top right. Save a copy makes a new .mscz file: it never replaces the one you opened." }]),
         { target: el("notes-toggle"), also: () => [el("save")()], title: "Your notes", text: "Write on the score with a pen, highlighter or text boxes, using a finger or a stylus. Save keeps your notes and mixer changes for this score on this device, not in the file. If you forget, PocketScore asks before you open another score." },
         { target: el("view-mode"), title: "Views", text: "Page view scrolls through the pages. Page by page shows one whole page at a time: swipe left or right to turn it, and zoom in to read closer. Two pages shows two side by side with the device on its side, and hides the controls (tap off the music to bring them back); each swipe slides along one page, so the right page becomes the left (Settings can make a swipe turn both). Continuous lays the music out in one long line." },
-        { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, a sound delay for Bluetooth earbuds, and a playback report to send if the music stutters. ? shows this tour again." },
+        { target: el("focus-toggle"), also: () => [el("settings-open")(), el("help")()], title: "Focus, settings and help", text: "Focus (the first icon) hides everything but the music and a play button; tap off the staves to bring the controls back. The gear has Settings, such as keeping the music playing when you leave the app, a sound delay for Bluetooth earbuds, whether to share anonymous usage counts, and a playback report to send if the music stutters. ? shows this tour again." },
         tipStep,
     ];
 }

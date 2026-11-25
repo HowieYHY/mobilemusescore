@@ -2,10 +2,6 @@ name = "pocketscore-usage"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
-# Days are cut at this offset from UTC (8 = Singapore)
-[vars]
-TZ_OFFSET_HOURS = "8"
-
 # `npx wrangler d1 create pocketscore-usage` prints the id: paste it here
 [[d1_databases]]
 binding = "DB"

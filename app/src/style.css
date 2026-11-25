@@ -1428,21 +1428,150 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 .resume-item .btn:first-child { justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resume-item .hint { white-space: nowrap; }
 
-/* the owner's hidden usage screen */
-.ask.owner { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; }
-.owner .ou-msg { margin: 0 0 10px; min-height: 1.4em; }
-.ou-keyrow { display: flex; gap: 8px; margin-bottom: 12px; }
-.ou-keyrow[hidden], .owner [hidden] { display: none; }
-.ou-key { flex: 1; min-width: 0; font-size: 16px; padding: 8px 10px; border: 1px solid #c7ccd2; border-radius: 8px; }
-.ou-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 14px; }
-.ou-stat { display: flex; flex-direction: column; padding: 10px; border-radius: 10px; background: #f1f3f5; }
-.ou-num { font-size: 22px; font-weight: 700; line-height: 1.15; }
-.ou-label { font-size: 13px; color: var(--ink-2); }
-.ou-note { font-size: 12px; color: var(--ink-2); margin: 4px 0 0; }
-.ou-block { margin-bottom: 14px; }
-.ou-block h3 { margin: 0 0 6px; font-size: 14px; }
-.ou-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 3px 0; border-bottom: 1px solid #eceff1; }
-.ou-day { display: grid; grid-template-columns: 44px 70px 1fr; gap: 8px; align-items: center; font-size: 12px; padding: 2px 0; }
-.ou-track { height: 10px; border-radius: 5px; background: #eceff1; overflow: hidden; }
-.ou-bar { display: block; height: 100%; background: #2f6fed; border-radius: 5px; }
-.ou-n { color: var(--ink-2); }
+/* the owner's hidden usage screen: a whole screen of its own, only for the owner. Dark, from the app's own navy
+   chrome and its bright blue (--accent-bright), one accent for the one series on screen. */
+.ask.owner {
+  --ou-bg: #0e1622;
+  --ou-card: #172131;
+  --ou-card-2: #1c2a3d;
+  --ou-line: rgba(255, 255, 255, 0.08);
+  --ou-line-2: rgba(255, 255, 255, 0.16);
+  --ou-ink: #eef2f8;
+  --ou-ink-2: #aab6c7;
+  --ou-mute: #8d9bb0;
+  --ou-accent: #5b9cf2;
+  --ou-accent-ink: #07111d;
+  width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; border-radius: 0;
+  overflow-y: auto; box-shadow: none; color-scheme: dark;
+  color: var(--ou-ink);
+  background: radial-gradient(1100px 460px at 12% -8%, rgba(91, 156, 242, 0.13), transparent 62%), var(--ou-bg);
+  font-variant-numeric: tabular-nums;
+  scrollbar-width: thin; scrollbar-color: #36486a transparent;
+}
+.owner[open] { display: block; }
+.owner [hidden] { display: none !important; }
+.owner ::selection { background: rgba(91, 156, 242, 0.4); color: #fff; }
+.owner :focus-visible { outline: 2px solid var(--ou-accent); outline-offset: 2px; }
+.ou-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* header */
+.ou-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; max-width: 1220px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 12px max(18px, env(safe-area-inset-left)); }
+.ou-head h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; color: var(--ou-ink); }
+.ou-head h2 svg { flex: none; color: var(--ou-accent); }
+.ou-msg { flex: 1; min-width: 140px; font-size: 13px; color: var(--ou-mute); }
+.ou-actions { display: flex; gap: 8px; }
+.owner .btn { background: rgba(255, 255, 255, 0.07); color: var(--ou-ink); border: 1px solid var(--ou-line-2); }
+.owner .btn:hover { background: rgba(255, 255, 255, 0.13); }
+.owner .btn.primary { background: var(--ou-accent); border-color: var(--ou-accent); color: var(--ou-accent-ink); font-weight: 600; }
+.owner .btn.primary:hover { background: #7ab1f6; }
+.ou-keyrow { display: flex; gap: 8px; max-width: 520px; margin: 12px auto 16px; padding: 0 18px; }
+.ou-key { flex: 1; min-width: 0; font-size: 16px; padding: 9px 12px; color: var(--ou-ink); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--ou-line-2); border-radius: 10px; }
+.ou-key::placeholder { color: var(--ou-mute); }
+
+/* the range, always in reach */
+.ou-controls { position: sticky; top: 0; z-index: 2; background: var(--ou-bg); border-bottom: 1px solid var(--ou-line); padding: 8px max(18px, env(safe-area-inset-right)) 10px max(18px, calc((100% - 1220px) / 2 + 18px)); }
+.ou-controls .ou-seg { display: flex; width: fit-content; margin: 0; }
+@media (max-width: 540px) {
+  .ou-controls .ou-seg { width: 100%; }
+  .ou-controls .ou-seg button { flex: 1; padding-inline: 6px; }
+}
+.ou-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: rgba(255, 255, 255, 0.06); border-radius: 999px; }
+.ou-seg button { border: 0; background: transparent; color: var(--ou-ink-2); font: inherit; font-size: 13px; padding: 7px 14px; min-height: 34px; border-radius: 999px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.ou-seg button:hover { color: var(--ou-ink); background: rgba(255, 255, 255, 0.07); }
+.ou-seg button[aria-pressed="true"] { background: var(--ou-accent); color: var(--ou-accent-ink); font-weight: 600; }
+
+.ou-body { max-width: 1220px; margin: 0 auto; padding: 16px max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left)); transition: opacity 0.15s; }
+.ou-body.busy { opacity: 0.45; }
+.ou-empty { text-align: center; padding: 56px 0; }
+.ask.owner p { color: var(--ou-ink-2); }  /* the base question box styles its paragraphs: these are the screen's own */
+.ask.owner .ou-alltime { margin: 0 2px 14px; font-size: 13px; color: var(--ou-mute); }
+.ask.owner .ou-note { font-size: 12.5px; color: var(--ou-mute); margin: 4px 0 0; line-height: 1.45; }
+.ask.owner .ou-foot { margin-top: 18px; max-width: 70ch; }
+.ask.owner .ou-empty { color: var(--ou-ink-2); }
+.owner:focus { outline: none; }
+
+/* cards: one wide hero, two halves, three thirds, one wide table */
+.ou-cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+.ou-card { grid-column: span 6; min-width: 0; padding: 18px; border-radius: 16px; border: 1px solid var(--ou-line);
+  background: linear-gradient(180deg, var(--ou-card-2), var(--ou-card));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 28px rgba(0, 0, 0, 0.3); }
+.ou-card.half { grid-column: span 3; }
+.ou-card.third { grid-column: span 2; }
+.ou-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
+.ou-card-head h3 { margin: 0; font-size: 15px; font-weight: 650; color: var(--ou-ink); }
+.ask.owner .ou-card-body > .ou-note:first-child { margin-top: 0; }
+@media (max-width: 880px) {
+  .ou-card.half { grid-column: span 6; }
+  .ou-card.third { grid-column: span 3; }
+  .ou-card.third:nth-last-child(2) { grid-column: span 6; }
+}
+@media (max-width: 540px) {
+  .ou-card { padding: 14px; border-radius: 14px; }
+  .ou-card.third { grid-column: span 6; }
+}
+
+/* the metric tabs: each shows its total for the range, and picks what the line draws */
+.ou-metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.ou-stat { display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: var(--ou-ink); padding: 11px 13px 12px; border-radius: 12px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.035); border: 1px solid var(--ou-line); transition: background 0.15s, border-color 0.15s; min-width: 0; }
+.ou-stat:hover { background: rgba(255, 255, 255, 0.07); }
+.ou-stat[aria-pressed="true"] { background: rgba(91, 156, 242, 0.15); border-color: rgba(91, 156, 242, 0.6); box-shadow: inset 0 -2px 0 var(--ou-accent); }
+.ou-label { font-size: 12.5px; font-weight: 500; color: var(--ou-ink-2); }
+.ou-num { font-size: 24px; font-weight: 650; line-height: 1.15; letter-spacing: -0.01em; white-space: nowrap; }
+.ask.owner .ou-stat .ou-note { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 960px) {
+  .ou-metrics { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(142px, 1fr); overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 6px; scrollbar-width: thin; scrollbar-color: #36486a transparent; }
+  .ou-stat { scroll-snap-align: start; }
+}
+
+/* charts */
+.ask.owner .ou-cap { margin: 0 0 6px; }
+.ou-chart { position: relative; }
+.ou-chart svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.ou-chart .ou-grid { stroke: rgba(255, 255, 255, 0.07); stroke-width: 1; }
+.ou-chart .ou-axis { stroke: rgba(255, 255, 255, 0.24); stroke-width: 1; }
+.ou-tick { font-size: 11px; fill: var(--ou-mute); }
+.ou-stop-a { stop-color: var(--ou-accent); stop-opacity: 0.38; }
+.ou-stop-b { stop-color: var(--ou-accent); stop-opacity: 0; }
+.ou-line { fill: none; stroke: var(--ou-accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ou-dot { fill: var(--ou-accent); stroke: var(--ou-card); stroke-width: 2; }
+.ou-cross { stroke: rgba(255, 255, 255, 0.3); stroke-width: 1; stroke-dasharray: 3 3; }
+.ou-mark { fill: #fff; stroke: var(--ou-accent); stroke-width: 3; }
+.ou-hit { fill: transparent; outline: none; cursor: crosshair; }
+.ou-hit:focus-visible { fill: rgba(91, 156, 242, 0.1); }
+.ou-tip { position: absolute; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 11px; border-radius: 10px; background: #09101a; border: 1px solid var(--ou-line-2); color: var(--ou-ink); font-size: 12px; line-height: 1.4; white-space: nowrap; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); z-index: 3; }
+.ou-tip strong { font-size: 17px; font-weight: 650; }
+.ou-tip span { color: var(--ou-ink-2); }
+/* the one moment of motion: the line draws itself, then the area and dots come in */
+@keyframes ou-draw { to { stroke-dashoffset: 0; } }
+@keyframes ou-fade { to { opacity: 1; } }
+.ou-chart.draw .ou-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ou-draw 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.ou-chart.draw .ou-area { opacity: 0; animation: ou-fade 0.7s ease-out 0.3s forwards; }
+.ou-chart.draw .ou-dot { opacity: 0; animation: ou-fade 0.4s ease-out 0.75s forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .ou-chart.draw .ou-line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
+  .ou-chart.draw .ou-area, .ou-chart.draw .ou-dot { animation: none; opacity: 1; }
+  .ou-body, .ou-stat, .ou-seg button { transition: none; }
+}
+
+/* tables behind the charts, and the heaviest users */
+.ou-details { margin-top: 10px; font-size: 13px; }
+.ou-details summary { cursor: pointer; color: var(--ou-ink-2); padding: 4px 0; width: fit-content; }
+.ou-details summary:hover { color: var(--ou-ink); }
+.ou-table { overflow-x: auto; max-height: 340px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #36486a transparent; }
+.ou-table table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ou-table th, .ou-table td { text-align: left; padding: 7px 14px 7px 0; border-bottom: 1px solid var(--ou-line); white-space: nowrap; }
+.ou-table th { position: sticky; top: 0; background: #1a2638; font-size: 12px; font-weight: 600; color: var(--ou-mute); }
+.ou-table tbody tr:hover td { background: rgba(255, 255, 255, 0.035); }
+.ou-table.who { max-height: none; }
+.ou-table.who td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--ou-ink); }
+.ou-table.who td:nth-child(n+3):nth-child(-n+6), .ou-table.who th:nth-child(n+3):nth-child(-n+6) { text-align: right; }
+.ou-table.who td:nth-child(7), .ou-table.who th:nth-child(7) { padding-left: 22px; }
+
+/* short lists with a bar for each share */
+.ou-shares { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; }
+.ou-share { display: grid; grid-template-columns: minmax(72px, 104px) 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.ou-share-name { color: var(--ou-ink); }
+.ou-track { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.ou-fill { display: block; height: 100%; background: var(--ou-accent); border-radius: 4px; }
+.ou-n { color: var(--ou-ink-2); white-space: nowrap; }

@@ -6,8 +6,10 @@
 //     seconds in front grow (and are kept when the page goes to the background),
 //   - a reload is a second visit by the same install; a second browser profile is a second install,
 //   - Settings' "Share anonymous usage counts" off sends nothing (the same flow with it on does: the control),
-//   - seven taps on the version line open the owner screen; a wrong key is refused, the right key shows
-//     the figures, is kept for next time and can be forgotten; fewer than seven taps open nothing,
+//   - seven taps on the version line open the owner screen (a whole screen); a wrong key is refused, the right
+//     key shows the figures, is kept for next time and can be forgotten; fewer than seven taps open nothing,
+//   - the ranges (24 hours, 7 days, 1 month, 1 year): Singapore-time columns, nothing drawn before the first
+//     visit, every view adding up, hover and table views, with the browser set to New York time,
 //   - a copy built with no counter address has no owner screen and the setting is off, saying so.
 //
 // Starts its own dev server (port 5191) and counter (port 8799).
@@ -45,7 +47,6 @@ const stmt = (sql, args = []) => ({
 const env = {
     DB: { prepare: (sql) => stmt(sql), batch: async (list) => Promise.all(list.map((s) => s.all())) },
     STATS_KEY: "test-key-0123456789",
-    TZ_OFFSET_HOURS: "8",
 };
 const counter = http.createServer(async (req, res) => {
     const chunks = [];
@@ -100,7 +101,7 @@ try {
     check(bad.status === 400 && rows().length === 0, "/ping with bad ids: refused, nothing stored");
 
     browser = await chromium.launch();
-    const ctxA = await browser.newContext({ viewport: { width: 1000, height: 800 } });
+    const ctxA = await browser.newContext({ viewport: { width: 1000, height: 800 }, timezoneId: "America/New_York" }); // not SGT, to see that the screen is
     const page = await ctxA.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
@@ -149,26 +150,105 @@ try {
     check(!(await page.$eval(".ou-keyrow", (e) => e.hidden)), "the key box stays for another try");
     await page.fill(".ou-key", env.STATS_KEY);
     await page.click(".ou-go");
-    const shown = await until(async () => /people so far/.test(await page.textContent(".ou-body")), 5000);
+    const shown = await until(async () => (await page.$$(".ou-stat")).length > 0, 5000);
     check(shown, "the right key shows the figures");
-    const text = shown ? await page.textContent(".ou-body") : "";
     const figures = await page.$$eval(".ou-stat", (els) => Object.fromEntries(els.map((e) => [e.querySelector(".ou-label").textContent, e.querySelector(".ou-num").textContent])));
-    const num = (label) => Number(figures[label]);
-    check(num("people so far") === 2, `people so far = 2 (shown ${num("people so far")})`);
-    check(num("visits so far") === 3 || num("visits so far") === 4, `visits so far counts every visit (shown ${num("visits so far")}; the page just reloaded)`);
-    check(num("used it today") === 2, `used it today = 2 (shown ${num("used it today")})`);
-    check(/Each day, last 30 days/.test(text) && /Installed app or browser tab/.test(text), "daily list and breakdowns are shown");
-    // a look at it on a phone (build/usage/owner-phone.png)
+    check(Number(figures["People"]) === 2, `people = 2 (shown ${figures["People"]})`);
+    check([3, 4].includes(Number(figures["Visits"])), `visits counts every visit (shown ${figures["Visits"]})`);
+    check(await page.$eval("#owner", (d) => Math.round(d.getBoundingClientRect().width) === innerWidth && Math.round(d.getBoundingClientRect().height) === innerHeight), "the owner screen takes the whole screen");
+
+    // ---- the counter's own answers: Singapore time, nothing before the first visit
+    const SGT = 8 * 3600000, HOUR = 3600000, DAY = 24 * HOUR, WEEK = 7 * DAY;
+    const get = async (range) => (await fetch(`${COUNTER}/stats?range=${range}`, { headers: { authorization: "Bearer " + env.STATS_KEY } })).json();
+    const [s24, s7, s30, s1y, bogus] = await Promise.all(["24h", "7d", "30d", "1y", "nonsense"].map(get));
+    check(bogus.range === "7d", "an unknown range falls back to 7 days");
+    check(s24.unit === "hour" && s24.buckets.every((b) => b.t % HOUR === 0), "24 hours: hourly columns");
+    check(s7.unit === "day" && s7.buckets.every((b) => (b.t + SGT) % DAY === 0), "7 days: daily columns that start at midnight Singapore time");
+    check(s30.buckets.every((b) => (b.t + SGT) % DAY === 0), "1 month: daily columns that start at midnight Singapore time");
+    check(s1y.unit === "week" && s1y.buckets.every((b) => (b.t + SGT - 4 * DAY) % WEEK === 0), "1 year: weekly columns that start on a Monday, Singapore time");
+    check([s7, s30, s1y].every((x) => x.buckets.length === 1) && s24.buckets.length >= 1 && s24.buckets.length <= 2 && s24.buckets[0].t + HOUR > s24.since,
+        `nothing before the first visit is shown (7 days, 1 month, 1 year: 1 column; 24 hours: ${s24.buckets.length})`);
+    const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+    check(sum(s7.buckets.map((b) => b.visits)) === s7.summary.visits && sum(s7.hourOfDay.map((x) => x.visits)) === s7.summary.visits
+        && sum(s7.dayOfWeek.map((x) => x.visits)) === s7.summary.visits && sum(s7.visitLengths) === s7.summary.visits, "every view adds up to the same number of visits");
+
+    // ---- the views on the screen
+    const hits = (card) => page.$$eval(`.ou-cards > .ou-card:nth-child(${card}) .ou-hit`, (e) => e.length);
+    const tableRows = (card) => page.$$eval(`.ou-cards > .ou-card:nth-child(${card}) tbody tr`, (rs) => rs.map((r) => [...r.children].map((c) => c.textContent)));
+    const pressed = () => page.$$eval(".ou-controls button[aria-pressed=true]", (b) => b.map((x) => x.textContent).join());
+    check((await page.$$(".ou-controls button")).length === 4 && (await pressed()) === "7 days", "range choices: 24 hours, 7 days, 1 month, 1 year; 7 days at first");
+    check((await hits(1)) === s7.buckets.length, "the chart shows only the days since the first visit (1)");
+    const asked = page.waitForRequest((r) => /range=24h/.test(r.url()));
+    await page.click(".ou-controls button:has-text('24 hours')");
+    await asked;
+    check(await until(async () => (await pressed()) === "24 hours" && (await hits(1)) === s24.buckets.length, 5000), "24 hours asks the counter for 24 hours and redraws");
+    check(await page.evaluate(() => JSON.parse(localStorage.getItem("pocketscore.owner.view")).range === "24h"), "the chosen range is remembered on this device");
+    // the hour under the pointer is named in Singapore time although this browser is on New York time
+    const sgtHour = (ms) => new Intl.DateTimeFormat("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: true }).format(ms);
+    const nyHour = (ms) => new Intl.DateTimeFormat("en-SG", { timeZone: "America/New_York", hour: "numeric", hour12: true }).format(ms);
+    const lastBucket = s24.buckets.at(-1);
+    await page.hover(".ou-cards > .ou-card:nth-child(1) .ou-hit:last-of-type");
+    const tipText = await page.textContent(".ou-cards > .ou-card:nth-child(1) .ou-tip");
+    check(await page.$eval(".ou-cards > .ou-card:nth-child(1) .ou-tip", (t) => !t.hidden) && tipText.includes(sgtHour(lastBucket.t)) && sgtHour(lastBucket.t) !== nyHour(lastBucket.t),
+        `hovering a column names it in Singapore time (${sgtHour(lastBucket.t)}, not ${nyHour(lastBucket.t)}): "${tipText.slice(0, 60)}"`);
+    check(await page.$eval(".ou-cards > .ou-card:nth-child(1) .ou-cross", (c) => c.style.display !== "none") && await page.$eval(".ou-cards > .ou-card:nth-child(1) .ou-mark", (c) => c.style.display !== "none"),
+        "hovering draws the crosshair and the marker on the point");
+    check(/ SGT$/.test(await page.textContent(".ou-msg")), "the screen says its update time is SGT");
+    // what to chart
+    const caption = () => page.textContent(".ou-cards > .ou-card:nth-child(1) .ou-cap");
+    const before1 = await caption();
+    await page.click(".ou-metrics button:has-text('Visits')");
+    check((await caption()) !== before1 && /Visits/.test(await caption()), "the chart's metric switch changes what is drawn");
+    check(sum((await tableRows(1)).map((r) => Number(r[3]))) === s24.summary.visits, "the table behind the chart adds up to the visits in the range");
+    await page.click(".ou-metrics button:has-text('Average visit')");
+    check(/Average visit/.test(await caption()), "...and so does Average visit");
+    // when people use it
+    check((await hits(2)) === 24, "when people use it: 24 hours of the day");
+    await page.click(".ou-cards > .ou-card:nth-child(2) .ou-seg button:has-text('Day of week')");
+    check((await hits(2)) === 7, "...and 7 days of the week");
+    check(sum((await tableRows(2)).map((r) => Number(r[1]))) === s24.summary.visits, "...adding up to the visits in the range");
+    check((await hits(3)) === 7 && sum((await tableRows(3)).map((r) => Number(r[1]))) === s24.summary.visits, "how long visits last: 7 groups, adding up to the visits");
+    const heavy = await tableRows(7);
+    check(heavy.length === 2 && heavy.every((r) => r[0].length === 8), "heaviest users: one row per person, with a short id only");
+    // look at it on a desktop and on a phone (build/usage)
     fs.mkdirSync(path.join(root, "build/usage"), { recursive: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({ path: path.join(root, "build/usage/owner-desktop.png") });
     await page.setViewportSize({ width: 390, height: 800 });
+    await sleep(400);
     await page.screenshot({ path: path.join(root, "build/usage/owner-phone.png") });
-    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "the owner screen fits a phone's width");
+    check(await page.$eval("#owner", (d) => d.scrollWidth <= d.clientWidth), "the owner screen fits a phone's width (no sideways scrolling)");
     await page.setViewportSize({ width: 1000, height: 800 });
+
+    // ---- older visits: the wider ranges show them, from the first visit on
+    const old = db.prepare("INSERT INTO sessions (sid, id, started, last, secs, play, v, mode) VALUES (?, ?, ?, ?, ?, ?, '1.0.30', 'app')");
+    const at = (daysAgo) => Date.now() - daysAgo * DAY;
+    for (const [n, daysAgo, secs] of [[1, 3, 600], [2, 3, 120], [3, 40, 900], [4, 200, 60]]) {
+        old.run("old-visit-" + n, "old-person-" + (n === 2 ? 1 : n), at(daysAgo), at(daysAgo), secs, secs / 2);
+    }
+    const [t7, t30, t1y, t24] = await Promise.all(["7d", "30d", "1y", "24h"].map(get));
+    check(t7.summary.people === 3 && t30.summary.people === 3 && t1y.summary.people === 5 && t24.summary.people === 2, "ranges count the right people (24 hours 2, 7 days 3, 1 month 3, 1 year 5)");
+    check(t1y.summary.newPeople === 5 && t30.summary.newPeople === 3, "new people are counted the first time ever");
+    check(t7.buckets.length === 7 && t30.buckets.length === 30 && t1y.buckets[0].t <= t1y.since && t1y.since < t1y.buckets[0].t + WEEK, "the columns now reach back to the first visit and no further");
+    // wait for something only the new range has (the summary's note and the chart's unit), not for a count the old range may share
+    const inRange = (text) => until(async () => (await page.textContent(".ou-stat .ou-note")).includes(text) && !(await page.$eval(".ou-body", (b) => b.classList.contains("busy"))), 5000);
+    await page.click(".ou-controls button:has-text('1 month')");
+    check((await inRange("1 month")) && (await hits(1)) === 30 && /per day/.test(await caption()), "1 month draws 30 days");
+    await page.click(".ou-controls button:has-text('1 year')");
+    check((await inRange("1 year")) && (await hits(1)) === t1y.buckets.length && /per week/.test(await caption()), `1 year draws the weeks since the first visit (${t1y.buckets.length}), per week`);
+    check(Number((await page.$$eval(".ou-stat .ou-num", (n) => n.map((x) => x.textContent)))[0]) === 5, "1 year: 5 people");
+    await page.screenshot({ path: path.join(root, "build/usage/owner-year.png") });
+    // every chart is a line over an area, not columns
+    const kinds = await page.$$eval(".ou-chart", (cs) => cs.map((c) => ({ lines: c.querySelectorAll(".ou-line").length, areas: c.querySelectorAll(".ou-area").length, bars: c.querySelectorAll(".ou-bar").length })));
+    check(kinds.length === 3 && kinds.every((k) => k.lines === 1 && k.areas === 1 && k.bars === 0), `all ${kinds.length} charts are lines with an area under them, no columns`);
+    // the metric tabs show their totals for the range and move the chart
+    const tabsText = await page.$$eval(".ou-metrics .ou-stat", (b) => b.map((x) => x.querySelector(".ou-label").textContent));
+    check(tabsText.join() === "People,New people,Visits,Time in app,Time playing,Average visit", "the six metric tabs carry the range's totals");
     await page.click(".ou-close");
 
     // the key is kept on this device: next time it loads by itself; Forget removes it
     for (let i = 0; i < 7; i++) await page.click("#version");
-    check(await until(async () => /people so far/.test(await page.textContent(".ou-body")), 5000), "the saved key is used next time (no typing)");
+    check(await until(async () => (await page.$$(".ou-stat")).length > 0, 5000), "the saved key is used next time (no typing)");
     await page.click(".ou-forget");
     check(await page.evaluate(() => localStorage.getItem("pocketscore.owner")) === null && !(await page.$eval(".ou-keyrow", (e) => e.hidden)),
         "Forget key removes it and asks again");

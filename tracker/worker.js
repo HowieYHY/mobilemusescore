@@ -1,6 +1,6 @@
 // PocketScore's private usage counter (a Cloudflare Worker with a D1 database).
 //   POST /ping   the app's anonymous heartbeat (no key: anyone's copy of the app may send it)
-//   GET  /stats  the numbers, only with `Authorization: Bearer <STATS_KEY>` (the owner's key, a secret
+//   GET  /stats?range=24h|7d|30d|1y  the numbers (times in Singapore time), only with `Authorization: Bearer <STATS_KEY>` (the owner's key, a secret
 //                set with `wrangler secret put STATS_KEY`; it is never in the app)
 // Stored: a random install id, a random visit id, version, installed-or-browser, seconds in front and
 // seconds of playing. Not stored: IP address, score names, files, notes.
@@ -50,87 +50,90 @@ async function ping(req, env) {
     return json({ ok: true });
 }
 
-const DAY = 86400000;
-const LIMIT = 60000;
+// Everything the owner sees is in Singapore time (SGT, UTC+8, no daylight saving): the buckets below
+// start at SGT midnights and hours, whatever time zone the owner's phone is in.
+const SGT = 8 * 3600000;
+const HOUR = 3600000;
+const DAY = 24 * HOUR;
+const WEEK = 7 * DAY;
+const RANGES = {
+    "24h": { unit: "hour", size: HOUR, count: 24 },
+    "7d": { unit: "day", size: DAY, count: 7 },
+    "30d": { unit: "day", size: DAY, count: 30 },
+    "1y": { unit: "week", size: WEEK, count: 52 }, // weeks start on Monday
+};
 
-async function stats(env) {
-    const off = (Number(env.TZ_OFFSET_HOURS) || 0) * 3600000;
-    const dayOf = (ms) => new Date(ms + off).toISOString().slice(0, 10);
+/** Start of the first bucket of a range: the range ends with the bucket that holds `now`. */
+function rangeStart(now, r) {
+    const x = now + SGT;
+    // 1 Jan 1970 was a Thursday, so a Monday is 4 days on
+    const current = r.unit === "week" ? Math.floor((x - 4 * DAY) / WEEK) * WEEK + 4 * DAY - SGT : Math.floor(x / r.size) * r.size - SGT;
+    return current - (r.count - 1) * r.size;
+}
+
+async function stats(env, rangeName) {
+    const range = RANGES[rangeName] ? rangeName : "7d";
+    const r = RANGES[range];
     const now = Date.now();
-    const today = dayOf(now);
-    const [rows, all, firsts] = await env.DB.batch([
-        env.DB.prepare("SELECT id, started, secs, play, v, mode FROM sessions WHERE started >= ?1 ORDER BY started LIMIT ?2").bind(now - 90 * DAY, LIMIT),
-        env.DB.prepare("SELECT COUNT(DISTINCT id) AS installs, COUNT(*) AS sessions, COALESCE(SUM(secs), 0) AS secs, MIN(started) AS first FROM sessions"),
-        env.DB.prepare("SELECT id, MIN(started) AS f FROM sessions GROUP BY id"),
+    const start = rangeStart(now, r);
+    const [per, news, sum, med, freq, vers, modes, all, hod, dow, lens, top] = await env.DB.batch([
+        // per bucket: people, visits, seconds in front, seconds playing
+        env.DB.prepare("SELECT CAST((started - ?1) / ?2 AS INTEGER) AS b, COUNT(DISTINCT id) AS people, COUNT(*) AS visits, SUM(secs) AS secs, SUM(play) AS play FROM sessions WHERE started >= ?1 GROUP BY b").bind(start, r.size),
+        // per bucket: people seen for the first time ever
+        env.DB.prepare("SELECT CAST((f - ?1) / ?2 AS INTEGER) AS b, COUNT(*) AS n FROM (SELECT MIN(started) AS f FROM sessions GROUP BY id) WHERE f >= ?1 GROUP BY b").bind(start, r.size),
+        env.DB.prepare("SELECT COUNT(DISTINCT id) AS people, COUNT(*) AS visits, COALESCE(SUM(secs), 0) AS secs, COALESCE(AVG(secs), 0) AS avgSecs, COALESCE(AVG(play), 0) AS avgPlay FROM sessions WHERE started >= ?1").bind(start),
+        env.DB.prepare("SELECT secs FROM sessions WHERE started >= ?1 ORDER BY secs LIMIT 1 OFFSET (SELECT COUNT(*) / 2 FROM sessions WHERE started >= ?1)").bind(start),
+        // how many different (SGT) days each person came on
+        env.DB.prepare("SELECT days, COUNT(*) AS n FROM (SELECT COUNT(DISTINCT CAST((started + ?2) / 86400000 AS INTEGER)) AS days FROM sessions WHERE started >= ?1 GROUP BY id) GROUP BY days").bind(start, SGT),
+        // each person's latest version and mode in the range
+        env.DB.prepare("SELECT v AS k, COUNT(*) AS n FROM (SELECT v, MAX(started) FROM sessions WHERE started >= ?1 GROUP BY id) GROUP BY v").bind(start),
+        env.DB.prepare("SELECT mode AS k, COUNT(*) AS n FROM (SELECT mode, MAX(started) FROM sessions WHERE started >= ?1 GROUP BY id) GROUP BY mode").bind(start),
+        env.DB.prepare("SELECT COUNT(DISTINCT id) AS people, COUNT(*) AS visits, COALESCE(SUM(secs), 0) AS secs, MIN(started) AS since FROM sessions"),
+        // when people use it: by SGT hour of the day (0-23) and SGT day of the week (0 = Monday)
+        env.DB.prepare("SELECT CAST(((started + ?2) / 3600000) % 24 AS INTEGER) AS k, COUNT(*) AS visits, COUNT(DISTINCT id) AS people, SUM(secs) AS secs FROM sessions WHERE started >= ?1 GROUP BY k").bind(start, SGT),
+        env.DB.prepare("SELECT CAST((((started + ?2) / 86400000) + 3) % 7 AS INTEGER) AS k, COUNT(*) AS visits, COUNT(DISTINCT id) AS people, SUM(secs) AS secs FROM sessions WHERE started >= ?1 GROUP BY k").bind(start, SGT),
+        // how long visits last
+        env.DB.prepare("SELECT CASE WHEN secs < 10 THEN 0 WHEN secs < 30 THEN 1 WHEN secs < 60 THEN 2 WHEN secs < 300 THEN 3 WHEN secs < 900 THEN 4 WHEN secs < 1800 THEN 5 ELSE 6 END AS k, COUNT(*) AS n FROM sessions WHERE started >= ?1 GROUP BY k").bind(start),
+        // the heaviest installs in the range (a short piece of the random id, nothing that names anyone)
+        env.DB.prepare("SELECT substr(id, 1, 8) AS who, MAX(mode) AS mode, COUNT(*) AS visits, SUM(secs) AS secs, SUM(play) AS play, MIN(started) AS first, MAX(started) AS last, COUNT(DISTINCT CAST((started + ?2) / 86400000 AS INTEGER)) AS days FROM sessions WHERE started >= ?1 GROUP BY id ORDER BY secs DESC LIMIT 15").bind(start, SGT),
     ]);
-    const ss = rows.results.map((r) => ({ ...r, day: dayOf(r.started) }));
-    // the day each install was first seen (over everything, not only the last 90 days)
-    const firstSeen = new Map(firsts.results.map((r) => [r.id, dayOf(r.f)]));
-
-    const days = [];
-    for (let i = 29; i >= 0; i--) {
-        days.push(dayOf(now - i * DAY));
-    }
-    const perDay = new Map(days.map((d) => [d, { users: new Set(), sessions: 0, secs: 0, play: 0, fresh: new Set() }]));
-    for (const s of ss) {
-        const p = perDay.get(s.day);
-        if (p) {
-            p.users.add(s.id);
-            p.sessions++;
-            p.secs += s.secs;
-            p.play += s.play;
-            if (firstSeen.get(s.id) === s.day) {
-                p.fresh.add(s.id);
-            }
+    const since = all.results[0].since;
+    const byB = new Map(per.results.map((x) => [x.b, x]));
+    const newByB = new Map(news.results.map((x) => [x.b, x.n]));
+    const buckets = [];
+    for (let i = 0; i < r.count; i++) {
+        const t = start + i * r.size;
+        if (since === null || t + r.size <= since) {
+            continue; // nothing was being counted yet: no empty history before the first visit
         }
+        const x = byB.get(i);
+        buckets.push({ t, people: x ? x.people : 0, newPeople: newByB.get(i) || 0, visits: x ? x.visits : 0, secs: x ? x.secs : 0, play: x ? x.play : 0 });
     }
-    const daily = days.map((d) => {
-        const p = perDay.get(d);
-        return { day: d, users: p.users.size, newUsers: p.fresh.size, sessions: p.sessions, secs: p.secs, play: p.play };
-    });
-
-    const distinct = (fromMs) => new Set(ss.filter((s) => s.started >= fromMs).map((s) => s.id)).size;
-    const last30 = ss.filter((s) => s.started >= now - 30 * DAY);
-    const lens = last30.map((s) => s.secs).sort((a, b) => a - b);
-    const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-
-    // how often each install came back: the number of different days it was used in 30 days
-    const daysUsed = new Map();
-    for (const s of last30) {
-        if (!daysUsed.has(s.id)) {
-            daysUsed.set(s.id, new Set());
-        }
-        daysUsed.get(s.id).add(s.day);
+    const frequency = { "1 day": 0, "2-3 days": 0, "4-7 days": 0, "8-30 days": 0, "31+ days": 0 };
+    for (const { days, n } of freq.results) {
+        frequency[days <= 1 ? "1 day" : days <= 3 ? "2-3 days" : days <= 7 ? "4-7 days" : days <= 30 ? "8-30 days" : "31+ days"] += n;
     }
-    const frequency = { "1 day": 0, "2-3 days": 0, "4-7 days": 0, "8+ days": 0 };
-    for (const set of daysUsed.values()) {
-        const n = set.size;
-        frequency[n === 1 ? "1 day" : n <= 3 ? "2-3 days" : n <= 7 ? "4-7 days" : "8+ days"]++;
-    }
-
-    // installs by the version / mode they used last, in 30 days
-    const count = (key) => {
-        const latest = new Map();
-        for (const s of last30) {
-            latest.set(s.id, s[key]);
-        }
-        const out = {};
-        for (const v of latest.values()) {
-            out[v] = (out[v] || 0) + 1;
+    const fill = (rows, n, pick) => {
+        const out = Array.from({ length: n }, () => pick(null));
+        for (const x of rows.results) {
+            out[x.k] = pick(x);
         }
         return out;
     };
-
+    const tally = (rows) => Object.fromEntries(rows.results.map((x) => [x.k, x.n]));
     return {
-        now, today, tzOffsetHours: Number(env.TZ_OFFSET_HOURS) || 0,
-        total: { installs: all.results[0].installs, sessions: all.results[0].sessions, hours: all.results[0].secs / 3600, since: all.results[0].first },
-        active: { today: new Set(ss.filter((s) => s.day === today).map((s) => s.id)).size, d7: distinct(now - 7 * DAY), d30: distinct(now - 30 * DAY) },
-        session: { avgSecs: avg(lens), medianSecs: lens.length ? lens[Math.floor(lens.length / 2)] : 0, avgPlaySecs: avg(last30.map((s) => s.play)), n: lens.length },
-        frequency,
-        versions: count("v"),
-        modes: count("mode"),
-        daily,
-        truncated: rows.results.length >= LIMIT,
+        now, range, unit: r.unit, size: r.size, start, since,
+        total: { people: all.results[0].people, visits: all.results[0].visits, hours: all.results[0].secs / 3600 },
+        summary: {
+            people: sum.results[0].people, visits: sum.results[0].visits, secs: sum.results[0].secs,
+            newPeople: [...newByB.values()].reduce((a, b) => a + b, 0),
+            avgSecs: sum.results[0].avgSecs, medianSecs: med.results[0] ? med.results[0].secs : 0, avgPlaySecs: sum.results[0].avgPlay,
+        },
+        buckets, frequency, versions: tally(vers), modes: tally(modes),
+        hourOfDay: fill(hod, 24, (x) => ({ visits: x ? x.visits : 0, people: x ? x.people : 0, secs: x ? x.secs : 0 })),
+        dayOfWeek: fill(dow, 7, (x) => ({ visits: x ? x.visits : 0, people: x ? x.people : 0, secs: x ? x.secs : 0 })),
+        visitLengths: fill(lens, 7, (x) => (x ? x.n : 0)),
+        top: top.results,
     };
 }
 
@@ -149,7 +152,7 @@ export default {
                 if (!env.STATS_KEY || !sameKey(given, env.STATS_KEY)) {
                     return json({ error: "wrong key" }, 401);
                 }
-                return json(await stats(env));
+                return json(await stats(env, url.searchParams.get("range")));
             }
         } catch {
             return json({ error: "server error" }, 500);

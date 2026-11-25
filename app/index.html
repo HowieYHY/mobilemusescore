@@ -380,11 +380,14 @@
 
   <!-- the owner's hidden usage screen (seven taps on the version line); see usageview.ts -->
   <dialog class="ask owner" id="owner" aria-labelledby="owner-title">
-    <h2 id="owner-title">Usage</h2>
-    <p class="ou-msg" role="status"></p>
+    <header class="ou-head">
+      <h2 id="owner-title"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>PocketScore usage</h2>
+      <span class="ou-msg" role="status"></span>
+      <span class="ou-actions"><button class="btn plain small ou-forget" hidden>Forget key</button><button class="btn plain small ou-refresh" hidden>Refresh</button><button class="btn primary small ou-close">Close</button></span>
+    </header>
     <div class="ou-keyrow"><input class="ou-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Owner key" placeholder="Key"><button class="btn primary ou-go">Show</button></div>
+    <div class="ou-controls" hidden></div>
     <div class="ou-body"></div>
-    <div class="ask-buttons"><button class="btn plain ou-forget" hidden>Forget key</button><button class="btn plain ou-refresh" hidden>Refresh</button><button class="btn primary ou-close">Close</button></div>
   </dialog>
 
   <dialog class="ask newscore" id="newscore" aria-labelledby="newscore-title">

@@ -5,7 +5,7 @@ A small Cloudflare Worker with a D1 database. The app sends it one anonymous hea
 start screen seven times and typing the key (it opens a full screen of views). See the *Usage counter* row in `docs/DEVELOPMENT.md`.
 
 Stored per visit: a random install id, a random visit id, app version, installed app or browser tab,
-seconds in front, seconds of playing. Not stored: IP address, score names, files, notes.
+seconds in front, seconds of playing, and whether the visit came from the owner's own device (a flag, set when the app sends the owner's key; the key itself is never stored). Not stored: IP address, score names, files, notes.
 
 ## One-time setup (free Cloudflare account)
 
@@ -33,6 +33,7 @@ npx wrangler deploy
 
 ## Notes
 
+- **Owner vs others:** open the screen once on each of your devices (the key is then kept there and sent with that device's visits, so they're marked as yours). The screen's *Leave out my own visits* tick filters by it. On a database made before this, run `npx wrangler d1 execute pocketscore-usage --remote --file=migrations/001-own.sql` once, then `npx wrangler deploy`.
 - Every time is Singapore time (SGT, UTC+8): days start at midnight there and weeks on Monday, whatever time zone the phone is in. Ranges: 24 hours (hourly), 7 days and 1 month (daily), 1 year (weekly); columns before the first visit are left out.
 - The key is only a Worker secret. To change it, run `wrangler secret put STATS_KEY` again.
 - The Reso website's frozen copy of PocketScore is built without the address, so it sends nothing.

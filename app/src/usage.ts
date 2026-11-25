@@ -65,11 +65,17 @@ export function startUsage(hooks: UsageHooks): () => void {
         }
         sentSecs = secs;
         sentPlay = play;
+        // on the owner's own devices (the key typed on the hidden screen) the counter is told so, which only
+        // marks these visits as the owner's; the key is checked by the counter and never stored there
+        let k = "";
+        try {
+            k = localStorage.getItem("pocketscore.owner") || "";
+        } catch { /* not marked */ }
         lastBeat = Date.now();
         // text/plain keeps it a plain request (no preflight); keepalive lets it finish as the page closes
         fetch(USAGE_URL + "/ping", {
             method: "POST",
-            body: JSON.stringify({ id, sid, v: hooks.version, mode, secs: Math.round(secs), play: Math.round(play) }),
+            body: JSON.stringify({ id, sid, v: hooks.version, mode, secs: Math.round(secs), play: Math.round(play), ...(k ? { k } : {}) }),
             headers: { "content-type": "text/plain" },
             keepalive: true,
             credentials: "omit",

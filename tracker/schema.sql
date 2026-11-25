@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   secs    INTEGER NOT NULL,   -- seconds the app was in front
   play    INTEGER NOT NULL,   -- seconds music was playing
   v       TEXT NOT NULL,      -- app version
-  mode    TEXT NOT NULL       -- 'app' (installed) or 'tab' (browser)
+  mode    TEXT NOT NULL,      -- 'app' (installed) or 'tab' (browser)
+  own     INTEGER NOT NULL DEFAULT 0  -- 1 when the visit carried the owner's key (see migrations/)
 );
 CREATE INDEX IF NOT EXISTS sessions_started ON sessions (started);
 CREATE INDEX IF NOT EXISTS sessions_id ON sessions (id);

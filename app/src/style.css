@@ -1470,6 +1470,9 @@ body:has(#empty:not([hidden])) #focus-toggle { display: none; }
 
 /* the range, always in reach */
 .ou-controls { position: sticky; top: 0; z-index: 2; background: var(--ou-bg); border-bottom: 1px solid var(--ou-line); padding: 8px max(18px, env(safe-area-inset-right)) 10px max(18px, calc((100% - 1220px) / 2 + 18px)); }
+.ou-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.ou-tick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ou-ink-2); cursor: pointer; min-height: 34px; }
+.ou-tick input { width: 18px; height: 18px; accent-color: var(--ou-accent); margin: 0; }
 .ou-controls .ou-seg { display: flex; width: fit-content; margin: 0; }
 @media (max-width: 540px) {
   .ou-controls .ou-seg { width: 100%; }

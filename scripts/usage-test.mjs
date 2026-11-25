@@ -112,7 +112,7 @@ try {
     const first = rows()[0];
     check(first && /^[a-z0-9-]{8,40}$/.test(first.id) && first.v === version && first.mode === "tab",
         `its id, version (${version}) and mode (browser tab) are right`);
-    check(JSON.stringify(first).indexOf("mscz") < 0 && Object.keys(first).join() === "sid,id,started,last,secs,play,v,mode",
+    check(JSON.stringify(first).indexOf("mscz") < 0 && Object.keys(first).join() === "sid,id,started,last,secs,play,v,mode,own",
         "the row holds only the listed fields (no score names, no IP)");
 
     await sleep(7000); // the page counts in 5 s steps
@@ -172,11 +172,41 @@ try {
     check(sum(s7.buckets.map((b) => b.visits)) === s7.summary.visits && sum(s7.hourOfDay.map((x) => x.visits)) === s7.summary.visits
         && sum(s7.dayOfWeek.map((x) => x.visits)) === s7.summary.visits && sum(s7.visitLengths) === s7.summary.visits, "every view adds up to the same number of visits");
 
+    // ---- telling the owner's own visits from everyone else's
+    const send = (id, sid, k) => fetch(COUNTER + "/ping", { method: "POST", body: JSON.stringify({ id, sid, v: version, mode: "tab", secs: 30, play: 10, ...(k ? { k } : {}) }) });
+    const who = async (w) => (await fetch(`${COUNTER}/stats?range=7d&who=${w}`, { headers: { authorization: "Bearer " + env.STATS_KEY } })).json();
+    const everyBefore = await who("all");
+    const mineBefore = (await who("mine")).summary.visits;
+    await send("owner-device-0001", "owner-visit-0001"); // an install that has not shown the key yet
+    await send("other-person-0001", "other-visit-0001", "a-guessed-key");
+    check((await who("mine")).summary.visits === mineBefore && rows().find((r) => r.id === "other-person-0001").own === 0, "a visit with a wrong key is not marked as the owner's");
+    await send("owner-device-0001", "owner-visit-0002", env.STATS_KEY);
+    const mine = await who("mine"), others = await who("others"), every = await who("all");
+    check(mine.summary.people >= 1 && mine.installs.mine >= 1 && mine.summary.visits >= 2, "the right key marks the install as the owner's");
+    const ownerRows = rows().filter((r) => r.id === "owner-device-0001");
+    check(ownerRows.length === 2 && ownerRows.every((r) => r.own === 1 || r.sid === "owner-visit-0001"), "(its first visit, sent before the key, is still stored as it was)");
+    check(mine.summary.visits === rows().filter((r) => r.own === 1 || rows().some((o) => o.id === r.id && o.own === 1)).length, "...but counted as the owner's too, since the install is");
+    check(others.summary.visits + mine.summary.visits === every.summary.visits && others.summary.people + mine.summary.people === every.summary.people, "mine and others add up to everyone");
+    check(every.summary.visits === everyBefore.summary.visits + 3, "everyone still counts every visit");
+    check(sum(mine.buckets.map((b) => b.visits)) === mine.summary.visits && sum(others.hourOfDay.map((x) => x.visits)) === others.summary.visits && mine.total.visits === mine.summary.visits, "the filter reaches every part (chart, hours, all time)");
+    check((await fetch(`${COUNTER}/stats?range=7d&who=mine`, { headers: { authorization: "Bearer nope" } })).status === 401, "the filter doesn't bypass the key");
+    check(!JSON.stringify(rows()).includes(env.STATS_KEY), "the key itself is never stored");
+    db.prepare("DELETE FROM sessions WHERE id IN ('owner-device-0001', 'other-person-0001')").run(); // so the counts below are the real ones
+
     // ---- the views on the screen
     const hits = (card) => page.$$eval(`.ou-cards > .ou-card:nth-child(${card}) .ou-hit`, (e) => e.length);
     const tableRows = (card) => page.$$eval(`.ou-cards > .ou-card:nth-child(${card}) tbody tr`, (rs) => rs.map((r) => [...r.children].map((c) => c.textContent)));
-    const pressed = () => page.$$eval(".ou-controls button[aria-pressed=true]", (b) => b.map((x) => x.textContent).join());
-    check((await page.$$(".ou-controls button")).length === 4 && (await pressed()) === "7 days", "range choices: 24 hours, 7 days, 1 month, 1 year; 7 days at first");
+    const pressed = () => page.$$eval(".ou-controls .ou-seg:first-child button[aria-pressed=true]", (b) => b.map((x) => x.textContent).join());
+    check((await page.$$(".ou-controls .ou-seg:first-child button")).length === 4 && (await pressed()) === "7 days", "range choices: 24 hours, 7 days, 1 month, 1 year; 7 days at first");
+    check((await page.$eval(".ou-tick", (l) => l.textContent.trim())) === "Leave out my own visits" && !(await page.$eval(".ou-tick input", (i) => i.checked)), "a tick: Leave out my own visits, off at first");
+    const askedOthers = page.waitForRequest((r) => /who=others/.test(r.url()));
+    await page.check(".ou-tick input");
+    await askedOthers;
+    check(await until(async () => /without your own visits/.test(await page.textContent(".ou-alltime")), 5000), "ticking it asks the counter for everyone but the owner, and the all-time line says so");
+    const askedAll = page.waitForRequest((r) => /who=all/.test(r.url()));
+    await page.uncheck(".ou-tick input");
+    await askedAll;
+    check(await until(async () => !/without your own/.test(await page.textContent(".ou-alltime")), 5000), "unticking brings everyone back");
     check((await hits(1)) === s7.buckets.length, "the chart shows only the days since the first visit (1)");
     const asked = page.waitForRequest((r) => /range=24h/.test(r.url()));
     await page.click(".ou-controls button:has-text('24 hours')");

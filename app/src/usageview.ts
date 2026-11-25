@@ -13,11 +13,12 @@ const PREFS = "pocketscore.owner.view";
 type RangeName = "24h" | "7d" | "30d" | "1y";
 type MetricName = "people" | "newPeople" | "visits" | "secs" | "play" | "avg";
 type WhenName = "hour" | "weekday";
+type WhoName = "all" | "others" | "mine";
 
 interface Bucket { t: number; people: number; newPeople: number; visits: number; secs: number; play: number }
 interface Slice { visits: number; people: number; secs: number }
 interface Stats {
-    now: number; range: RangeName; unit: "hour" | "day" | "week"; size: number; start: number; since: number | null;
+    now: number; range: RangeName; who: WhoName; installs: { mine: number; others: number }; unit: "hour" | "day" | "week"; size: number; start: number; since: number | null;
     total: { people: number; visits: number; hours: number };
     summary: { people: number; visits: number; secs: number; newPeople: number; avgSecs: number; medianSecs: number; avgPlaySecs: number };
     buckets: Bucket[];
@@ -98,13 +99,14 @@ const timeUnit = (maxSecs: number) => (maxSecs < 60 ? { div: 1, name: "seconds" 
 const oneDecimal = (n: number) => String(+n.toFixed(2));
 const quarter = (n: number) => String(+(Math.round(n * 4) / 4).toFixed(2)); // time in minutes or hours: nearest quarter
 
-interface View { range: RangeName; metric: MetricName; when: WhenName }
+interface View { range: RangeName; metric: MetricName; when: WhenName; who: WhoName }
 function loadView(): View {
-    const v: View = { range: "7d", metric: "people", when: "hour" };
+    const v: View = { range: "7d", metric: "people", when: "hour", who: "all" };
     try {
         const raw = JSON.parse(localStorage.getItem(PREFS) || "null");
         if (raw && RANGES.some(([k]) => k === raw.range)) v.range = raw.range;
         if (raw && METRICS.some((m) => m.key === raw.metric)) v.metric = raw.metric;
+        if (raw && (raw.who === "all" || raw.who === "others")) v.who = raw.who;
         if (raw && (raw.when === "hour" || raw.when === "weekday")) v.when = raw.when;
     } catch { /* the defaults */ }
     return v;
@@ -386,7 +388,7 @@ export function openOwnerScreen(dlg: HTMLDialogElement) {
             return;
         }
 
-        body.append(el("p", "ou-alltime", `All time: ${count(s.total.people)} people, ${count(s.total.visits)} visits, ${s.total.hours.toFixed(1)} hours` + (s.since ? `, since ${fYear.format(new Date(s.since))}` : "") + "."));
+        body.append(el("p", "ou-alltime", `All time${s.who === "all" ? "" : " (without your own visits)"}: ${count(s.total.people)} people, ${count(s.total.visits)} visits, ${s.total.hours.toFixed(1)} hours` + (s.since ? `, since ${fYear.format(new Date(s.since))}` : "") + "." + (s.installs.mine ? ` ${s.installs.mine} of the installs ${s.installs.mine === 1 ? "is" : "are"} yours.` : " None of the installs are marked as yours yet: opening this screen on a device marks it.")));
 
         const grid = el("div", "ou-cards");
         body.append(grid);
@@ -529,7 +531,7 @@ export function openOwnerScreen(dlg: HTMLDialogElement) {
         msg.textContent = "Loading…";
         body.classList.add("busy"); // the last picture stays, dimmed, until the new one is ready
         try {
-            const res = await fetch(USAGE_URL + "/stats?range=" + view.range, { headers: { authorization: "Bearer " + k }, cache: "no-store" });
+            const res = await fetch(USAGE_URL + "/stats?range=" + view.range + "&who=" + view.who, { headers: { authorization: "Bearer " + k }, cache: "no-store" });
             if (mine !== seq) {
                 return;
             }
@@ -580,6 +582,18 @@ export function openOwnerScreen(dlg: HTMLDialogElement) {
         saveView(view);
         void load(key);
     }));
+    // one tick to leave the owner's own devices out of every figure
+    const tick = el("label", "ou-tick");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = view.who === "others";
+    box.onchange = () => {
+        view.who = box.checked ? "others" : "all";
+        saveView(view);
+        void load(key);
+    };
+    tick.append(box, document.createTextNode(" Leave out my own visits"));
+    controls.append(tick);
     controls.hidden = true;
 
     keyBox.value = "";

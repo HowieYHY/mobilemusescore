@@ -33,6 +33,7 @@ npx wrangler deploy
 
 ## Notes
 
+- **Updates keep the data and your registered devices.** The database is separate from the Worker and the app, so deploying either never touches it. Change its shape only with an additive migration (`migrations/`, `ADD COLUMN` with a default), run before the Worker that needs it; never drop or recreate the table. Back up first when in doubt: `npx wrangler d1 export pocketscore-usage --remote --output <a file outside the repo>`.
 - **Owner vs others:** open the screen once on each of your devices (the key is then kept there and sent with that device's visits, so they're marked as yours). The screen's *Leave out my own visits* tick filters by it. On a database made before this, run `npx wrangler d1 execute pocketscore-usage --remote --file=migrations/001-own.sql` once, then `npx wrangler deploy`.
 - Every time is Singapore time (SGT, UTC+8): days start at midnight there and weeks on Monday, whatever time zone the phone is in. Ranges: 24 hours (hourly), 7 days and 1 month (daily), 1 year (weekly); columns before the first visit are left out.
 - The key is only a Worker secret. To change it, run `wrangler secret put STATS_KEY` again.

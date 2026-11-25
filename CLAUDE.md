@@ -81,6 +81,15 @@ build, tests, status) before working here.
   key). It stays off until `VITE_USAGE_URL` is built in. Keep it anonymous (random id, no IP, score names,
   files or notes), keep the owner's key out of the app and the repo, keep the reader's off switch and the
   README's plain description of it in step with what is sent, and never turn it on in the Reso preview.
+  **Updates must never reset the counter's data or the owner's registered devices** (the owner, 26 Nov 2026).
+  The data lives in D1, outside the app: change its shape only with an additive migration in
+  `tracker/migrations/` (`ALTER TABLE ... ADD COLUMN` with a default), run on the live database *before* the
+  Worker that uses it; never `DROP`, `DELETE`, recreate the table, or run `schema.sql` over data. A device is
+  registered by the server's `own` flag (permanent, once per install) and by two localStorage keys,
+  `pocketscore.usage.id` and `pocketscore.owner`: never rename them, clear them, or add code that removes them
+  (only the screen's *Forget key* and a refused key do, on purpose), and keep `usage-test`'s check that a reload
+  keeps the install id and the owner mark. Before a risky database change take a copy:
+  `npx wrangler d1 export pocketscore-usage --remote --output <file outside the repo>`.
 - **Every new or changed feature updates the tour and the README**, without being asked: a tour step
   (`tour` steps in `main.ts`) for any new control, and the README's user guide. The user's standing
   request (10 Oct 2026).

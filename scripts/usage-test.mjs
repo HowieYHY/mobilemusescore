@@ -18,7 +18,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
@@ -70,7 +70,7 @@ function devServer(port, withCounter) {
     return p;
 }
 const servers = [devServer(5191, true), devServer(5192, false)];
-const killAll = () => servers.forEach((s) => spawn("taskkill", ["/pid", String(s.pid), "/T", "/F"], { stdio: "ignore" }));
+const killAll = () => servers.forEach((s) => spawnSync("taskkill", ["/pid", String(s.pid), "/T", "/F"], { stdio: "ignore" })); // synchronous: a detached kill is lost when the script exits
 async function waitFor(url) {
     for (let i = 0; i < 60; i++) {
         try { if ((await fetch(url)).ok) return; } catch { /* not up yet */ }
@@ -111,7 +111,7 @@ try {
     check(await until(() => rows().length === 1, 10000), "a visit is counted (one row within 10 s)");
     const first = rows()[0];
     check(first && /^[a-z0-9-]{8,40}$/.test(first.id) && first.v === version && first.mode === "tab",
-        `its id, version (${version}) and mode (browser tab) are right`);
+        `its id, version (${version}) and mode (browser tab) are right ${JSON.stringify(first)}`);
     check(JSON.stringify(first).indexOf("mscz") < 0 && Object.keys(first).join() === "sid,id,started,last,secs,play,v,mode,own",
         "the row holds only the listed fields (no score names, no IP)");
 
@@ -279,6 +279,10 @@ try {
     // the key is kept on this device: next time it loads by itself; Forget removes it
     for (let i = 0; i < 7; i++) await page.click("#version");
     check(await until(async () => (await page.$$(".ou-stat")).length > 0, 5000), "the saved key is used next time (no typing)");
+    // an update is a reload of the new build: the install id and the owner mark must survive it, so this device stays registered
+    const mineId = first.id;
+    check(await until(() => { const r = rows().filter((x) => x.id === mineId); return r.length > 0 && r.at(-1).own === 1 && r.at(-1).started > Date.now() - 60000; }, 10000)
+        && (await page.evaluate(() => !!localStorage.getItem("pocketscore.owner"))), "after reloads the same install id is used and its new visit is marked as the owner's again (an update keeps the device registered)");
     await page.click(".ou-forget");
     check(await page.evaluate(() => localStorage.getItem("pocketscore.owner")) === null && !(await page.$eval(".ou-keyrow", (e) => e.hidden)),
         "Forget key removes it and asks again");
@@ -297,6 +301,7 @@ try {
     await ctxA.close();
 
     // ---- a copy with no counter
+
     const plain = await browser.newPage();
     await plain.goto("http://127.0.0.1:5192/");
     await plain.waitForSelector("#version");
